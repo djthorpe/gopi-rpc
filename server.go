@@ -72,6 +72,8 @@ func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
 		// Receive errors and print them out
 		go this.recv_errors()
 
+		// TODO: Add in invalidation after TTL has been reached
+
 		// Success
 		return this, nil
 	}
