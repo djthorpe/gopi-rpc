@@ -1,24 +1,26 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"time"
+
+	// Frameworks
+	"github.com/djthorpe/gopi"
+
+	// Modules
+	_ "github.com/djthorpe/gopi/sys/logger"
 )
 
-func Main() int {
-	if listener, err := NewListener(nil); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return -1
+func Main(app *gopi.AppInstance, done chan<- struct{}) error {
+	if listener, err := gopi.Open(Listener{}, app.Logger); err != nil {
+		return err
 	} else {
-		fmt.Println("START")
-		time.Sleep(100 * time.Second)
-		fmt.Println("END")
-		listener.Close()
-		return 0
+		app.Logger.Info("Waiting for CTRL+C")
+		app.WaitForSignal()
+		return listener.Close()
 	}
 }
 
 func main() {
-	os.Exit(Main())
+	config := gopi.NewAppConfig()
+	os.Exit(gopi.CommandLineTool(config, Main))
 }
