@@ -20,8 +20,8 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	rpc "github.com/djthorpe/gopi/sys/rpc"
-	evt "github.com/djthorpe/gopi/util/event"
+	rpc "github.com/djthorpe/gopi-rpc/sys"
+	event "github.com/djthorpe/gopi/util/event"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -40,13 +40,13 @@ type clientpool struct {
 	skipverify bool
 	ssl        bool
 	timeout    time.Duration
-	pubsub     *evt.PubSub
 	discovery  gopi.RPCServiceDiscovery
 	services   map[string]*servicetuple
 	clients    map[string]gopi.RPCNewClientFunc
 	records    map[string]*gopi.RPCServiceRecord
 	done       chan struct{}
-	lock       sync.Mutex
+	sync.Mutex
+	event.Publisher
 }
 
 type servicetuple struct {
@@ -88,7 +88,6 @@ func (config ClientPool) Open(log gopi.Logger) (gopi.Driver, error) {
 	this.skipverify = config.SkipVerify
 	this.ssl = config.SSL
 	this.timeout = config.Timeout
-	this.pubsub = evt.NewPubSub(0)
 	this.clients = make(map[string]gopi.RPCNewClientFunc)
 	this.discovery = config.Discovery
 	this.records = make(map[string]*gopi.RPCServiceRecord)
@@ -126,8 +125,7 @@ func (this *clientpool) Close() error {
 	}
 
 	// Release resources
-	this.pubsub.Close()
-	this.pubsub = nil
+	this.Publisher.Close()
 	this.clients = nil
 	this.discovery = nil
 	this.done = nil
@@ -163,7 +161,7 @@ func (this *clientpool) Connect(service *gopi.RPCServiceRecord, flags gopi.RPCFl
 		}
 
 		// Emit a connected event
-		this.emit(rpc.NewEvent(clientconn, gopi.RPC_EVENT_CLIENT_CONNECTED, service))
+		this.Emit(rpc.NewEvent(clientconn, gopi.RPC_EVENT_CLIENT_CONNECTED, service))
 
 		// Return success
 		return clientconn, nil
@@ -174,7 +172,7 @@ func (this *clientpool) Disconnect(conn gopi.RPCClientConn) error {
 	this.log.Debug2("<grpc.clientpool>Disconnect{ conn=%v }", conn)
 
 	// Emit a disconnect event - event happens just before disconnect occurs
-	this.emit(rpc.NewEvent(conn, gopi.RPC_EVENT_CLIENT_DISCONNECTED, nil))
+	this.Emit(rpc.NewEvent(conn, gopi.RPC_EVENT_CLIENT_DISCONNECTED, nil))
 
 	return conn.(*clientconn).Disconnect()
 }
@@ -205,22 +203,6 @@ func (this *clientpool) NewClient(service string, conn gopi.RPCClientConn) gopi.
 	} else {
 		return callback(conn)
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// PUBSUB
-
-func (this *clientpool) Subscribe() <-chan gopi.Event {
-	return this.pubsub.Subscribe()
-}
-
-func (this *clientpool) Unsubscribe(c <-chan gopi.Event) {
-	this.pubsub.Unsubscribe(c)
-}
-
-func (this *clientpool) emit(evt gopi.Event) {
-	// Emit happens in goroutine
-	go this.pubsub.Emit(evt)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -403,7 +385,7 @@ func (this *clientpool) mdnsHandleEvent(evt gopi.RPCEvent) {
 		return
 	} else if sr, exists := this.records[hash]; exists == false {
 		this.records[hash] = new_sr
-		this.emit(rpc.NewEvent(this, evt.Type(), new_sr))
+		this.Emit(rpc.NewEvent(this, evt.Type(), new_sr))
 	} else if mdnsRecordEquals(sr, new_sr) {
 		// Do nothing
 	} else {
@@ -416,7 +398,7 @@ func (this *clientpool) mdnsHandleEvent(evt gopi.RPCEvent) {
 		sr.Text = new_sr.Text
 		sr.TTL = new_sr.TTL
 		sr.Type = new_sr.Type
-		this.emit(rpc.NewEvent(this, evt.Type(), sr))
+		this.Emit(rpc.NewEvent(this, evt.Type(), sr))
 
 		// If TTL is zero then we delete the record
 		if sr.TTL == 0 {
@@ -459,8 +441,8 @@ func mdnsRecordEquals(a, b *gopi.RPCServiceRecord) bool {
 
 func (this *clientpool) mdnsRediscovery() {
 	// Critical section
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	this.Lock()
+	defer this.Unlock()
 
 	for service, tuple := range this.services {
 		if tuple.cancelfunc == nil {
@@ -482,8 +464,8 @@ func (this *clientpool) mdnsDoCancel(service string) {
 
 func (this *clientpool) mdnsSetCancel(service string, cancel context.CancelFunc) *servicetuple {
 	// Critical section
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	this.Lock()
+	defer this.Unlock()
 
 	// Make a servicetuple if it doesn't exist yet
 	if _, exists := this.services[service]; exists == false {

@@ -18,8 +18,8 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	rpc "github.com/djthorpe/gopi/sys/rpc"
-	evt "github.com/djthorpe/gopi/util/event"
+	rpc "github.com/djthorpe/gopi-rpc/sys"
+	event "github.com/djthorpe/gopi/util/event"
 	grpc "google.golang.org/grpc"
 	credentials "google.golang.org/grpc/credentials"
 	reflection "google.golang.org/grpc/reflection"
@@ -38,7 +38,7 @@ type server struct {
 	port   uint
 	server *grpc.Server
 	addr   net.Addr
-	pubsub *evt.PubSub
+	event.Publisher
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,9 +64,6 @@ func (config Server) Open(log gopi.Logger) (gopi.Driver, error) {
 
 	this.addr = nil
 
-	// Fan out events to subscribers
-	this.pubsub = evt.NewPubSub(0)
-
 	// Register reflection service on gRPC server.
 	reflection.Register(this.server)
 
@@ -84,9 +81,10 @@ func (this *server) Close() error {
 		this.log.Warn("grpc.Server: %v", err)
 	}
 
+	// Close publisher
+	this.Publisher.Close()
+
 	// Release resources
-	this.pubsub.Close()
-	this.pubsub = nil
 	this.addr = nil
 	this.server = nil
 
@@ -108,10 +106,10 @@ func (this *server) Start() error {
 	} else {
 		// Start server
 		this.addr = lis.Addr()
-		this.emit(rpc.NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED, nil))
+		this.Emit(rpc.NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED, nil))
 		this.log.Debug("<grpc.Server>{ addr=%v }", this.addr)
 		err := this.server.Serve(lis) // blocking call
-		this.emit(rpc.NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED, nil))
+		this.Emit(rpc.NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED, nil))
 		this.addr = nil
 		return err
 	}
@@ -145,24 +143,6 @@ func (this *server) Addr() net.Addr {
 // Return the gRPC server object
 func (this *server) GRPCServer() *grpc.Server {
 	return this.server
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// EVENTS
-
-// Subscribe to events from the server
-func (this *server) Subscribe() <-chan gopi.Event {
-	return this.pubsub.Subscribe()
-}
-
-// Unsubscribe from events from the server
-func (this *server) Unsubscribe(c <-chan gopi.Event) {
-	this.pubsub.Unsubscribe(c)
-}
-
-// emit broadcasts events onto listening channels
-func (this *server) emit(evt gopi.RPCEvent) {
-	this.pubsub.Emit(evt)
 }
 
 ///////////////////////////////////////////////////////////////////////////////

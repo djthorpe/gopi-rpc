@@ -19,7 +19,7 @@ import (
 func init() {
 	// Register service/helloworld:grpc
 	gopi.RegisterModule(gopi.Module{
-		Name:     "rpc/service/helloworld:grpc",
+		Name:     "rpc/service/helloworld",
 		Type:     gopi.MODULE_TYPE_SERVICE,
 		Requires: []string{"rpc/server"},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
@@ -30,15 +30,14 @@ func init() {
 	})
 
 	gopi.RegisterModule(gopi.Module{
-		Name:     "rpc/client/helloworld:grpc",
+		Name:     "rpc/client/helloworld",
 		Type:     gopi.MODULE_TYPE_CLIENT,
 		Requires: []string{"rpc/clientpool"},
 		Run: func(app *gopi.AppInstance, _ gopi.Driver) error {
-			clientpool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
-			if clientpool == nil {
+			if clientpool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool); clientpool == nil {
 				return gopi.ErrAppError
 			} else {
-				clientpool.RegisterClient("mutablelogic.Helloworld", NewGreeterClient)
+				clientpool.RegisterClient("gopi.Helloworld", NewGreeterClient)
 				return nil
 			}
 		},
