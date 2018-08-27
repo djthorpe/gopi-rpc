@@ -211,6 +211,20 @@ func (this *clientpool) NewClient(service string, conn gopi.RPCClientConn) gopi.
 func (this *clientpool) Lookup(ctx context.Context, name, addr string, max int) ([]*gopi.RPCServiceRecord, error) {
 	this.log.Debug2("<grpc.clientpool>Lookup{ name='%v' addr='%v' max='%v' }", name, addr, max)
 
+	// If there is no discovery subsystem
+	if this.discovery == nil {
+		host, port := lookupMatchSplitAddr(addr)
+		if host == "" || port == 0 {
+			return nil, gopi.ErrBadParameter
+		}
+		record := &gopi.RPCServiceRecord{
+			Name: name,
+			Port: port,
+			Host: host,
+		}
+		return []*gopi.RPCServiceRecord{record}, nil
+	}
+
 	// Make a buffered channel of all service records and put them in
 	records := make(chan *gopi.RPCServiceRecord, len(this.records)+2)
 	matched := make([]*gopi.RPCServiceRecord, 0, max)
