@@ -16,7 +16,7 @@ package protobuf
 	This folder contains all the protocol buffer definitions including
 	the RPC Service definitions. You generate golang code by running:
 
-	go generate -x github.com/djthorpe/gopi/protobuf
+	go generate -x github.com/djthorpe/gopi-rpc/rpc/protobuf
 
 	where you have installed the protoc compiler and the GRPC plugin for
 	golang. In order to do that on a Mac:

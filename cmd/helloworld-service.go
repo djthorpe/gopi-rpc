@@ -16,22 +16,18 @@ import (
 	gopi "github.com/djthorpe/gopi"
 
 	// Modules
-	_ "github.com/djthorpe/gopi/sys/hw/darwin"
-	_ "github.com/djthorpe/gopi/sys/hw/linux"
+	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi/sys/logger"
-	_ "github.com/djthorpe/gopi/sys/rpc/grpc"
-	_ "github.com/djthorpe/gopi/sys/rpc/mdns"
 
 	// RPC Services
-	_ "github.com/djthorpe/gopi/rpc/grpc/helloworld"
-	_ "github.com/djthorpe/gopi/rpc/grpc/metrics"
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/helloworld"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/service/helloworld:grpc", "rpc/service/metrics:grpc")
+	config := gopi.NewAppConfig("rpc/service/helloworld")
 
 	// Set the RPCServiceRecord for server discovery
 	config.Service = "helloworld"

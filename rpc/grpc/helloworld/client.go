@@ -14,10 +14,10 @@ import (
 
 	// Framework
 	gopi "github.com/djthorpe/gopi"
-	grpc "github.com/djthorpe/gopi/sys/rpc/grpc"
+	grpc "github.com/djthorpe/gopi-rpc/sys/grpc"
 
 	// Protocol buffers
-	pb "github.com/djthorpe/gopi/rpc/protobuf/helloworld"
+	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/helloworld"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
