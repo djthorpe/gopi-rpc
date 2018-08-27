@@ -52,6 +52,13 @@ func IsErrCanceled(err error) bool {
 	return grpc.Code(err) == codes.Canceled
 }
 
+func IsErrUnavailable(err error) bool {
+	if err == nil {
+		return false
+	}
+	return grpc.Code(err) == codes.Unavailable
+}
+
 func IsErrDeadlineExceeded(err error) bool {
 	if err == nil {
 		return false
