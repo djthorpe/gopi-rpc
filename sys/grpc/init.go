@@ -56,16 +56,19 @@ func init() {
 			skipverify, _ := app.AppFlags.GetBool("rpc.skipverify")
 			timeout, _ := app.AppFlags.GetDuration("rpc.timeout")
 			service, _ := app.AppFlags.GetString("rpc.service")
-			if service == "" {
-				service = app.Service()
-			}
-			return gopi.Open(ClientPool{
-				Discovery:  app.ModuleInstance("mdns").(gopi.RPCServiceDiscovery),
+			config := ClientPool{
 				SkipVerify: skipverify,
 				SSL:        (insecure == false),
 				Timeout:    timeout,
 				Service:    service,
-			}, app.Logger)
+			}
+			if discovery, ok := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery); ok {
+				config.Discovery = discovery
+			}
+			if service == "" {
+				config.Service = app.Service()
+			}
+			return gopi.Open(config, app.Logger)
 		},
 	})
 }
