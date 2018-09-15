@@ -18,6 +18,7 @@ import (
 
 	// Frameworks
 	"github.com/djthorpe/gopi"
+	"github.com/djthorpe/gopi/util/event"
 	"github.com/miekg/dns"
 )
 
@@ -33,9 +34,12 @@ type listener struct {
 	log      gopi.Logger
 	ipv4     *net.UDPConn
 	ipv6     *net.UDPConn
-	entries  map[string]*gopi.RPCServiceRecord
+	entries  map[string]*ServiceRecord
 	shutdown bool
 	ended    sync.WaitGroup
+
+	// Background tasks to expire TTL
+	event.Tasks
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +66,7 @@ func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
 		this := new(listener)
 		this.log = logger
 		this.shutdown = false
-		this.entries = make(map[string]*gopi.RPCServiceRecord)
+		this.entries = make(map[string]*ServiceRecord)
 
 		// Start listening to connections
 		if ipv4 != nil {
@@ -74,7 +78,17 @@ func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
 			go this.recv_loop(this.ipv6)
 		}
 
-		// TODO: Add in invalidation after TTL has been reached
+		// Add in invalidation after TTL has been reached
+		this.Tasks.Start(this.ttl_expire)
+
+		// Ask for services
+		go func() {
+			time.Sleep(time.Second)
+			this.log.Debug("Sending domains recommended query")
+			if err := this.SendQuery("_services._dns-sd._udp.local."); err != nil {
+				fmt.Println(err)
+			}
+		}()
 
 		// Success
 		return this, nil
@@ -83,6 +97,9 @@ func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
 
 func (this *listener) Close() error {
 	this.log.Debug("<rpc.mdns.Close>{ }")
+
+	// Stop tasks
+	this.Tasks.Close()
 
 	// Indicate shutdown
 	this.shutdown = true
@@ -105,8 +122,38 @@ func (this *listener) Close() error {
 	return nil
 }
 
+func (this *listener) SendQuery(z string) error {
+	m := new(dns.Msg)
+	m.SetQuestion(z, dns.TypePTR)
+	m.RecursionDesired = false
+	if err := this.send(m); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
+
+// send is used to multicast a query out
+func (this *listener) send(q *dns.Msg) error {
+	if buf, err := q.Pack(); err != nil {
+		return err
+	} else {
+		if this.ipv4 != nil {
+			if _, err := this.ipv4.WriteToUDP(buf, MDNS_ADDR_IPV4); err != nil {
+				return err
+			}
+		}
+		if this.ipv6 != nil {
+			if _, err := this.ipv6.WriteToUDP(buf, MDNS_ADDR_IPV6); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 // recv_loop is a long running routine to receive packets from an interface
 func (this *listener) recv_loop(conn *net.UDPConn) {
@@ -128,11 +175,11 @@ func (this *listener) recv_loop(conn *net.UDPConn) {
 			this.log.Warn("rpc.mdns.recv_loop: %v", err)
 		} else if service_record != nil {
 			if service_record.TTL > 0 {
-				if err := this.insert(service_record.Id, service_record); err != nil {
+				if err := this.insert(service_record.Key, service_record); err != nil {
 					this.log.Warn("rpc.mdns.recv_loop: %v", err)
 				}
 			} else {
-				if err := this.remove(service_record.Id, service_record); err != nil {
+				if err := this.remove(service_record.Key, service_record); err != nil {
 					this.log.Warn("rpc.mdns.recv_loop: %v", err)
 				}
 			}
@@ -141,7 +188,7 @@ func (this *listener) recv_loop(conn *net.UDPConn) {
 }
 
 // parse packets into service records
-func (this *listener) parse(packet []byte, from net.Addr) (*gopi.RPCServiceRecord, error) {
+func (this *listener) parse(packet []byte, from net.Addr) (*ServiceRecord, error) {
 	var msg dns.Msg
 	if err := msg.Unpack(packet); err != nil {
 		return nil, err
@@ -157,7 +204,7 @@ func (this *listener) parse(packet []byte, from net.Addr) (*gopi.RPCServiceRecor
 	}
 
 	// Make the entry
-	entry := &gopi.RPCServiceRecord{
+	entry := &ServiceRecord{
 		Timestamp: time.Now(),
 	}
 
@@ -168,12 +215,12 @@ func (this *listener) parse(packet []byte, from net.Addr) (*gopi.RPCServiceRecor
 		switch rr := answer.(type) {
 		case *dns.PTR:
 			// Obtain the name and service
-			entry.Id = rr.Ptr
+			entry.Key = rr.Ptr
 			entry.Name = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
-			entry.Service = rr.Hdr.Name
+			entry.ServiceDomain = rr.Hdr.Name
 			entry.TTL = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
 		case *dns.SRV:
-			entry.Hostname = rr.Target
+			entry.Host = rr.Target
 			entry.Port = rr.Port
 		case *dns.TXT:
 			entry.TXT = rr.Txt
@@ -198,7 +245,7 @@ func (this *listener) parse(packet []byte, from net.Addr) (*gopi.RPCServiceRecor
 	}
 }
 
-func (this *listener) insert(key string, record *gopi.RPCServiceRecord) error {
+func (this *listener) insert(key string, record *ServiceRecord) error {
 	this.Lock()
 	defer this.Unlock()
 
@@ -216,7 +263,7 @@ func (this *listener) insert(key string, record *gopi.RPCServiceRecord) error {
 	return nil
 }
 
-func (this *listener) remove(key string, record *gopi.RPCServiceRecord) error {
+func (this *listener) remove(key string, record *ServiceRecord) error {
 	this.Lock()
 	defer this.Unlock()
 
@@ -227,5 +274,35 @@ func (this *listener) remove(key string, record *gopi.RPCServiceRecord) error {
 	}
 
 	// Success
+	return nil
+}
+
+func (this *listener) ttl_expire(start chan<- event.Signal, stop <-chan event.Signal) error {
+	this.log.Debug("START ttl_expire")
+	start <- gopi.DONE
+
+	timer := time.NewTicker(500 * time.Millisecond)
+
+FOR_LOOP:
+	for {
+		select {
+		case <-timer.C:
+			// look for expiring TTL records
+			expired_keys := make([]string, 0, 1)
+			for _, entry := range this.entries {
+				if time.Now().After(entry.Timestamp.Add(entry.TTL)) {
+					expired_keys = append(expired_keys, entry.Key)
+				}
+			}
+			for _, key := range expired_keys {
+				fmt.Printf("EXP: %v\n", this.entries[key])
+				delete(this.entries, key)
+			}
+		case <-stop:
+			break FOR_LOOP
+		}
+	}
+
+	this.log.Debug("STOP ttl_expire")
 	return nil
 }

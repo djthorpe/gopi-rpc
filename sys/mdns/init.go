@@ -10,7 +10,12 @@
 package mdns
 
 import (
+
 	// Frameworks
+	"fmt"
+	"net"
+	"strings"
+
 	"github.com/djthorpe/gopi"
 )
 
@@ -20,10 +25,30 @@ import (
 func init() {
 	// Register InputManager
 	gopi.RegisterModule(gopi.Module{
-		Name: "rpc/discovery",
-		Type: gopi.MODULE_TYPE_MDNS,
+		Name: "rpc/mdns",
+		Type: gopi.MODULE_TYPE_DISCOVERY,
+		Config: func(config *gopi.AppConfig) {
+			config.AppFlags.FlagString("dns-sd.iface", "", "DNS Service Discovery Interface")
+		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
-			return gopi.Open(Listener{}, app.Logger)
+			config := Listener{}
+			if name, exists := app.AppFlags.GetString("dns-sd.iface"); exists {
+				if ifaces, err := net.Interfaces(); err != nil {
+					return nil, err
+				} else {
+					iface_names := ""
+					for _, iface := range ifaces {
+						if iface.Name == name {
+							config.Interface = &iface
+						}
+						iface_names += "'" + iface.Name + "',"
+					}
+					if config.Interface == nil {
+						return nil, fmt.Errorf("Invalid -dns-sd.iface flag (values: %v)", strings.Trim(iface_names, ","))
+					}
+				}
+			}
+			return gopi.Open(config, app.Logger)
 		},
 	})
 }

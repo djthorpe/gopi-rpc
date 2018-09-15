@@ -9,7 +9,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	// Frameworks
@@ -24,8 +23,11 @@ import (
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
-	discovery := app.ModuleInstance("rpc/discovery")
-	fmt.Println(discovery)
+	//discovery := app.ModuleInstance("discovery")
+	//fmt.Println(discovery)
+
+	app.Logger.Info("Waiting for CTRL+C")
+	app.WaitForSignal()
 
 	done <- gopi.DONE
 
@@ -37,7 +39,7 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/discovery")
+	config := gopi.NewAppConfig("discovery")
 
 	// Run the command line tool
 	os.Exit(gopi.CommandLineTool(config, Main))
