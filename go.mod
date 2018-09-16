@@ -4,7 +4,7 @@ require (
 	cloud.google.com/go v0.27.0 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
 	github.com/djthorpe/gopi v1.0.20
-	github.com/djthorpe/zeroconf v0.0.0-20171029195637-8219919fca89 // indirect
+	github.com/djthorpe/zeroconf v0.0.0-20171029195637-8219919fca89
 	github.com/golang/protobuf v1.2.0
 	github.com/mattn/go-runewidth v0.0.3 // indirect
 	github.com/miekg/dns v1.0.8

@@ -20,16 +20,16 @@ import (
 // TYPES
 
 type ServiceRecord struct {
-	Timestamp     time.Time
-	Key           string
-	Name          string
-	Host          string
-	ServiceDomain string
-	Port          uint16
-	TTL           time.Duration
-	TXT           []string
-	IPv4          []net.IP
-	IPv6          []net.IP
+	Key       string
+	Name      string
+	Host      string
+	Service   string
+	Port      uint16
+	TXT       []string
+	IPv4      []net.IP
+	IPv6      []net.IP
+	Timestamp time.Time
+	TTL       time.Duration
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -42,6 +42,26 @@ func (this *ServiceRecord) complete() bool {
 	return true
 }
 
+func (this *ServiceRecord) equals(that *ServiceRecord) bool {
+	if this.Key != that.Key {
+		return false
+	}
+	if this.Name != that.Name {
+		return false
+	}
+	if this.Host != that.Host {
+		return false
+	}
+	if this.Service != that.Service {
+		return false
+	}
+	if this.Port != that.Port {
+		return false
+	}
+	// TODO: Check TXT, IP4 and TP6
+	return true
+}
+
 func (this *ServiceRecord) String() string {
 	parts := make([]string, 0)
 	if this.Key != "" {
@@ -50,8 +70,8 @@ func (this *ServiceRecord) String() string {
 	if this.Name != "" {
 		parts = append(parts, fmt.Sprintf("Name='%v'", this.Name))
 	}
-	if this.ServiceDomain != "" {
-		parts = append(parts, fmt.Sprintf("ServiceDomain='%v'", this.ServiceDomain))
+	if this.Service != "" {
+		parts = append(parts, fmt.Sprintf("Service='%v'", this.Service))
 	}
 	if this.Host != "" {
 		parts = append(parts, fmt.Sprintf("Host='%v'", this.Host))

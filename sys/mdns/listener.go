@@ -10,6 +10,7 @@
 package mdns
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -27,11 +28,13 @@ import (
 
 type Listener struct {
 	Interface *net.Interface
+	Domain    string
 }
 
 type listener struct {
 	sync.Mutex
 	log      gopi.Logger
+	domain   string
 	ipv4     *net.UDPConn
 	ipv6     *net.UDPConn
 	entries  map[string]*ServiceRecord
@@ -45,6 +48,11 @@ type listener struct {
 ////////////////////////////////////////////////////////////////////////////////
 // GLOBAL VERIABLES
 
+const (
+	MDNS_DEFAULT_DOMAIN = "local."
+	MDNS_SERVICE_QUERY  = "_services._dns-sd._udp"
+)
+
 var (
 	MDNS_ADDR_IPV4 = &net.UDPAddr{IP: net.ParseIP("224.0.0.251"), Port: 5353}
 	MDNS_ADDR_IPV6 = &net.UDPAddr{IP: net.ParseIP("ff02::fb"), Port: 5353}
@@ -54,8 +62,14 @@ var (
 // OPEN AND CLOSE
 
 func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
-	logger.Debug("<rpc.mdns.Open>{ interface=%v }", config.Interface)
+	logger.Debug("<rpc.mdns.Open>{ interface=%v domain='%v' }", config.Interface, config.Domain)
 
+	if config.Domain == "" {
+		config.Domain = MDNS_DEFAULT_DOMAIN
+	}
+	if strings.HasSuffix(config.Domain, ".") == false {
+		return nil, gopi.ErrBadParameter
+	}
 	ipv4, _ := net.ListenMulticastUDP("udp4", config.Interface, MDNS_ADDR_IPV4)
 	ipv6, _ := net.ListenMulticastUDP("udp6", config.Interface, MDNS_ADDR_IPV6)
 	if ipv4 == nil && ipv6 == nil {
@@ -66,6 +80,7 @@ func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
 		this := new(listener)
 		this.log = logger
 		this.shutdown = false
+		this.domain = config.Domain
 		this.entries = make(map[string]*ServiceRecord)
 
 		// Start listening to connections
@@ -81,22 +96,13 @@ func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
 		// Add in invalidation after TTL has been reached
 		this.Tasks.Start(this.ttl_expire)
 
-		// Ask for services
-		go func() {
-			time.Sleep(time.Second)
-			this.log.Debug("Sending domains recommended query")
-			if err := this.SendQuery("_services._dns-sd._udp.local."); err != nil {
-				fmt.Println(err)
-			}
-		}()
-
 		// Success
 		return this, nil
 	}
 }
 
 func (this *listener) Close() error {
-	this.log.Debug("<rpc.mdns.Close>{ }")
+	this.log.Debug("<rpc.mdns.Close>{ domain='%v' }", this.domain)
 
 	// Stop tasks
 	this.Tasks.Close()
@@ -122,15 +128,30 @@ func (this *listener) Close() error {
 	return nil
 }
 
-func (this *listener) SendQuery(z string) error {
-	m := new(dns.Msg)
-	m.SetQuestion(z, dns.TypePTR)
-	m.RecursionDesired = false
-	if err := this.send(m); err != nil {
-		return err
-	} else {
-		return nil
+// EnumerateServiceNames browses for services available on the domain
+// and publishes the service names as events
+func (this *listener) EnumerateServiceNames(ctx context.Context) error {
+	msg := new(dns.Msg)
+	msg.SetQuestion(MDNS_SERVICE_QUERY+"."+this.domain, dns.TypePTR)
+	msg.RecursionDesired = false
+
+	// Send out service message
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			if err := this.send(msg); err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			ticker.Stop()
+			return ctx.Err()
+		}
 	}
+}
+
+func (this *listener) String() string {
+	return fmt.Sprintf("<rpc.mdns.Server>{ domain='%v' }", this.domain)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -217,7 +238,7 @@ func (this *listener) parse(packet []byte, from net.Addr) (*ServiceRecord, error
 			// Obtain the name and service
 			entry.Key = rr.Ptr
 			entry.Name = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
-			entry.ServiceDomain = rr.Hdr.Name
+			entry.Service = rr.Hdr.Name
 			entry.TTL = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
 		case *dns.SRV:
 			entry.Host = rr.Target
@@ -226,6 +247,14 @@ func (this *listener) parse(packet []byte, from net.Addr) (*ServiceRecord, error
 			entry.TXT = rr.Txt
 		}
 	}
+
+	// Check the entry ServiceDomain matches this domain
+	if strings.HasSuffix(entry.Service, "."+this.domain) {
+		entry.Service = strings.TrimSuffix(entry.Service, "."+this.domain)
+	} else {
+		return nil, nil
+	}
+
 	// Associate IPs in a second round
 	entry.IPv4 = make([]net.IP, 0)
 	entry.IPv6 = make([]net.IP, 0)
@@ -255,7 +284,9 @@ func (this *listener) insert(key string, record *ServiceRecord) error {
 		this.entries[key] = record
 	} else {
 		// Update existing entry
-		fmt.Printf("UPD: %v\n", record)
+		if record.equals(this.entries[key]) == false {
+			fmt.Printf("UPD: %v\n", record)
+		}
 		this.entries[key] = record
 	}
 
@@ -287,7 +318,7 @@ FOR_LOOP:
 	for {
 		select {
 		case <-timer.C:
-			// look for expiring TTL records
+			// look for expiring TTL records in a very non-optimal way
 			expired_keys := make([]string, 0, 1)
 			for _, entry := range this.entries {
 				if time.Now().After(entry.Timestamp.Add(entry.TTL)) {

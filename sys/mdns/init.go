@@ -28,10 +28,14 @@ func init() {
 		Name: "rpc/mdns",
 		Type: gopi.MODULE_TYPE_DISCOVERY,
 		Config: func(config *gopi.AppConfig) {
-			config.AppFlags.FlagString("dns-sd.iface", "", "DNS Service Discovery Interface")
+			config.AppFlags.FlagString("dns-sd.iface", "", "Service Discovery Interface")
+			config.AppFlags.FlagString("dns-sd.domain", "local.", "Service Discovery Domain")
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
-			config := Listener{}
+			domain, _ := app.AppFlags.GetString("dns-sd.domain")
+			config := Listener{
+				Domain: domain,
+			}
 			if name, exists := app.AppFlags.GetString("dns-sd.iface"); exists {
 				if ifaces, err := net.Interfaces(); err != nil {
 					return nil, err
