@@ -9,8 +9,9 @@ import (
 
 type Discovery interface {
 	gopi.Driver
+	gopi.Publisher
 
-	// Enumerage service names
+	// Enumerate service names and generate
 	EnumerateServiceNames(ctx context.Context) error
 
 	// Enumerate service instances

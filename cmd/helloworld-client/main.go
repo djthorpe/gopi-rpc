@@ -87,9 +87,6 @@ func main() {
 	}
 	config.AppFlags.FlagString("addr", "", "Gateway address")
 
-	// Set the RPCServiceRecord for server discovery
-	config.Service = "helloworld"
-
 	// Run the command line tool
 	os.Exit(gopi.CommandLineTool(config, Main))
 }

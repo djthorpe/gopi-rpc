@@ -18,9 +18,10 @@ import (
 	"time"
 
 	// Frameworks
-	"github.com/djthorpe/gopi"
-	"github.com/djthorpe/gopi/util/event"
-	"github.com/miekg/dns"
+	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
+	event "github.com/djthorpe/gopi/util/event"
+	dns "github.com/miekg/dns"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -41,8 +42,9 @@ type listener struct {
 	shutdown bool
 	ended    sync.WaitGroup
 
-	// Background tasks to expire TTL
+	// Background tasks and publisher
 	event.Tasks
+	event.Publisher
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -104,8 +106,9 @@ func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
 func (this *listener) Close() error {
 	this.log.Debug("<rpc.mdns.Close>{ domain='%v' }", this.domain)
 
-	// Stop tasks
+	// Stop tasks & publisher
 	this.Tasks.Close()
+	this.Publisher.Close()
 
 	// Indicate shutdown
 	this.shutdown = true
@@ -136,13 +139,15 @@ func (this *listener) EnumerateServiceNames(ctx context.Context) error {
 	msg.RecursionDesired = false
 
 	// Send out service message
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTimer(1 * time.Millisecond)
 	for {
 		select {
 		case <-ticker.C:
 			if err := this.send(msg); err != nil {
 				return err
 			}
+			// Restart timer after 5 seconds
+			ticker.Reset(5 * time.Second)
 		case <-ctx.Done():
 			ticker.Stop()
 			return ctx.Err()
@@ -196,10 +201,12 @@ func (this *listener) recv_loop(conn *net.UDPConn) {
 			this.log.Warn("rpc.mdns.recv_loop: %v", err)
 		} else if service_record != nil {
 			if service_record.TTL > 0 {
+				this.log.Debug2("rpc.mdns.insert{ service_record=%v }", service_record)
 				if err := this.insert(service_record.Key, service_record); err != nil {
 					this.log.Warn("rpc.mdns.recv_loop: %v", err)
 				}
 			} else {
+				this.log.Debug2("rpc.mdns.remove{ service_record=%v }", service_record)
 				if err := this.remove(service_record.Key, service_record); err != nil {
 					this.log.Warn("rpc.mdns.recv_loop: %v", err)
 				}
@@ -278,7 +285,15 @@ func (this *listener) insert(key string, record *ServiceRecord) error {
 	this.Lock()
 	defer this.Unlock()
 
-	if _, exists := this.entries[key]; exists == false {
+	if record.Service == MDNS_SERVICE_QUERY {
+		if _, exists := this.entries[key]; exists == false {
+			domain := "." + this.domain
+			if strings.HasSuffix(record.Key, domain) {
+				this.emit_service_event(strings.TrimSuffix(record.Key, domain))
+			}
+			this.entries[key] = record
+		}
+	} else if _, exists := this.entries[key]; exists == false {
 		// Add new entry
 		fmt.Printf("ADD: %v\n", record)
 		this.entries[key] = record
@@ -298,7 +313,9 @@ func (this *listener) remove(key string, record *ServiceRecord) error {
 	this.Lock()
 	defer this.Unlock()
 
-	if _, exists := this.entries[key]; exists == true {
+	if record.Service == MDNS_SERVICE_QUERY {
+		delete(this.entries, key)
+	} else if _, exists := this.entries[key]; exists == true {
 		// Remove existing entry
 		fmt.Printf("DEL: %v\n", record)
 		delete(this.entries, key)
@@ -336,4 +353,8 @@ FOR_LOOP:
 
 	this.log.Debug("STOP ttl_expire")
 	return nil
+}
+
+func (this *listener) emit_service_event(service_name string) {
+	this.Emit(rpc.NewEvent(gopi.RPC_EVENT_SERVICE_NAME))
 }

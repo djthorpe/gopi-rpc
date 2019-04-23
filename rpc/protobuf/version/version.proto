@@ -1,18 +1,18 @@
 syntax = "proto3";
-package gopi;
-option go_package = "metrics";
+option go_package = "version";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 
 /////////////////////////////////////////////////////////////////////
 // SERVICES
 
-service Metrics {
+service Version {
     // Simple ping method to show server is "up"
-    rpc Ping (EmptyRequest) returns (EmptyReply);
+    rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
 
-    // Return host metrics
-    rpc HostMetrics (EmptyRequest) returns (HostMetricsReply);
+    // Return versions
+    rpc Version (google.protobuf.Empty) returns (VersionReply);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -24,9 +24,7 @@ message EmptyReply { }
 /////////////////////////////////////////////////////////////////////
 // HOST METRICS REPLY
 
-message HostMetricsReply {
-    string hostname = 1;
-    google.protobuf.Duration host_uptime = 2;
-    google.protobuf.Duration service_uptime = 3;
+message VersionReply {
+    google.protobuf.Duration service_uptime = 1;
 }
 
