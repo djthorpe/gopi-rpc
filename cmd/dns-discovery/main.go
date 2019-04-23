@@ -9,11 +9,12 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"os"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/mdns"
@@ -22,10 +23,31 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
+func EnumerateServices(app *gopi.AppInstance, done <-chan struct{}) error {
+	discovery := app.ModuleInstance("discovery").(rpc.Discovery)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		app.Logger.Info("EnumerateServices")
+		discovery.EnumerateServiceNames(ctx)
+	}()
+
+FOR_LOOP:
+	for {
+		select {
+		case <-done:
+			cancel()
+			break FOR_LOOP
+		}
+	}
+	return nil
+}
+
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
-	discovery := app.ModuleInstance("rpc/discovery")
-	fmt.Println(discovery)
+	//discovery := app.ModuleInstance("discovery").(sd.Discovery)
+
+	app.Logger.Info("Waiting for CTRL+C")
+	app.WaitForSignal()
 
 	done <- gopi.DONE
 
@@ -37,8 +59,8 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/discovery")
+	config := gopi.NewAppConfig("discovery")
 
 	// Run the command line tool
-	os.Exit(gopi.CommandLineTool(config, Main))
+	os.Exit(gopi.CommandLineTool(config, Main, EnumerateServices))
 }

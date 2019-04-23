@@ -1,9 +1,11 @@
 module github.com/djthorpe/gopi-rpc
 
+go 1.12
+
 require (
-	github.com/djthorpe/gopi v1.0.7
-	github.com/golang/protobuf v1.2.0
-	github.com/miekg/dns v1.0.8
-	golang.org/x/net v0.0.0-20180826012351-8a410e7b638d
-	google.golang.org/grpc v1.14.0
+	github.com/djthorpe/gopi v1.0.60
+	github.com/golang/protobuf v1.3.1
+	github.com/miekg/dns v1.1.8
+	golang.org/x/net v0.0.0-20190420063019-afa5a82059c6
+	google.golang.org/grpc v1.20.1
 )
