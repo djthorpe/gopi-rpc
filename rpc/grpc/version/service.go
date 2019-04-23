@@ -88,5 +88,7 @@ func (this *service) Ping(context.Context, *empty.Empty) (*empty.Empty, error) {
 func (this *service) Version(context.Context, *empty.Empty) (*pb.VersionReply, error) {
 	this.log.Debug("<grpc.service.version.Version>{ }")
 
+	// TODO
+
 	return &pb.VersionReply{}, nil
 }
