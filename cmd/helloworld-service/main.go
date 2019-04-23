@@ -19,18 +19,16 @@ import (
 	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi/sys/logger"
 
-	// RPC Services
+	// Services
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/helloworld"
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/service/helloworld")
-
-	// Set the RPCServiceRecord for server discovery
-	config.Service = "helloworld"
+	config := gopi.NewAppConfig("rpc/helloworld:service", "rpc/version:service")
 
 	// Run the server and register all the services
 	os.Exit(gopi.RPCServerTool(config))

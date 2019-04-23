@@ -11,54 +11,61 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 
 	// Modules
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/helloworld"
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
 	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi/sys/logger"
-
-	// RPC Clients
-	hw "github.com/djthorpe/gopi-rpc/rpc/grpc/helloworld"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
-
-	// Client Pool
-	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
-	addr, _ := app.AppFlags.GetString("addr")
-
-	// Lookup any service record for application
-	ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	if records, err := pool.Lookup(ctx, "", addr, 1); err != nil {
-		done <- gopi.DONE
+	if conn, err := Conn(app); err != nil {
 		return err
-	} else if len(records) == 0 {
-		done <- gopi.DONE
-		return gopi.ErrDeadlineExceeded
-	} else if conn, err := pool.Connect(records[0], 0); err != nil {
-		done <- gopi.DONE
+	} else if services, err := conn.Services(); err != nil {
 		return err
-	} else if err := RunHelloworld(app, conn); err != nil {
-		done <- gopi.DONE
-		return err
-	} else if err := pool.Disconnect(conn); err != nil {
-		done <- gopi.DONE
-		return err
+	} else {
+		app.Logger.Info("conn=%v", conn)
+		app.Logger.Info("services=%v", services)
 	}
+	/*
+		// Obtain the client
+		pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+		addr, _ := app.AppFlags.GetString("addr")
 
-	// Success
-	done <- gopi.DONE
+		// Lookup any service record for application
+		ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		if records, err := pool.Lookup(ctx, "", addr, 1); err != nil {
+			done <- gopi.DONE
+			return err
+		} else if len(records) == 0 {
+			done <- gopi.DONE
+			return gopi.ErrDeadlineExceeded
+		} else if conn, err := pool.Connect(records[0], 0); err != nil {
+			done <- gopi.DONE
+			return err
+		} else if err := RunHelloworld(app, conn); err != nil {
+			done <- gopi.DONE
+			return err
+		} else if err := pool.Disconnect(conn); err != nil {
+			done <- gopi.DONE
+			return err
+		}
+
+		// Success
+		done <- gopi.DONE
+	*/
 	return nil
 }
 
+/*
 func RunHelloworld(app *gopi.AppInstance, conn gopi.RPCClientConn) error {
 	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
 	name, _ := app.AppFlags.GetString("name")
@@ -73,19 +80,33 @@ func RunHelloworld(app *gopi.AppInstance, conn gopi.RPCClientConn) error {
 		return nil
 	}
 }
+*/
+
+func Conn(app *gopi.AppInstance) (gopi.RPCClientConn, error) {
+	// Return a single connection
+	addr, _ := app.AppFlags.GetString("addr")
+	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+	ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	if records, err := pool.Lookup(ctx, "", addr, 1); err != nil {
+		return nil, err
+	} else if len(records) == 0 {
+		return nil, gopi.ErrDeadlineExceeded
+	} else if conn, err := pool.Connect(records[0], 0); err != nil {
+		return nil, err
+	} else {
+		return conn, nil
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/client/helloworld")
+	config := gopi.NewAppConfig("rpc/helloworld:client")
 
-	if cur, err := user.Current(); err == nil {
-		config.AppFlags.FlagString("name", cur.Name, "Your name")
-	} else {
-		config.AppFlags.FlagString("name", "", "Your name")
-	}
-	config.AppFlags.FlagString("addr", "", "Gateway address")
+	// Set flags
+	config.AppFlags.FlagString("name", "", "Your name")
+	config.AppFlags.FlagString("addr", "localhost:8080", "Gateway address")
 
 	// Run the command line tool
 	os.Exit(gopi.CommandLineTool(config, Main))

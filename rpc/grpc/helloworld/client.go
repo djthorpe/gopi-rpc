@@ -12,12 +12,13 @@ import (
 	"context"
 	"fmt"
 
-	// Framework
+	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	grpc "github.com/djthorpe/gopi-rpc/sys/grpc"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/helloworld"
+	empty "github.com/golang/protobuf/ptypes/empty"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +54,18 @@ func (this *Client) Conn() gopi.RPCClientConn {
 
 ////////////////////////////////////////////////////////////////////////////////
 // CALLS
+
+func (this *Client) Ping() error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	// Perform ping
+	if _, err := this.GreeterClient.Ping(this.NewContext(), &empty.Empty{}); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
 
 func (this *Client) SayHello(name string) (string, error) {
 	this.conn.Lock()
