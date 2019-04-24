@@ -37,7 +37,7 @@ func init() {
 			if clientpool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool); clientpool == nil {
 				return gopi.ErrAppError
 			} else {
-				clientpool.RegisterClient("gopi.Helloworld", NewGreeterClient)
+				clientpool.RegisterClient("gopi.Greeter", NewGreeterClient)
 				return nil
 			}
 		},

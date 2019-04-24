@@ -17,7 +17,7 @@ import (
 // INIT
 
 func init() {
-	// Register service/helloworld:grpc
+	// Service
 	gopi.RegisterModule(gopi.Module{
 		Name:     "rpc/version:service",
 		Type:     gopi.MODULE_TYPE_SERVICE,
@@ -27,6 +27,21 @@ func init() {
 				Server: app.ModuleInstance("rpc/server").(gopi.RPCServer),
 				Flags:  app.AppFlags,
 			}, app.Logger)
+		},
+	})
+
+	// Client
+	gopi.RegisterModule(gopi.Module{
+		Name:     "rpc/version:client",
+		Type:     gopi.MODULE_TYPE_CLIENT,
+		Requires: []string{"rpc/clientpool"},
+		Run: func(app *gopi.AppInstance, _ gopi.Driver) error {
+			if clientpool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool); clientpool == nil {
+				return gopi.ErrAppError
+			} else {
+				clientpool.RegisterClient("gopi.Version", NewVersionClient)
+				return nil
+			}
 		},
 	})
 }

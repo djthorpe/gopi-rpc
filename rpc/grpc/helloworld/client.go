@@ -83,5 +83,5 @@ func (this *Client) SayHello(name string) (string, error) {
 // STRINGIFY
 
 func (this *Client) String() string {
-	return fmt.Sprintf("<helloworld.MyGreeterClient>{ conn=%v }", this.conn)
+	return fmt.Sprintf("<rpc.service.helloworld.Client>{ conn=%v }", this.conn)
 }
