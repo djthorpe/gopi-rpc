@@ -1,12 +1,15 @@
-# gopi-rpc
+<table style="border-color: white;"><tr>
+  <td width="50%">
+    <img src="https://raw.githubusercontent.com/djthorpe/gopi/master/etc/images/gopi-800x388.png" alt="GOPI" style="width:200px">
+  </td><td>
+    Go Language Application Framework
+  </td>
+</tr></table>
+
+[![CircleCI](https://circleci.com/gh/djthorpe/gopi-rpc/tree/master.svg?style=svg)](https://circleci.com/gh/djthorpe/gopi-rpc/tree/master)
 
 This respository contains remote procedure call (RPC) and service
-discovery modules for gopi. It supports gRPC and mDNS at present. The gopi
-modules provided are:
-
-| Platform | Import | Type | Name |
-| -------- | ------ | ---- | ---- |
-
+discovery modules for gopi. It supports gRPC and mDNS at present.
 
 ## The "helloworld" service
 
