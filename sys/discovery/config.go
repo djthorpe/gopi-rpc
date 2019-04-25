@@ -41,7 +41,7 @@ func (this *Config) Init() error {
 	return nil
 }
 
-func (this *Config) Deinit() error {
+func (this *Config) Destroy() error {
 	return nil
 }
 

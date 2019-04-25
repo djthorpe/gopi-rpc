@@ -16,6 +16,7 @@ import (
 
 	// Frameworks
 	"github.com/djthorpe/gopi"
+	iface "github.com/djthorpe/gopi-rpc"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -29,11 +30,15 @@ func init() {
 		Config: func(config *gopi.AppConfig) {
 			config.AppFlags.FlagString("dns-sd.iface", "", "Service Discovery Interface")
 			config.AppFlags.FlagString("dns-sd.domain", "local.", "Service Discovery Domain")
+			config.AppFlags.FlagBool("dns-sd.ip4", true, "Bind to IPv4 addresses")
+			config.AppFlags.FlagBool("dns-sd.ip6", true, "Bind to IPv6 addresses")
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
 			domain, _ := app.AppFlags.GetString("dns-sd.domain")
 			name, _ := app.AppFlags.GetString("dns-sd.iface")
-			if config, err := GetConfig(domain, name); err != nil {
+			ip4, _ := app.AppFlags.GetBool("dns-sd.ip4")
+			ip6, _ := app.AppFlags.GetBool("dns-sd.ip6")
+			if config, err := getDiscoveryConfig(domain, name, ip4, ip6); err != nil {
 				return nil, err
 			} else {
 				return gopi.Open(config, app.Logger)
@@ -42,9 +47,15 @@ func init() {
 	})
 }
 
-func GetConfig(domain, iface_name string) (Discovery, error) {
+func getDiscoveryConfig(domain, net_iface_name string, ip4, ip6 bool) (Discovery, error) {
 	config := Discovery{Domain: domain}
-	if iface_name == "" {
+	if ip4 {
+		config.Flags |= iface.RPC_FLAG_IPV4
+	}
+	if ip6 {
+		config.Flags |= iface.RPC_FLAG_IPV6
+	}
+	if net_iface_name == "" {
 		return config, nil
 	}
 	if ifaces, err := net.Interfaces(); err != nil {
@@ -52,7 +63,7 @@ func GetConfig(domain, iface_name string) (Discovery, error) {
 	} else {
 		iface_names := ""
 		for _, iface := range ifaces {
-			if iface.Name == iface_name {
+			if iface.Name == net_iface_name {
 				config.Interface = &iface
 			}
 			iface_names += "'" + iface.Name + "',"

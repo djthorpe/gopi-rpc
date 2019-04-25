@@ -13,7 +13,7 @@ func Test_Config_001(t *testing.T) {
 	if err := config.Init(); err != nil {
 		t.Error(err)
 	} else {
-		defer config.Deinit()
+		defer config.Destroy()
 		t.Log(config)
 	}
 
@@ -24,7 +24,7 @@ func Test_Config_002(t *testing.T) {
 	if err := config.Init(); err != nil {
 		t.Error(err)
 	} else {
-		defer config.Deinit()
+		defer config.Destroy()
 		var b strings.Builder
 		if err := config.Writer(&b, true); err != nil {
 			t.Fatal(err)
@@ -39,7 +39,7 @@ func Test_Config_003(t *testing.T) {
 	if err := config.Init(); err != nil {
 		t.Error(err)
 	} else {
-		defer config.Deinit()
+		defer config.Destroy()
 		b := new(strings.Builder)
 		if err := config.Writer(b, true); err != nil {
 			t.Fatal(err)

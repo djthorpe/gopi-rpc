@@ -16,6 +16,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	iface "github.com/djthorpe/gopi-rpc"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +25,7 @@ import (
 type Discovery struct {
 	Interface *net.Interface
 	Domain    string
+	Flags     iface.RPCFlags
 }
 
 type discovery struct {
@@ -56,7 +58,12 @@ func (this *discovery) Close() error {
 	this.log.Debug("<rpc.discovery.Close>{ config=%v listener=%v }", this.Config, this.Listener)
 
 	// Release resources, etc
-	this.Config.Deinit()
+	if err := this.Listener.Destroy(); err != nil {
+		return err
+	}
+	if err := this.Config.Destroy(); err != nil {
+		return err
+	}
 
 	// Return success
 	return nil
