@@ -10,6 +10,7 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -30,10 +31,12 @@ import (
 type Listener struct {
 	sync.WaitGroup
 
-	domain string
-	ipv4   *net.UDPConn
-	ipv6   *net.UDPConn
-	end    bool
+	domain   string
+	end      bool
+	ipv4     *net.UDPConn
+	ipv6     *net.UDPConn
+	errors   chan<- error
+	services chan<- *ServiceRecord
 }
 
 type ServiceRecord struct {
@@ -65,11 +68,14 @@ var (
 ////////////////////////////////////////////////////////////////////////////////
 // INIT / DEINIT
 
-func (this *Listener) Init(config Discovery) error {
+func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- *ServiceRecord) error {
 	if config.Domain == "" {
 		config.Domain = MDNS_DEFAULT_DOMAIN
 	}
 	if strings.HasSuffix(config.Domain, ".") == false {
+		return gopi.ErrBadParameter
+	}
+	if errors == nil || services == nil {
 		return gopi.ErrBadParameter
 	}
 	if config.Flags|iface.RPC_FLAG_IPV4 != 0 {
@@ -82,8 +88,10 @@ func (this *Listener) Init(config Discovery) error {
 		return fmt.Errorf("No multicast listeners could be started")
 	}
 
-	// Set domain
+	// Set up the listener
 	this.domain = config.Domain
+	this.errors = errors
+	this.services = services
 
 	// Start listening to connections
 	go this.recv_loop(this.ipv4)
@@ -117,6 +125,31 @@ func (this *Listener) Destroy() error {
 
 	// Return compound errors
 	return errs.ErrorOrSelf()
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// QUERY
+
+func (this *Listener) Query(ctx context.Context) error {
+	msg := new(dns.Msg)
+	msg.SetQuestion(MDNS_SERVICE_QUERY+"."+this.domain, dns.TypePTR)
+	msg.RecursionDesired = false
+
+	// Send out service message
+	ticker := time.NewTimer(1 * time.Millisecond)
+	for {
+		select {
+		case <-ticker.C:
+			if err := this.send(msg); err != nil {
+				return err
+			}
+			// Restart timer after 5 seconds
+			ticker.Reset(5 * time.Second)
+		case <-ctx.Done():
+			ticker.Stop()
+			return ctx.Err()
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -155,31 +188,35 @@ func (this *Listener) recv_loop(conn *net.UDPConn) {
 	for this.end == false {
 		if n, from, err := conn.ReadFrom(buf); err != nil {
 			continue
-		} else if service_record, err := this.parse_data(buf[:n], from); err != nil {
-			// TODO
-			fmt.Printf("rpc.mdns.recv_loop: %v\n", err)
-		} else if service_record != nil {
-			// TODO
-			fmt.Printf("rpc.mdns.recv_loop: %v\n", service_record)
-			/*
-				if service_record.TTL > 0 {
-					this.log.Debug2("rpc.mdns.insert{ service_record=%v }", service_record)
-					if err := this.insert(service_record.Key, service_record); err != nil {
-						this.log.Warn("rpc.mdns.recv_loop: %v", err)
-					}
-				} else {
-					this.log.Debug2("rpc.mdns.remove{ service_record=%v }", service_record)
-					if err := this.remove(service_record.Key, service_record); err != nil {
-						this.log.Warn("rpc.mdns.recv_loop: %v", err)
-					}
-				}
-			*/
+		} else if service, err := this.parse_packet(buf[:n], from); err != nil {
+			this.errors <- err
+		} else if service != nil {
+			this.services <- service
 		}
 	}
 }
 
+// send is used to multicast a query out
+func (this *Listener) send(q *dns.Msg) error {
+	if buf, err := q.Pack(); err != nil {
+		return err
+	} else {
+		if this.ipv4 != nil {
+			if _, err := this.ipv4.WriteToUDP(buf, MDNS_ADDR_IPV4); err != nil {
+				return err
+			}
+		}
+		if this.ipv6 != nil {
+			if _, err := this.ipv6.WriteToUDP(buf, MDNS_ADDR_IPV6); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // parse packets into service records
-func (this *Listener) parse_data(packet []byte, from net.Addr) (*ServiceRecord, error) {
+func (this *Listener) parse_packet(packet []byte, from net.Addr) (*ServiceRecord, error) {
 	var msg dns.Msg
 	if err := msg.Unpack(packet); err != nil {
 		return nil, err
@@ -255,77 +292,6 @@ func (this *ServiceRecord) complete() bool {
 }
 
 /*
-////////////////////////////////////////////////////////////////////////////////
-// OPEN AND CLOSE
-
-func (config Listener) Open(logger gopi.Logger) (gopi.Driver, error) {
-	logger.Debug("<rpc.mdns.Open>{ interface=%v domain='%v' }", config.Interface, config.Domain)
-
-	if config.Domain == "" {
-		config.Domain = MDNS_DEFAULT_DOMAIN
-	}
-	if strings.HasSuffix(config.Domain, ".") == false {
-		return nil, gopi.ErrBadParameter
-	}
-	ipv4, _ := net.ListenMulticastUDP("udp4", config.Interface, MDNS_ADDR_IPV4)
-	ipv6, _ := net.ListenMulticastUDP("udp6", config.Interface, MDNS_ADDR_IPV6)
-	if ipv4 == nil && ipv6 == nil {
-		return nil, fmt.Errorf("No multicast listeners could be started")
-	} else {
-
-		// Create listener
-		this := new(listener)
-		this.log = logger
-		this.shutdown = false
-		this.domain = config.Domain
-		this.entries = make(map[string]*ServiceRecord)
-
-		// Start listening to connections
-		if ipv4 != nil {
-			this.ipv4 = ipv4
-			go this.recv_loop(this.ipv4)
-		}
-		if ipv6 != nil {
-			this.ipv6 = ipv6
-			go this.recv_loop(this.ipv6)
-		}
-
-		// Add in invalidation after TTL has been reached
-		this.Tasks.Start(this.ttl_expire)
-
-		// Success
-		return this, nil
-	}
-}
-
-func (this *listener) Close() error {
-	this.log.Debug("<rpc.mdns.Close>{ domain='%v' }", this.domain)
-
-	// Stop tasks & publisher
-	this.Tasks.Close()
-	this.Publisher.Close()
-
-	// Indicate shutdown
-	this.shutdown = true
-
-	// Close connections
-	if this.ipv4 != nil {
-		this.ipv4.Close()
-	}
-	if this.ipv6 != nil {
-		this.ipv6.Close()
-	}
-
-	// Wait for go routines to end
-	this.ended.Wait()
-
-	// Empty entries
-	this.entries = nil
-
-	// Return success
-	return nil
-}
-
 // EnumerateServiceNames browses for services available on the domain
 // and publishes the service names as events
 func (this *listener) EnumerateServiceNames(ctx context.Context) error {
@@ -356,25 +322,6 @@ func (this *listener) String() string {
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
-
-// send is used to multicast a query out
-func (this *listener) send(q *dns.Msg) error {
-	if buf, err := q.Pack(); err != nil {
-		return err
-	} else {
-		if this.ipv4 != nil {
-			if _, err := this.ipv4.WriteToUDP(buf, MDNS_ADDR_IPV4); err != nil {
-				return err
-			}
-		}
-		if this.ipv6 != nil {
-			if _, err := this.ipv6.WriteToUDP(buf, MDNS_ADDR_IPV6); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
 
 // recv_loop is a long running routine to receive packets from an interface
 func (this *listener) recv_loop(conn *net.UDPConn) {

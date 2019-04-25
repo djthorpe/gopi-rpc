@@ -23,6 +23,8 @@ func Test_Discovery_001(t *testing.T) {
 
 func Test_Discovery_002(t *testing.T) {
 	config := gopi.NewAppConfig("rpc/discovery")
+	config.Debug = true
+	config.Verbose = true
 	if app, err := gopi.NewAppInstance(config); err != nil {
 		t.Error(err)
 	} else {
