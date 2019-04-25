@@ -9,7 +9,58 @@
 [![CircleCI](https://circleci.com/gh/djthorpe/gopi-rpc/tree/master.svg?style=svg)](https://circleci.com/gh/djthorpe/gopi-rpc/tree/master)
 
 This respository contains remote procedure call (RPC) and service
-discovery modules for gopi. It supports gRPC and mDNS at present.
+discovery modules for gopi. It supports gRPC and mDNS at present. This
+README guide will walk you though:
+
+  * Satisfying dependencies
+  * Building the helloworld service and client
+  * Understanding how to use an existing client in your application
+  * Generating a protocol buffer file for your service
+  * Creating a new service and client
+
+Please also see documentation for:
+
+  * [Protocol Buffers](https://developers.google.com/protocol-buffers/)
+  * [gRPC](https://grpc.io/)
+
+## Introduction
+
+A "microservice" is a server-based process which can satisfy remote procedure calls, by 
+accepting requests, processing the information within the service, and providing a 
+response. A "simple" microservice might provide a single response to a request, 
+a more complicated version will accept requests in a "stream" and may provide responses
+similarly in a "stream".
+
+Protocol Buffers are an attractive mechanism for defining a schema for this request and response,
+and can generate both the client and server code programmatically in many languages using a 
+compiler. The Google gRPC project is a useful counterpart for the compiler, providing supporting
+libraries, but there are others such as [Twerp](https://github.com/twitchtv/twirp) which can
+be used to provide a more traditional REST-based interface on compiling the protocol buffer
+code.
+
+When you have your service running on your network, how do other processes discover it? This
+is where the discovery mechanisms come into play....__TODO__
+
+## Dependencies
+
+It is assumed you're using either a MacOS or Debian Linux machine. For MacOS, you should be
+using the [Homebrew Package Manager](https://brew.sh/):
+
+```bash
+bash# brew install protobuf
+bash# go get -u github.com/golang/protobuf/protoc-gen-go
+```
+
+For Debian Linux:
+
+```bash
+bash# sudo apt install protobuf-compiler
+bash# sudo apt install libprotobuf-dev
+bash# go get -u github.com/golang/protobuf/protoc-gen-go
+```
+
+You can then use the `protoc` compiler command with the gRPC plugin to generate
+golang code for client and server.
 
 ## The "helloworld" service
 
@@ -39,5 +90,8 @@ the client and service can be generated with the `make protobuf` command:
 bash% make protobuf
 go generate -x ./rpc/...
 protoc helloworld/helloworld.proto --go_out=plugins=grpc:.
-protoc version/version.proto --go_out=plugins=grpc:.
 ```
+
+This will create the generated client and server code in the file `rpc/protobuf/helloworld.pb.go`.
+
+__TODO__
