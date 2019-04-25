@@ -26,7 +26,7 @@ type Config struct {
 	sync.Mutex
 
 	// Public members
-	Services []gopi.RPCServiceRecord `json:"services"`
+	Services []*ServiceRecord `json:"services"`
 
 	// Private members
 	modified bool
@@ -36,7 +36,7 @@ type Config struct {
 // INIT / DEINIT
 
 func (this *Config) Init() error {
-	this.Services = make([]gopi.RPCServiceRecord, 0)
+	this.Services = make([]*ServiceRecord, 0)
 	this.modified = false
 	return nil
 }
@@ -113,4 +113,49 @@ func (this *Config) Reader(fh io.Reader) error {
 
 	// Success
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// REGISTER & REMOVE SERVICES
+
+func (this *Config) Register(service *ServiceRecord) error {
+	if service == nil || service.ttl == 0 || service.key == "" {
+		return gopi.ErrBadParameter
+	}
+	if index := this.IndexForService(service); index == -1 {
+		this.Services = append(this.Services, service)
+		this.modified = true
+	} else {
+		this.Services[index] = service
+		this.modified = true
+	}
+
+	// Success
+	return nil
+}
+
+func (this *Config) Remove(service *ServiceRecord) error {
+	if service == nil || service.key == "" {
+		return gopi.ErrBadParameter
+	}
+	if index := this.IndexForService(service); index == -1 {
+		return gopi.ErrNotModified
+	} else {
+		// Remove the record
+		this.Services = append(this.Services[:index], this.Services[index+1:]...)
+		this.modified = true
+	}
+
+	// Success
+	return nil
+}
+
+func (this *Config) IndexForService(service *ServiceRecord) int {
+	for i, s := range this.Services {
+		if service.key == s.key {
+			return i
+		}
+	}
+	// Return 'not found'
+	return -1
 }

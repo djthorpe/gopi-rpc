@@ -30,6 +30,6 @@ func Test_Discovery_002(t *testing.T) {
 	} else {
 		defer app.Close()
 		t.Log(app)
-		time.Sleep(time.Second * 30)
+		time.Sleep(time.Second * 5)
 	}
 }

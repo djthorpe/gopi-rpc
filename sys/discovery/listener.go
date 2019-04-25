@@ -39,19 +39,6 @@ type Listener struct {
 	services chan<- *ServiceRecord
 }
 
-type ServiceRecord struct {
-	Key       string
-	Name      string
-	Host      string
-	Service   string
-	Port      uint16
-	TXT       []string
-	IPv4      []net.IP
-	IPv6      []net.IP
-	Timestamp time.Time
-	TTL       time.Duration
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // GLOBAL VERIABLES
 
@@ -120,7 +107,7 @@ func (this *Listener) Destroy() error {
 		}
 	}
 
-	// Wait for go routines to end
+	// Wait for recv_loop go routines to end
 	this.Wait()
 
 	// Return compound errors
@@ -233,7 +220,7 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*ServiceRecord
 
 	// Make the entry
 	entry := &ServiceRecord{
-		Timestamp: time.Now(),
+		ts: time.Now(),
 	}
 
 	// Process sections of the response
@@ -243,52 +230,42 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*ServiceRecord
 		switch rr := answer.(type) {
 		case *dns.PTR:
 			// Obtain the name and service
-			entry.Key = rr.Ptr
-			entry.Name = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
-			entry.Service = rr.Hdr.Name
-			entry.TTL = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
+			entry.key = rr.Ptr
+			entry.name = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
+			entry.service = rr.Hdr.Name
+			entry.ttl = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
 		case *dns.SRV:
-			entry.Host = rr.Target
-			entry.Port = rr.Port
+			entry.host = rr.Target
+			entry.port = rr.Port
 		case *dns.TXT:
-			entry.TXT = rr.Txt
+			entry.txt = rr.Txt
 		}
 	}
 
 	// Check the entry ServiceDomain matches this domain
-	if strings.HasSuffix(entry.Service, "."+this.domain) {
-		entry.Service = strings.TrimSuffix(entry.Service, "."+this.domain)
+	if strings.HasSuffix(entry.service, "."+this.domain) {
+		entry.service = strings.TrimSuffix(entry.service, "."+this.domain)
 	} else {
 		return nil, nil
 	}
 
 	// Associate IPs in a second round
-	entry.IPv4 = make([]net.IP, 0)
-	entry.IPv6 = make([]net.IP, 0)
+	entry.ipv4 = make([]net.IP, 0)
+	entry.ipv6 = make([]net.IP, 0)
 	for _, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.A:
-			entry.IPv4 = append(entry.IPv4, rr.A)
+			entry.ipv4 = append(entry.ipv4, rr.A)
 		case *dns.AAAA:
-			entry.IPv6 = append(entry.IPv4, rr.AAAA)
+			entry.ipv6 = append(entry.ipv6, rr.AAAA)
 		}
 	}
 	// Ensure entry is complete
-	if entry.complete() {
+	if entry.key != "" {
 		return entry, nil
 	} else {
 		return nil, nil
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// PRIVATE METHODS
-
-func (this *ServiceRecord) complete() bool {
-	if this.Key == "" {
-		return false
-	}
-	return true
 }
 
 /*

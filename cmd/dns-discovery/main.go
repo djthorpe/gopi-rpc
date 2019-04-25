@@ -9,20 +9,18 @@
 package main
 
 import (
-	"context"
 	"os"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
-	_ "github.com/djthorpe/gopi-rpc/sys/mdns"
+	_ "github.com/djthorpe/gopi-rpc/sys/discovery"
 	_ "github.com/djthorpe/gopi/sys/logger"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
-
+/*
 func EnumerateServices(app *gopi.AppInstance, done <-chan struct{}) error {
 	discovery := app.ModuleInstance("discovery").(rpc.Discovery)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -41,10 +39,12 @@ FOR_LOOP:
 	}
 	return nil
 }
+*/
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
-	//discovery := app.ModuleInstance("discovery").(sd.Discovery)
+	discovery := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery)
+	app.Logger.Info("discovery=%v", discovery)
 
 	app.Logger.Info("Waiting for CTRL+C")
 	app.WaitForSignal()
@@ -62,5 +62,5 @@ func main() {
 	config := gopi.NewAppConfig("discovery")
 
 	// Run the command line tool
-	os.Exit(gopi.CommandLineTool(config, Main, EnumerateServices))
+	os.Exit(gopi.CommandLineTool(config, Main))
 }

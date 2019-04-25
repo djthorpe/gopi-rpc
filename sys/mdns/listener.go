@@ -9,6 +9,7 @@
 
 package mdns
 
+/*
 import (
 	"context"
 	"fmt"
@@ -358,3 +359,4 @@ FOR_LOOP:
 func (this *listener) emit_service_event(service_name string) {
 	this.Emit(rpc.NewEvent(gopi.RPC_EVENT_SERVICE_NAME))
 }
+*/

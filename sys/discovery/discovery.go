@@ -96,21 +96,25 @@ func (this *discovery) BackgroundTask(start chan<- event.Signal, stop <-chan eve
 	this.log.Debug("BackgroundTask started")
 	start <- gopi.DONE
 
+	// TODO
 FOR_LOOP:
 	for {
 		select {
 		case err := <-this.errors:
 			this.log.Warn("Error: %v", err)
 		case service := <-this.services:
-			this.log.Info("Service: %v", service)
+			if service.ttl == 0 {
+				this.Config.Remove(service)
+			} else {
+				this.Config.Register(service)
+			}
 		case <-stop:
 			break FOR_LOOP
 		}
 	}
 
-	this.log.Debug("BackgroundTask completed")
-
 	// Success
+	this.log.Debug("BackgroundTask completed")
 	return nil
 }
 
