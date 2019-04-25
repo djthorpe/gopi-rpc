@@ -1,8 +1,13 @@
 syntax = "proto3";
 package gopi;
 
+import "google/protobuf/empty.proto";
+
 // The greeting service definition
 service Greeter {
+  // Simple ping method to show server is "up"
+  rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
+
   // Sends a greeting
   rpc SayHello (HelloRequest) returns (HelloReply);
 }

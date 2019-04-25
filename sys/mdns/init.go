@@ -9,6 +9,7 @@
 
 package mdns
 
+/*
 import (
 
 	// Frameworks
@@ -56,3 +57,4 @@ func init() {
 		},
 	})
 }
+*/

@@ -9,6 +9,7 @@
 
 package mdns
 
+/*
 import (
 	"fmt"
 	"net"
@@ -91,3 +92,4 @@ func (this *ServiceRecord) String() string {
 	}
 	return fmt.Sprintf("<ServiceRecord>{ %v ts=%v }", strings.Join(parts, " "), this.Timestamp.Format(time.Kitchen))
 }
+*/

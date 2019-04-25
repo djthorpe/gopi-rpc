@@ -1,24 +1,23 @@
 /*
 	Go Language Raspberry Pi Interface
-	(c) Copyright David Thorpe 2016-2018
+	(c) Copyright David Thorpe 2019
 	All Rights Reserved
 	Documentation http://djthorpe.github.io/gopi/
 	For Licensing and Usage information, please see LICENSE.md
 */
 
-package helloworld
+package version
 
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	grpc "github.com/djthorpe/gopi-rpc/sys/grpc"
 
 	// Protocol buffers
-	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/helloworld"
+	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/version"
 	empty "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -27,10 +26,12 @@ import (
 
 type Service struct {
 	Server gopi.RPCServer
+	Flags  *gopi.Flags
 }
 
 type service struct {
-	log gopi.Logger
+	log   gopi.Logger
+	flags *gopi.Flags
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,22 +39,24 @@ type service struct {
 
 // Open the server
 func (config Service) Open(log gopi.Logger) (gopi.Driver, error) {
-	log.Debug("<grpc.service.helloworld>Open{ server=%v }", config.Server)
+	log.Debug("<grpc.service.version>Open{ server=%v flags=%v }", config.Server, config.Flags)
 
 	this := new(service)
 	this.log = log
+	this.flags = config.Flags
 
 	// Register service with GRPC server
-	pb.RegisterGreeterServer(config.Server.(grpc.GRPCServer).GRPCServer(), this)
+	pb.RegisterVersionServer(config.Server.(grpc.GRPCServer).GRPCServer(), this)
 
 	// Success
 	return this, nil
 }
 
 func (this *service) Close() error {
-	this.log.Debug("<grpc.service.helloworld>Close{}")
+	this.log.Debug("<grpc.service.version>Close{}")
 
-	// No resources to release
+	// Release resources
+	this.flags = nil
 
 	// Success
 	return nil
@@ -71,23 +74,21 @@ func (this *service) CancelRequests() error {
 // Stringify
 
 func (this *service) String() string {
-	return fmt.Sprintf("grpc.service.helloworld{}")
+	return fmt.Sprintf("grpc.service.version{}")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // RPC Methods
 
 func (this *service) Ping(context.Context, *empty.Empty) (*empty.Empty, error) {
-	this.log.Debug("<grpc.service.helloworld.Ping>{ }")
+	this.log.Debug("<grpc.service.version.Ping>{ }")
 	return &empty.Empty{}, nil
 }
 
-func (this *service) SayHello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloReply, error) {
-	this.log.Debug("<grpc.service.helloworld.SayHello>{ name=%v }", strconv.Quote(req.Name))
-	if req.Name == "" {
-		req.Name = "World"
-	}
-	return &pb.HelloReply{
-		Message: "Hello, " + req.Name,
-	}, nil
+func (this *service) Version(context.Context, *empty.Empty) (*pb.VersionReply, error) {
+	this.log.Debug("<grpc.service.version.Version>{ }")
+
+	// TODO
+
+	return &pb.VersionReply{}, nil
 }

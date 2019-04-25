@@ -1,12 +1,12 @@
 /*
 	Go Language Raspberry Pi Interface
-	(c) Copyright David Thorpe 2016-2018
+	(c) Copyright David Thorpe 2019
 	All Rights Reserved
 	Documentation http://djthorpe.github.io/gopi/
 	For Licensing and Usage information, please see LICENSE.md
 */
 
-package helloworld
+package version
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	grpc "github.com/djthorpe/gopi-rpc/sys/grpc"
 
 	// Protocol buffers
-	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/helloworld"
+	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/version"
 	empty "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -25,15 +25,15 @@ import (
 // TYPES
 
 type Client struct {
-	pb.GreeterClient
+	pb.VersionClient
 	conn gopi.RPCClientConn
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // NEW
 
-func NewGreeterClient(conn gopi.RPCClientConn) gopi.RPCClient {
-	return &Client{pb.NewGreeterClient(conn.(grpc.GRPCClientConn).GRPCConn()), conn}
+func NewVersionClient(conn gopi.RPCClientConn) gopi.RPCClient {
+	return &Client{pb.NewVersionClient(conn.(grpc.GRPCClientConn).GRPCConn()), conn}
 }
 
 func (this *Client) NewContext() context.Context {
@@ -60,22 +60,23 @@ func (this *Client) Ping() error {
 	defer this.conn.Unlock()
 
 	// Perform ping
-	if _, err := this.GreeterClient.Ping(this.NewContext(), &empty.Empty{}); err != nil {
+	if _, err := this.VersionClient.Ping(this.NewContext(), &empty.Empty{}); err != nil {
 		return err
 	} else {
 		return nil
 	}
 }
 
-func (this *Client) SayHello(name string) (string, error) {
+func (this *Client) Version() error {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
 	// Perform SayHello
-	if reply, err := this.GreeterClient.SayHello(this.NewContext(), &pb.HelloRequest{Name: name}); err != nil {
-		return "", err
+	if _, err := this.VersionClient.Version(this.NewContext(), &empty.Empty{}); err != nil {
+		return err
 	} else {
-		return reply.Message, nil
+		// TODO
+		return nil
 	}
 }
 
@@ -83,5 +84,5 @@ func (this *Client) SayHello(name string) (string, error) {
 // STRINGIFY
 
 func (this *Client) String() string {
-	return fmt.Sprintf("<rpc.service.helloworld.Client>{ conn=%v }", this.conn)
+	return fmt.Sprintf("<rpc.service.version.Client>{ conn=%v }", this.conn)
 }

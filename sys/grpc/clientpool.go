@@ -20,7 +20,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	rpc "github.com/djthorpe/gopi-rpc/sys"
+	rpc "github.com/djthorpe/gopi-rpc/rpc"
 	event "github.com/djthorpe/gopi/util/event"
 )
 
@@ -138,15 +138,15 @@ func (this *clientpool) Close() error {
 ////////////////////////////////////////////////////////////////////////////////
 // CONNECT
 
-func (this *clientpool) Connect(service *gopi.RPCServiceRecord, flags gopi.RPCFlag) (gopi.RPCClientConn, error) {
+func (this *clientpool) Connect(service gopi.RPCServiceRecord, flags gopi.RPCFlag) (gopi.RPCClientConn, error) {
 	this.log.Debug2("<grpc.clientpool>Connect{ service=%v flags=%v }", service, flags)
 
 	// Determine the address
 	if addr := addressFor(service, flags); addr == "" {
 		return nil, gopi.ErrBadParameter
 	} else if clientconn_, err := gopi.Open(ClientConn{
-		Name:       service.Name,
-		Addr:       addr + ":" + fmt.Sprint(service.Port),
+		Name:       service.Name(),
+		Addr:       addr + ":" + fmt.Sprint(service.Port()),
 		SSL:        this.ssl,
 		SkipVerify: this.skipverify,
 		Timeout:    this.timeout,
@@ -208,7 +208,7 @@ func (this *clientpool) NewClient(service string, conn gopi.RPCClientConn) gopi.
 ////////////////////////////////////////////////////////////////////////////////
 // LOOKUP
 
-func (this *clientpool) Lookup(ctx context.Context, name, addr string, max int) ([]*gopi.RPCServiceRecord, error) {
+func (this *clientpool) Lookup(ctx context.Context, name, addr string, max int) ([]gopi.RPCServiceRecord, error) {
 	this.log.Debug2("<grpc.clientpool>Lookup{ name='%v' addr='%v' max='%v' }", name, addr, max)
 
 	// If there is no discovery subsystem
@@ -222,7 +222,7 @@ func (this *clientpool) Lookup(ctx context.Context, name, addr string, max int) 
 			Port: port,
 			Host: host,
 		}
-		return []*gopi.RPCServiceRecord{record}, nil
+		return []gopi.RPCServiceRecord{record}, nil
 	}
 
 	// Make a buffered channel of all service records and put them in
@@ -343,24 +343,24 @@ func lookupMatchIP(addr string, record *gopi.RPCServiceRecord) bool {
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
-func addressFor(service *gopi.RPCServiceRecord, flags gopi.RPCFlag) string {
+func addressFor(service gopi.RPCServiceRecord, flags gopi.RPCFlag) string {
 	if flags&gopi.RPC_FLAG_INET_UDP != 0 {
 		// We don't support UDP connections
 		return ""
 	} else if flags&gopi.RPC_FLAG_INET_V6 != 0 {
-		if len(service.IP6) == 0 {
+		if len(service.IP6()) == 0 {
 			return ""
 		} else {
-			return service.IP6[0].String()
+			return service.IP6()[0].String()
 		}
 	} else if flags&gopi.RPC_FLAG_INET_V4 != 0 {
-		if len(service.IP4) == 0 {
+		if len(service.IP4()) == 0 {
 			return ""
 		} else {
-			return service.IP4[0].String()
+			return service.IP4()[0].String()
 		}
 	} else {
-		return service.Host
+		return service.Host()
 	}
 }
 
