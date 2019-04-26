@@ -10,8 +10,10 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 
 	// Frameworks
@@ -32,6 +34,7 @@ type Discovery struct {
 type discovery struct {
 	sync.Mutex
 	event.Tasks
+	event.Publisher
 	Config
 	Listener
 
@@ -67,6 +70,9 @@ func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
 func (this *discovery) Close() error {
 	this.log.Debug("<rpc.discovery.Close>{ config=%v listener=%v }", this.Config, this.Listener)
 
+	// Unsubscribe
+	this.Publisher.Close()
+
 	// Release resources, etc
 	if err := this.Listener.Destroy(); err != nil {
 		return err
@@ -80,6 +86,21 @@ func (this *discovery) Close() error {
 
 	// Return success
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// REGISTER AND BROWSE
+
+// Register a service record on the network
+func (this *discovery) Register(service gopi.RPCServiceRecord) error {
+	this.log.Debug2("<rpc.discovery.Register>{ service=%v }", service)
+	return gopi.ErrNotImplemented
+}
+
+// Browse for service records on the network with context
+func (this *discovery) Browse(ctx context.Context, service string) error {
+	this.log.Debug2("<rpc.discovery.Browse>{ service=%v }", strconv.Quote(service))
+	return gopi.ErrNotImplemented
 }
 
 ////////////////////////////////////////////////////////////////////////////////

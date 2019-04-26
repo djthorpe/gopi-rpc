@@ -43,7 +43,7 @@ type clientpool struct {
 	discovery  gopi.RPCServiceDiscovery
 	services   map[string]*servicetuple
 	clients    map[string]gopi.RPCNewClientFunc
-	records    map[string]*gopi.RPCServiceRecord
+	records    map[string]gopi.RPCServiceRecord
 	done       chan struct{}
 	sync.Mutex
 	event.Publisher
@@ -90,7 +90,7 @@ func (config ClientPool) Open(log gopi.Logger) (gopi.Driver, error) {
 	this.timeout = config.Timeout
 	this.clients = make(map[string]gopi.RPCNewClientFunc)
 	this.discovery = config.Discovery
-	this.records = make(map[string]*gopi.RPCServiceRecord)
+	this.records = make(map[string]gopi.RPCServiceRecord)
 
 	// Start the discovery in the background if it's available
 	if this.discovery != nil {
@@ -213,21 +213,16 @@ func (this *clientpool) Lookup(ctx context.Context, name, addr string, max int) 
 
 	// If there is no discovery subsystem
 	if this.discovery == nil {
-		host, port := lookupMatchSplitAddr(addr)
-		if host == "" || port == 0 {
+		if record := rpc.NewServiceRecordWithAddr(name, addr); record == nil {
 			return nil, gopi.ErrBadParameter
+		} else {
+			return []gopi.RPCServiceRecord{record}, nil
 		}
-		record := &gopi.RPCServiceRecord{
-			Name: name,
-			Port: port,
-			Host: host,
-		}
-		return []gopi.RPCServiceRecord{record}, nil
 	}
 
 	// Make a buffered channel of all service records and put them in
-	records := make(chan *gopi.RPCServiceRecord, len(this.records)+2)
-	matched := make([]*gopi.RPCServiceRecord, 0, max)
+	records := make(chan gopi.RPCServiceRecord, len(this.records)+2)
+	matched := make([]gopi.RPCServiceRecord, 0, max)
 
 	// Queue up the records we know about
 	for _, record := range this.records {
@@ -277,8 +272,8 @@ FOR_LOOP:
 	}
 }
 
-func lookupMatch(name, addr string, record *gopi.RPCServiceRecord) bool {
-	if name != "" && name == record.Name {
+func lookupMatch(name, addr string, record gopi.RPCServiceRecord) bool {
+	if name != "" && name == record.Name() {
 		return true
 	}
 	if addr != "" {
@@ -293,7 +288,7 @@ func lookupMatch(name, addr string, record *gopi.RPCServiceRecord) bool {
 				return false
 			}
 		}
-		if port != 0 && port != record.Port {
+		if port != 0 && port != record.Port() {
 			return false
 		}
 		return true
@@ -316,22 +311,22 @@ func lookupMatchSplitAddr(addr string) (string, uint) {
 	}
 }
 
-func lookupMatchHost(addr string, record *gopi.RPCServiceRecord) bool {
+func lookupMatchHost(addr string, record gopi.RPCServiceRecord) bool {
 	// Fully-qualify address
 	if strings.HasSuffix(addr, ".") == false {
 		addr += "."
 	}
-	return strings.ToLower(addr) == strings.ToLower(record.Host)
+	return strings.ToLower(addr) == strings.ToLower(record.Host())
 }
 
-func lookupMatchIP(addr string, record *gopi.RPCServiceRecord) bool {
+func lookupMatchIP(addr string, record gopi.RPCServiceRecord) bool {
 	if ip := net.ParseIP(addr); ip != nil {
-		for _, ip4 := range record.IP4 {
+		for _, ip4 := range record.IP4() {
 			if ip4.Equal(ip) {
 				return true
 			}
 		}
-		for _, ip6 := range record.IP6 {
+		for _, ip6 := range record.IP6() {
 			if ip6.Equal(ip) {
 				return true
 			}
@@ -421,15 +416,15 @@ func (this *clientpool) mdnsHandleEvent(evt gopi.RPCEvent) {
 	}
 }
 
-func mdnsRecordHash(record *gopi.RPCServiceRecord) string {
+func mdnsRecordHash(record gopi.RPCServiceRecord) string {
 	// The hash is a combo of host.port.type
-	if record.Host == "" || record.Port == 0 || record.Type == "" {
+	if record.Host == "" || record.Port() == 0 || record.Service() == "" {
 		return ""
 	}
-	return strings.Join([]string{record.Host, fmt.Sprint(record.Port), record.Type}, " ")
+	return strings.Join([]string{record.Host, fmt.Sprint(record.Port), record.Service()}, " ")
 }
 
-func mdnsRecordEquals(a, b *gopi.RPCServiceRecord) bool {
+func mdnsRecordEquals(a, b gopi.RPCServiceRecord) bool {
 	if a.Host != b.Host {
 		return false
 	}

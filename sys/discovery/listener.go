@@ -218,6 +218,8 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 		return nil, fmt.Errorf("Support for DNS requests with high truncated bit not implemented")
 	}
 
+	fmt.Println(msg)
+
 	// Make the entry
 	entry := rpc.NewServiceRecord()
 
@@ -227,38 +229,36 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 	for _, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.PTR:
-			entry.SetKey(rr.Ptr)
-			entry.SetName(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1))
-			entry.SetService(rr.Hdr.Name)
-			entry.SetTTL(time.Duration(time.Second * time.Duration(rr.Hdr.Ttl)))
+			entry.SetPTR(rr)
 		case *dns.SRV:
-			entry.SetHost(rr.Target)
-			entry.SetPort(uint(rr.Port))
+			entry.SetSRV(rr)
 		case *dns.TXT:
-			entry.SetText(rr.Txt)
+			entry.SetTXT(rr)
 		}
 	}
 
 	// Check the entry ServiceDomain matches this domain
-	if strings.HasSuffix(entry.Service(), "."+this.domain) {
-		entry.SetService(strings.TrimSuffix(entry.Service(), "."+this.domain))
-	} else {
-		return nil, nil
-	}
+	/*
+		if strings.HasSuffix(entry.Service(), "."+this.domain) {
+			// TODO
+			//entry.SetService(strings.TrimSuffix(entry.Service(), "."+this.domain))
+		} else {
+			return nil, nil
+		}
+	*/
 
 	// Associate IPs in a second round
-	entry.ipv4 = make([]net.IP, 0)
-	entry.ipv6 = make([]net.IP, 0)
 	for _, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.A:
-			entry.ipv4 = append(entry.ipv4, rr.A)
+			entry.AppendIP4(rr)
 		case *dns.AAAA:
-			entry.ipv6 = append(entry.ipv6, rr.AAAA)
+			entry.AppendIP6(rr)
 		}
 	}
+
 	// Ensure entry is complete
-	if entry.key != "" {
+	if entry.Key() != "" {
 		return entry, nil
 	} else {
 		return nil, nil
