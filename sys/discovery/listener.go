@@ -20,7 +20,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	iface "github.com/djthorpe/gopi-rpc"
+	rpc "github.com/djthorpe/gopi-rpc"
 	errors "github.com/djthorpe/gopi/util/errors"
 	dns "github.com/miekg/dns"
 )
@@ -36,7 +36,7 @@ type Listener struct {
 	ipv4     *net.UDPConn
 	ipv6     *net.UDPConn
 	errors   chan<- error
-	services chan<- *ServiceRecord
+	services chan<- *rpc.ServiceRecord
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +55,7 @@ var (
 ////////////////////////////////////////////////////////////////////////////////
 // INIT / DEINIT
 
-func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- *ServiceRecord) error {
+func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- *rpc.ServiceRecord) error {
 	if config.Domain == "" {
 		config.Domain = MDNS_DEFAULT_DOMAIN
 	}
@@ -65,10 +65,10 @@ func (this *Listener) Init(config Discovery, errors chan<- error, services chan<
 	if errors == nil || services == nil {
 		return gopi.ErrBadParameter
 	}
-	if config.Flags|iface.RPC_FLAG_IPV4 != 0 {
+	if config.Flags|gopi.RPC_FLAG_INET_V4 != 0 {
 		this.ipv4, _ = net.ListenMulticastUDP("udp4", config.Interface, MDNS_ADDR_IPV4)
 	}
-	if config.Flags|iface.RPC_FLAG_IPV6 != 0 {
+	if config.Flags|gopi.RPC_FLAG_INET_V6 != 0 {
 		this.ipv6, _ = net.ListenMulticastUDP("udp6", config.Interface, MDNS_ADDR_IPV6)
 	}
 	if this.ipv4 == nil && this.ipv6 == nil {
@@ -203,7 +203,7 @@ func (this *Listener) send(q *dns.Msg) error {
 }
 
 // parse packets into service records
-func (this *Listener) parse_packet(packet []byte, from net.Addr) (*ServiceRecord, error) {
+func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRecord, error) {
 	var msg dns.Msg
 	if err := msg.Unpack(packet); err != nil {
 		return nil, err
@@ -219,7 +219,7 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*ServiceRecord
 	}
 
 	// Make the entry
-	entry := &ServiceRecord{
+	entry := &rpc.ServiceRecord{
 		ts: time.Now(),
 	}
 
@@ -291,10 +291,6 @@ func (this *listener) EnumerateServiceNames(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
-}
-
-func (this *listener) String() string {
-	return fmt.Sprintf("<rpc.mdns.Server>{ domain='%v' }", this.domain)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

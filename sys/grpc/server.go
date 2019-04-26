@@ -18,7 +18,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	rpc "github.com/djthorpe/gopi-rpc/rpc"
+	rpc "github.com/djthorpe/gopi-rpc/"
 	event "github.com/djthorpe/gopi/util/event"
 	grpc "google.golang.org/grpc"
 	credentials "google.golang.org/grpc/credentials"

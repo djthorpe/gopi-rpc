@@ -17,6 +17,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -26,7 +27,7 @@ type Config struct {
 	sync.Mutex
 
 	// Public members
-	Services []*ServiceRecord `json:"services"`
+	Services []*rpc.ServiceRecord `json:"services"`
 
 	// Private members
 	modified bool
@@ -36,7 +37,7 @@ type Config struct {
 // INIT / DEINIT
 
 func (this *Config) Init() error {
-	this.Services = make([]*ServiceRecord, 0)
+	this.Services = make([]*rpc.ServiceRecord, 0)
 	this.modified = false
 	return nil
 }
@@ -118,8 +119,8 @@ func (this *Config) Reader(fh io.Reader) error {
 ////////////////////////////////////////////////////////////////////////////////
 // REGISTER & REMOVE SERVICES
 
-func (this *Config) Register(service *ServiceRecord) error {
-	if service == nil || service.ttl == 0 || service.key == "" {
+func (this *Config) Register(service *rpc.ServiceRecord) error {
+	if service == nil || service.TTL() == 0 || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
 	if index := this.IndexForService(service); index == -1 {
@@ -134,8 +135,8 @@ func (this *Config) Register(service *ServiceRecord) error {
 	return nil
 }
 
-func (this *Config) Remove(service *ServiceRecord) error {
-	if service == nil || service.key == "" {
+func (this *Config) Remove(service *rpc.ServiceRecord) error {
+	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
 	if index := this.IndexForService(service); index == -1 {
@@ -150,9 +151,12 @@ func (this *Config) Remove(service *ServiceRecord) error {
 	return nil
 }
 
-func (this *Config) IndexForService(service *ServiceRecord) int {
+func (this *Config) IndexForService(service *rpc.ServiceRecord) int {
+	if service == nil {
+		return -1
+	}
 	for i, s := range this.Services {
-		if service.key == s.key {
+		if service.Key() == s.Key() {
 			return i
 		}
 	}

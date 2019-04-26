@@ -15,8 +15,7 @@ import (
 	"strings"
 
 	// Frameworks
-	"github.com/djthorpe/gopi"
-	iface "github.com/djthorpe/gopi-rpc"
+	gopi "github.com/djthorpe/gopi"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -50,10 +49,10 @@ func init() {
 func getDiscoveryConfig(domain, net_iface_name string, ip4, ip6 bool) (Discovery, error) {
 	config := Discovery{Domain: domain}
 	if ip4 {
-		config.Flags |= iface.RPC_FLAG_IPV4
+		config.Flags |= gopi.RPC_FLAG_INET_V4
 	}
 	if ip6 {
-		config.Flags |= iface.RPC_FLAG_IPV6
+		config.Flags |= gopi.RPC_FLAG_INET_V6
 	}
 	if net_iface_name == "" {
 		return config, nil

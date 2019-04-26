@@ -16,7 +16,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	iface "github.com/djthorpe/gopi-rpc"
+	rpc "github.com/djthorpe/gopi-rpc"
 	event "github.com/djthorpe/gopi/util/event"
 )
 
@@ -26,7 +26,7 @@ import (
 type Discovery struct {
 	Interface *net.Interface
 	Domain    string
-	Flags     iface.RPCFlags
+	Flags     gopi.RPCFlag
 }
 
 type discovery struct {
@@ -36,7 +36,7 @@ type discovery struct {
 	Listener
 
 	errors   chan error
-	services chan *ServiceRecord
+	services chan *rpc.ServiceRecord
 	log      gopi.Logger
 }
 
@@ -48,7 +48,7 @@ func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
 
 	this := new(discovery)
 	this.errors = make(chan error)
-	this.services = make(chan *ServiceRecord)
+	this.services = make(chan *rpc.ServiceRecord)
 
 	if err := this.Config.Init(); err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ FOR_LOOP:
 		case err := <-this.errors:
 			this.log.Warn("Error: %v", err)
 		case service := <-this.services:
-			if service.ttl == 0 {
+			if service.TTL() == 0 {
 				this.Config.Remove(service)
 			} else {
 				this.Config.Register(service)
