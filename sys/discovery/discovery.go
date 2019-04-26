@@ -26,6 +26,7 @@ import (
 // TYPES
 
 type Discovery struct {
+	Path      string
 	Interface *net.Interface
 	Domain    string
 	Flags     gopi.RPCFlag
@@ -53,7 +54,7 @@ func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
 	this.errors = make(chan error)
 	this.services = make(chan *rpc.ServiceRecord)
 
-	if err := this.Config.Init(); err != nil {
+	if err := this.Config.Init(config.Path); err != nil {
 		return nil, err
 	} else if err := this.Listener.Init(config, this.errors, this.services); err != nil {
 		return nil, err

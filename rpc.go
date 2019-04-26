@@ -26,16 +26,16 @@ import (
 
 // RPCServiceRecord implementation
 type ServiceRecord struct {
-	key     string
-	name    string
-	host    string
-	service string
-	port    uint
-	txt     []string
-	ipv4    []net.IP
-	ipv6    []net.IP
-	ts      time.Time
-	ttl     time.Duration
+	Key_     string        `json:"key"`
+	Name_    string        `json:"name"`
+	Host_    string        `json:"host"`
+	Service_ string        `json:"service"`
+	Port_    uint          `json:"port"`
+	Txt_     []string      `json:"txt"`
+	Ipv4_    []net.IP      `json:"ipv4"`
+	Ipv6_    []net.IP      `json:"ipv6"`
+	Ts_      time.Time     `json:"ts"`
+	Ttl_     time.Duration `json:"ttl"`
 }
 
 // RPCEvent implementation
@@ -50,9 +50,9 @@ type Event struct {
 
 func NewServiceRecord() *ServiceRecord {
 	return &ServiceRecord{
-		ts:   time.Now(),
-		ipv4: make([]net.IP, 2),
-		ipv6: make([]net.IP, 2),
+		Ts_:   time.Now(),
+		Ipv4_: make([]net.IP, 0, 1),
+		Ipv6_: make([]net.IP, 0, 1),
 	}
 }
 
@@ -64,75 +64,87 @@ func NewServiceRecordWithAddr(name, addr string) *ServiceRecord {
 	} else if service := NewServiceRecord(); service == nil {
 		return nil
 	} else {
-		service.name = name
-		service.host = host
-		service.port = uint(port)
+		service.Name_ = name
+		service.Host_ = host
+		service.Port_ = uint(port)
 		return service
 	}
 }
 
 func (this *ServiceRecord) Key() string {
-	return this.key
+	return this.Key_
 }
 
 func (this *ServiceRecord) Name() string {
-	return this.name
+	return this.Name_
 }
 
 func (this *ServiceRecord) Service() string {
-	return this.service
+	return this.Service_
 }
 
 func (this *ServiceRecord) Host() string {
-	return this.host
+	return this.Host_
 }
 
 func (this *ServiceRecord) Port() uint {
-	return this.port
+	return this.Port_
 }
 
 func (this *ServiceRecord) TTL() time.Duration {
-	return this.ttl
+	return this.Ttl_
 }
 
 func (this *ServiceRecord) Timestamp() time.Time {
-	return this.ts
+	return this.Ts_
 }
 
 func (this *ServiceRecord) Text() []string {
-	return this.txt
+	return this.Txt_
 }
 
 func (this *ServiceRecord) IP4() []net.IP {
-	return this.ipv4
+	return this.Ipv4_
 }
 
 func (this *ServiceRecord) IP6() []net.IP {
-	return this.ipv6
+	return this.Ipv6_
 }
 
 func (this *ServiceRecord) SetPTR(rr *dns.PTR) {
-	this.key = rr.Ptr
-	this.name = strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1)
-	this.service = rr.Hdr.Name
-	this.ttl = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
+	this.Key_ = rr.Ptr
+	this.Name_ = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
+	this.Service_ = rr.Hdr.Name
+	this.Ttl_ = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
 }
 
 func (this *ServiceRecord) SetSRV(rr *dns.SRV) {
-	this.host = rr.Target
-	this.port = uint(rr.Port)
+	this.Host_ = rr.Target
+	this.Port_ = uint(rr.Port)
 }
 
 func (this *ServiceRecord) SetTXT(rr *dns.TXT) {
-	this.txt = rr.Txt
+	this.Txt_ = rr.Txt
 }
 
 func (this *ServiceRecord) AppendIP4(rr *dns.A) {
-	this.ipv4 = append(this.ipv4, rr.A)
+	this.Ipv4_ = append(this.Ipv4_, rr.A)
 }
 
 func (this *ServiceRecord) AppendIP6(rr *dns.AAAA) {
-	this.ipv6 = append(this.ipv6, rr.AAAA)
+	this.Ipv6_ = append(this.Ipv6_, rr.AAAA)
+}
+
+func (this *ServiceRecord) Expired() bool {
+	if this.Ts_.IsZero() {
+		return false
+	} else if this.Ttl_ == 0 {
+		return true
+	} else if time.Now().Sub(this.Ts_) > this.Ttl_ {
+		return true
+	} else {
+		return false
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -175,31 +187,34 @@ func (this *Event) String() string {
 
 func (s *ServiceRecord) String() string {
 	p := ""
-	if s.name != "" {
-		p += fmt.Sprintf("name=%v ", strconv.Quote(s.name))
+	if s.Name_ != "" {
+		p += fmt.Sprintf("name=%v ", strconv.Quote(s.Name_))
 	}
-	if s.service != "" {
-		p += fmt.Sprintf("service=%v ", strconv.Quote(s.service))
+	if s.Service_ != "" {
+		p += fmt.Sprintf("service=%v ", strconv.Quote(s.Service_))
 	}
-	if s.host != "" {
-		p += fmt.Sprintf("service=%v ", strconv.Quote(s.host))
+	if s.Host_ != "" {
+		p += fmt.Sprintf("host=%v ", strconv.Quote(s.Host_))
 	}
-	if s.port > 0 {
-		p += fmt.Sprintf("port=%v ", s.port)
+	if s.Port_ > 0 {
+		p += fmt.Sprintf("port=%v ", s.Port_)
 	}
-	if len(s.ipv4) > 0 {
-		p += fmt.Sprintf("ipv4=%v ", s.ipv4)
+	if len(s.Ipv4_) > 0 {
+		p += fmt.Sprintf("ipv4=%v ", s.Ipv4_)
 	}
-	if len(s.ipv6) > 0 {
-		p += fmt.Sprintf("ipv6=%v ", s.ipv6)
+	if len(s.Ipv6_) > 0 {
+		p += fmt.Sprintf("ipv6=%v ", s.Ipv6_)
 	}
-	if s.ttl > 0 {
-		p += fmt.Sprintf("ttl=%v ", s.ttl)
+	if s.Ttl_ > 0 {
+		p += fmt.Sprintf("ttl=%v ", s.Ttl_)
 	}
-	if len(s.txt) > 0 {
+	if len(s.Txt_) > 0 {
 		p += "txt=["
-		for _, txt := range s.txt {
-			p += strconv.Quote(txt) + ","
+		for i, txt := range s.Txt_ {
+			if i > 0 {
+				p += ","
+			}
+			p += strconv.Quote(txt)
 		}
 		p += "]"
 	}

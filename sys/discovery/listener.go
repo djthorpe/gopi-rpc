@@ -218,8 +218,6 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 		return nil, fmt.Errorf("Support for DNS requests with high truncated bit not implemented")
 	}
 
-	fmt.Println(msg)
-
 	// Make the entry
 	entry := rpc.NewServiceRecord()
 
@@ -237,16 +235,6 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 		}
 	}
 
-	// Check the entry ServiceDomain matches this domain
-	/*
-		if strings.HasSuffix(entry.Service(), "."+this.domain) {
-			// TODO
-			//entry.SetService(strings.TrimSuffix(entry.Service(), "."+this.domain))
-		} else {
-			return nil, nil
-		}
-	*/
-
 	// Associate IPs in a second round
 	for _, answer := range sections {
 		switch rr := answer.(type) {
@@ -257,11 +245,15 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 		}
 	}
 
-	// Ensure entry is complete
-	if entry.Key() != "" {
-		return entry, nil
-	} else {
+	// Check the entry is valid
+	if entry.Key() == "" {
+		// Ensure entry is complete
 		return nil, nil
+	} else if strings.HasSuffix(entry.Service(), "."+this.domain) == false {
+		// Domain doesn't match
+		return nil, nil
+	} else {
+		return entry, nil
 	}
 }
 
