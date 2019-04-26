@@ -47,33 +47,30 @@ type Event struct {
 ////////////////////////////////////////////////////////////////////////////////
 // SERVICERECORD IMPLEMENTATION
 
-func NewServiceRecord(name, service, host string, port uint, ttl time.Duration, txt ...string) *ServiceRecord {
-	// Check incoming parameters
-	if name == "" || service == "" || port == 0 {
-		return nil
+func NewServiceRecord() *ServiceRecord {
+	return &ServiceRecord{
+		ts: time.Now(),
 	}
+}
 
-	// Make the ServiceRecord
-	this := &ServiceRecord{
-		name:    name,
-		service: service,
-		host:    host,
-		port:    port,
-		ttl:     ttl,
-		ts:      time.Now(),
-		txt:     txt,
-	}
-
-	// Return
-	return this
+func (this *ServiceRecord) SetKey(value string) {
+	this.key = value
 }
 
 func (this *ServiceRecord) Key() string {
 	return this.key
 }
 
+func (this *ServiceRecord) SetName(value string) {
+	this.name = strings.TrimPrefix(value, ".")
+}
+
 func (this *ServiceRecord) Name() string {
 	return this.name
+}
+
+func (this *ServiceRecord) SetService(value string) {
+	this.service = value
 }
 
 func (this *ServiceRecord) Service() string {
@@ -86,6 +83,10 @@ func (this *ServiceRecord) Host() string {
 
 func (this *ServiceRecord) Port() uint {
 	return this.port
+}
+
+func (this *ServiceRecord) SetTTL(value time.Duration) {
+	this.ttl = value
 }
 
 func (this *ServiceRecord) TTL() time.Duration {

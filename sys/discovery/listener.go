@@ -219,9 +219,7 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 	}
 
 	// Make the entry
-	entry := &rpc.ServiceRecord{
-		ts: time.Now(),
-	}
+	entry := rpc.NewServiceRecord()
 
 	// Process sections of the response
 	sections := append(msg.Answer, msg.Ns...)
@@ -229,22 +227,21 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 	for _, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.PTR:
-			// Obtain the name and service
-			entry.key = rr.Ptr
-			entry.name = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
-			entry.service = rr.Hdr.Name
-			entry.ttl = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
+			entry.SetKey(rr.Ptr)
+			entry.SetName(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1))
+			entry.SetService(rr.Hdr.Name)
+			entry.SetTTL(time.Duration(time.Second * time.Duration(rr.Hdr.Ttl)))
 		case *dns.SRV:
-			entry.host = rr.Target
-			entry.port = rr.Port
+			entry.SetHost(rr.Target)
+			entry.SetPort(uint(rr.Port))
 		case *dns.TXT:
-			entry.txt = rr.Txt
+			entry.SetText(rr.Txt)
 		}
 	}
 
 	// Check the entry ServiceDomain matches this domain
-	if strings.HasSuffix(entry.service, "."+this.domain) {
-		entry.service = strings.TrimSuffix(entry.service, "."+this.domain)
+	if strings.HasSuffix(entry.Service(), "."+this.domain) {
+		entry.SetService(strings.TrimSuffix(entry.Service(), "."+this.domain))
 	} else {
 		return nil, nil
 	}

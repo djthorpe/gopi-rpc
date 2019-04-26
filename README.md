@@ -39,7 +39,10 @@ be used to provide a more traditional REST-based interface on compiling the prot
 code.
 
 When you have your service running on your network, how do other processes discover it? This
-is where the discovery mechanisms come into play....__TODO__
+is where the discovery mechanisms come into play. For local area networks, discovery by DNS
+provides an easy mechansism, specifically using multicast DNS and the [DNS-SD](http://www.dns-sd.org/)
+protocol. For cloud environents, service registration and discovery through services 
+like [Consul](https://www.consul.io/).
 
 ## Dependencies
 
@@ -93,5 +96,70 @@ protoc helloworld/helloworld.proto --go_out=plugins=grpc:.
 ```
 
 This will create the generated client and server code in the file `rpc/protobuf/helloworld.pb.go`.
+There are some other services defined in the `rpc/protobuf` folder:
+
+  * `gopi.Version` returns version numbers of the running service, service and host uptime.
+  * `gopi.Discovery` returns service records for any discovered and registered services on
+    the local area network.
+
+The `make protobuf` command generates the client and server code for these as well. In order to
+generate the helloworld client and service binaries, use the following commands:
+
+```bash
+bash% make helloworld-service
+bash% make helloworld-client
+```
+
+You can run the helloworld service with unencrypted requests and responses:
+
+```bash
+bash% helloworld-service -rpc.port 8080 -verbose
+[INFO] Waiting for CTRL+C or SIGTERM to stop server
+```
+
+Then to communicate with the service, use the following command in a separate terminal window:
+
+```bash
+bash% helloworld-client -addr localhost:8080 -rpc.insecure
+```
+
+You can use encrypted communications if you provide an SSL key and certificate.
+In order to generate a self-signed certificate, use the following commands, replacing 
+`DAYS`, `OUT` and `ORG` with appropriate values:
+
+```bash
+bash% DAYS=99999
+bash% OUT="${HOME}/.ssl"
+bash% ORG="mutablelogic"
+bash% install -d ${OUT} && openssl req \
+  -x509 -nodes \
+  -newkey rsa:2048 \
+  -keyout "${OUT}/selfsigned.key" \
+  -out "${OUT}/selfsigned.crt" \
+  -days "${DAYS}" \
+  -subj "/C=GB/L=London/O=${ORG}"
+```
+
+Then the following commands are used to invoke the service:
+
+```bash
+bash% helloworld-service -rpc.port 8080 \
+  -rpc.sslkey ${OUT}/selfsigned.key -rpc.sslcert  ${OUT}/selfsigned.crt \
+  -verbose
+[INFO] Waiting for CTRL+C or SIGTERM to stop server
+```
+
+You can then drop the `-rpc.insecure` flag when invoking the client.
+
+## Using a client in your own application
 
 __TODO__
+
+## Generating a protocol buffer file for your service
+
+__TODO__
+
+## Creating a new service and client
+
+__TODO__
+
