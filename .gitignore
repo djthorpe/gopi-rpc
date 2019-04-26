@@ -12,3 +12,5 @@
 *.out
 *.pb.go
 go.sum
+
+.vscode
