@@ -45,6 +45,7 @@ type Listener struct {
 const (
 	MDNS_DEFAULT_DOMAIN = "local."
 	MDNS_SERVICE_QUERY  = "_services._dns-sd._udp"
+	DELTA_QUERY         = 5 * time.Second
 )
 
 var (
@@ -117,12 +118,9 @@ func (this *Listener) Destroy() error {
 ////////////////////////////////////////////////////////////////////////////////
 // QUERY
 
-func (this *Listener) Query(ctx context.Context) error {
-	msg := new(dns.Msg)
-	msg.SetQuestion(MDNS_SERVICE_QUERY+"."+this.domain, dns.TypePTR)
-	msg.RecursionDesired = false
+func (this *Listener) Query(msg *dns.Msg, ctx context.Context) error {
 
-	// Send out service message
+	// Send out service message every five seconds
 	ticker := time.NewTimer(1 * time.Millisecond)
 	for {
 		select {
@@ -130,8 +128,8 @@ func (this *Listener) Query(ctx context.Context) error {
 			if err := this.send(msg); err != nil {
 				return err
 			}
-			// Restart timer after 5 seconds
-			ticker.Reset(5 * time.Second)
+			// Restart timer to send query again
+			ticker.Reset(DELTA_QUERY)
 		case <-ctx.Done():
 			ticker.Stop()
 			return ctx.Err()
@@ -227,7 +225,7 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 	for _, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.PTR:
-			entry.SetPTR(rr)
+			entry.SetPTR(this.domain, rr)
 		case *dns.SRV:
 			entry.SetSRV(rr)
 		case *dns.TXT:
@@ -249,217 +247,19 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 	if entry.Key() == "" {
 		// Ensure entry is complete
 		return nil, nil
-	} else if strings.HasSuffix(entry.Service(), "."+this.domain) == false {
+	} else if strings.HasSuffix(entry.Key(), "."+this.domain) == false {
 		// Domain doesn't match
 		return nil, nil
-	} else {
-		return entry, nil
-	}
-}
-
-/*
-// EnumerateServiceNames browses for services available on the domain
-// and publishes the service names as events
-func (this *listener) EnumerateServiceNames(ctx context.Context) error {
-	msg := new(dns.Msg)
-	msg.SetQuestion(MDNS_SERVICE_QUERY+"."+this.domain, dns.TypePTR)
-	msg.RecursionDesired = false
-
-	// Send out service message
-	ticker := time.NewTimer(1 * time.Millisecond)
-	for {
-		select {
-		case <-ticker.C:
-			if err := this.send(msg); err != nil {
-				return err
-			}
-			// Restart timer after 5 seconds
-			ticker.Reset(5 * time.Second)
-		case <-ctx.Done():
-			ticker.Stop()
-			return ctx.Err()
+	} else if entry.Service_ == MDNS_SERVICE_QUERY {
+		// Strip domain
+		entry.Name_ = strings.TrimPrefix(entry.Name_, ".") + "."
+		if strings.HasSuffix(entry.Name(), "."+this.domain) == false {
+			return nil, nil
+		} else {
+			entry.Name_ = strings.TrimSuffix(entry.Name(), "."+this.domain)
 		}
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// PRIVATE METHODS
-
-// recv_loop is a long running routine to receive packets from an interface
-func (this *listener) recv_loop(conn *net.UDPConn) {
-	// Sanity check
-	if conn == nil {
-		return
-	}
-
-	// Indicate end of loop
-	this.ended.Add(1)
-	defer this.ended.Done()
-
-	// Perform loop
-	buf := make([]byte, 65536)
-	for this.shutdown == false {
-		if n, from, err := conn.ReadFrom(buf); err != nil {
-			continue
-		} else if service_record, err := this.parse(buf[:n], from); err != nil {
-			this.log.Warn("rpc.mdns.recv_loop: %v", err)
-		} else if service_record != nil {
-			if service_record.TTL > 0 {
-				this.log.Debug2("rpc.mdns.insert{ service_record=%v }", service_record)
-				if err := this.insert(service_record.Key, service_record); err != nil {
-					this.log.Warn("rpc.mdns.recv_loop: %v", err)
-				}
-			} else {
-				this.log.Debug2("rpc.mdns.remove{ service_record=%v }", service_record)
-				if err := this.remove(service_record.Key, service_record); err != nil {
-					this.log.Warn("rpc.mdns.recv_loop: %v", err)
-				}
-			}
-		}
-	}
-}
-
-// parse packets into service records
-func (this *listener) parse(packet []byte, from net.Addr) (*ServiceRecord, error) {
-	var msg dns.Msg
-	if err := msg.Unpack(packet); err != nil {
-		return nil, err
-	}
-	if msg.Opcode != dns.OpcodeQuery {
-		return nil, fmt.Errorf("Query with non-zero Opcode %v", msg.Opcode)
-	}
-	if msg.Rcode != 0 {
-		return nil, fmt.Errorf("Query with non-zero Rcode %v", msg.Rcode)
-	}
-	if msg.Truncated {
-		return nil, fmt.Errorf("Support for DNS requests with high truncated bit not implemented")
-	}
-
-	// Make the entry
-	entry := &ServiceRecord{
-		Timestamp: time.Now(),
-	}
-
-	// Process sections of the response
-	sections := append(msg.Answer, msg.Ns...)
-	sections = append(sections, msg.Extra...)
-	for _, answer := range sections {
-		switch rr := answer.(type) {
-		case *dns.PTR:
-			// Obtain the name and service
-			entry.Key = rr.Ptr
-			entry.Name = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
-			entry.Service = rr.Hdr.Name
-			entry.TTL = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
-		case *dns.SRV:
-			entry.Host = rr.Target
-			entry.Port = rr.Port
-		case *dns.TXT:
-			entry.TXT = rr.Txt
-		}
-	}
-
-	// Check the entry ServiceDomain matches this domain
-	if strings.HasSuffix(entry.Service, "."+this.domain) {
-		entry.Service = strings.TrimSuffix(entry.Service, "."+this.domain)
-	} else {
-		return nil, nil
-	}
-
-	// Associate IPs in a second round
-	entry.IPv4 = make([]net.IP, 0)
-	entry.IPv6 = make([]net.IP, 0)
-	for _, answer := range sections {
-		switch rr := answer.(type) {
-		case *dns.A:
-			entry.IPv4 = append(entry.IPv4, rr.A)
-		case *dns.AAAA:
-			entry.IPv6 = append(entry.IPv4, rr.AAAA)
-		}
-	}
-	// Ensure entry is complete
-	if entry.complete() {
-		return entry, nil
-	} else {
-		return nil, nil
-	}
-}
-
-func (this *listener) insert(key string, record *ServiceRecord) error {
-	this.Lock()
-	defer this.Unlock()
-
-	if record.Service == MDNS_SERVICE_QUERY {
-		if _, exists := this.entries[key]; exists == false {
-			domain := "." + this.domain
-			if strings.HasSuffix(record.Key, domain) {
-				this.emit_service_event(strings.TrimSuffix(record.Key, domain))
-			}
-			this.entries[key] = record
-		}
-	} else if _, exists := this.entries[key]; exists == false {
-		// Add new entry
-		fmt.Printf("ADD: %v\n", record)
-		this.entries[key] = record
-	} else {
-		// Update existing entry
-		if record.equals(this.entries[key]) == false {
-			fmt.Printf("UPD: %v\n", record)
-		}
-		this.entries[key] = record
 	}
 
 	// Success
-	return nil
+	return entry, nil
 }
-
-func (this *listener) remove(key string, record *ServiceRecord) error {
-	this.Lock()
-	defer this.Unlock()
-
-	if record.Service == MDNS_SERVICE_QUERY {
-		delete(this.entries, key)
-	} else if _, exists := this.entries[key]; exists == true {
-		// Remove existing entry
-		fmt.Printf("DEL: %v\n", record)
-		delete(this.entries, key)
-	}
-
-	// Success
-	return nil
-}
-
-func (this *listener) ttl_expire(start chan<- event.Signal, stop <-chan event.Signal) error {
-	this.log.Debug("START ttl_expire")
-	start <- gopi.DONE
-
-	timer := time.NewTicker(500 * time.Millisecond)
-
-FOR_LOOP:
-	for {
-		select {
-		case <-timer.C:
-			// look for expiring TTL records in a very non-optimal way
-			expired_keys := make([]string, 0, 1)
-			for _, entry := range this.entries {
-				if time.Now().After(entry.Timestamp.Add(entry.TTL)) {
-					expired_keys = append(expired_keys, entry.Key)
-				}
-			}
-			for _, key := range expired_keys {
-				fmt.Printf("EXP: %v\n", this.entries[key])
-				delete(this.entries, key)
-			}
-		case <-stop:
-			break FOR_LOOP
-		}
-	}
-
-	this.log.Debug("STOP ttl_expire")
-	return nil
-}
-
-func (this *listener) emit_service_event(service_name string) {
-	this.Emit(rpc.NewEvent(gopi.RPC_EVENT_SERVICE_NAME))
-}
-*/

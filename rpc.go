@@ -10,6 +10,7 @@
 package rpc
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
@@ -26,16 +27,16 @@ import (
 
 // RPCServiceRecord implementation
 type ServiceRecord struct {
-	Key_     string        `json:"key"`
-	Name_    string        `json:"name"`
-	Host_    string        `json:"host"`
-	Service_ string        `json:"service"`
-	Port_    uint          `json:"port"`
-	Txt_     []string      `json:"txt"`
-	Ipv4_    []net.IP      `json:"ipv4"`
-	Ipv6_    []net.IP      `json:"ipv6"`
-	Ts_      time.Time     `json:"ts"`
-	Ttl_     time.Duration `json:"ttl"`
+	Key_     string    `json:"key"`
+	Name_    string    `json:"name"`
+	Host_    string    `json:"host"`
+	Service_ string    `json:"service"`
+	Port_    uint      `json:"port"`
+	Txt_     []string  `json:"txt"`
+	Ipv4_    []net.IP  `json:"ipv4"`
+	Ipv6_    []net.IP  `json:"ipv6"`
+	Ts_      time.Time `json:"ts"`
+	Ttl_     *Duration `json:"ttl"`
 }
 
 // RPCEvent implementation
@@ -43,6 +44,11 @@ type Event struct {
 	s gopi.Driver
 	t gopi.RPCEventType
 	r gopi.RPCServiceRecord
+}
+
+// Duration type to read and write JSON better
+type Duration struct {
+	Duration time.Duration
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -92,7 +98,7 @@ func (this *ServiceRecord) Port() uint {
 }
 
 func (this *ServiceRecord) TTL() time.Duration {
-	return this.Ttl_
+	return this.Ttl_.Duration
 }
 
 func (this *ServiceRecord) Timestamp() time.Time {
@@ -111,11 +117,17 @@ func (this *ServiceRecord) IP6() []net.IP {
 	return this.Ipv6_
 }
 
-func (this *ServiceRecord) SetPTR(rr *dns.PTR) {
+func (this *ServiceRecord) SetPTR(zone string, rr *dns.PTR) {
 	this.Key_ = rr.Ptr
 	this.Name_ = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
 	this.Service_ = rr.Hdr.Name
-	this.Ttl_ = time.Duration(time.Second * time.Duration(rr.Hdr.Ttl))
+	this.Ttl_ = &Duration{time.Second * time.Duration(rr.Hdr.Ttl)}
+
+	// Sanitize zone and service
+	if zone != "" {
+		zone = "." + strings.Trim(zone, ".") + "."
+		this.Service_ = strings.TrimSuffix(this.Service_, zone)
+	}
 }
 
 func (this *ServiceRecord) SetSRV(rr *dns.SRV) {
@@ -138,12 +150,14 @@ func (this *ServiceRecord) AppendIP6(rr *dns.AAAA) {
 func (this *ServiceRecord) Expired() bool {
 	if this.Ts_.IsZero() {
 		return false
-	} else if this.Ttl_ == 0 {
-		return true
-	} else if time.Now().Sub(this.Ts_) > this.Ttl_ {
+	} else if this.Ttl_.Duration == 0 {
 		return true
 	} else {
-		return false
+		if time.Now().Sub(this.Ts_) > this.Ttl_.Duration {
+			return true
+		} else {
+			return false
+		}
 	}
 }
 
@@ -205,8 +219,8 @@ func (s *ServiceRecord) String() string {
 	if len(s.Ipv6_) > 0 {
 		p += fmt.Sprintf("ipv6=%v ", s.Ipv6_)
 	}
-	if s.Ttl_ > 0 {
-		p += fmt.Sprintf("ttl=%v ", s.Ttl_)
+	if s.Ttl_.Duration > 0 {
+		p += fmt.Sprintf("ttl=%v ", s.Ttl_.Duration)
 	}
 	if len(s.Txt_) > 0 {
 		p += "txt=["
@@ -219,4 +233,23 @@ func (s *ServiceRecord) String() string {
 		p += "]"
 	}
 	return fmt.Sprintf("<gopi.RPCServiceRecord>{ %v }", strings.TrimSpace(p))
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// JSON SERIALIZATION
+
+func (this *Duration) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.Quote(fmt.Sprint(this.Duration))), nil
+}
+
+func (this *Duration) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	} else if tmp, err := time.ParseDuration(s); err != nil {
+		return err
+	} else {
+		this.Duration = tmp
+		return nil
+	}
 }

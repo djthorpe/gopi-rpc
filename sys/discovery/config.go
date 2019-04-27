@@ -15,6 +15,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,29 +32,41 @@ import (
 type Config struct {
 	sync.Mutex
 	event.Tasks
+	event.Publisher
 
 	// Public members
 	Services []*rpc.ServiceRecord `json:"services"`
 
 	// Private members
+	errors   chan<- error
 	modified bool
 	path     string
+	source   gopi.Driver
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
 const (
-	WRITE_DELTA  = 5 * time.Second
-	EXPIRE_DELTA = 60 * time.Second
+	FILENAME_DEFAULT = "discovery.json"
+	WRITE_DELTA      = 5 * time.Second
+	EXPIRE_DELTA     = 60 * time.Second
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 // INIT / DEINIT
 
-func (this *Config) Init(path string) error {
+func (this *Config) Init(source gopi.Driver, path string, errors chan<- error) error {
 	this.Services = make([]*rpc.ServiceRecord, 0)
 	this.modified = false
+
+	// Check incoming parameters
+	if errors == nil || source == nil {
+		return gopi.ErrBadParameter
+	}
+
+	this.source = source
+	this.errors = errors
 
 	// Read or create file
 	if path != "" {
@@ -68,6 +82,9 @@ func (this *Config) Init(path string) error {
 
 func (this *Config) Destroy() error {
 
+	// Unsubscribe listeners
+	this.Publisher.Close()
+
 	// Stop all tasks
 	if err := this.Tasks.Close(); err != nil {
 		return err
@@ -75,6 +92,17 @@ func (this *Config) Destroy() error {
 
 	// Success
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (this Config) String() string {
+	params := ""
+	if this.path != "" {
+		params += fmt.Sprintf("path=%v ", strconv.Quote(this.path))
+	}
+	return fmt.Sprintf("<Config>{ %v num_services=%v }", strings.TrimSpace(params), len(this.Services))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -95,16 +123,19 @@ func (this *Config) CreatePath(path string) error {
 	this.path = path
 
 	// Read file
-	if stat, err := os.Stat(path); err == nil && stat.Mode().IsRegular() {
-		if err := this.Read(path); err != nil {
+	if stat, err := os.Stat(this.path); err == nil && stat.Mode().IsRegular() {
+		if err := this.Read(this.path); err != nil {
 			return err
 		} else {
 			return nil
 		}
+	} else if err == nil && stat.IsDir() {
+		// append default filename
+		this.path = filepath.Join(this.path, FILENAME_DEFAULT)
 	}
 
 	// Create file
-	if fh, err := os.Create(path); err != nil {
+	if fh, err := os.Create(this.path); err != nil {
 		return err
 	} else if err := fh.Close(); err != nil {
 		return err
@@ -157,8 +188,13 @@ func (this *Config) Read(path string) error {
 		return err
 	} else {
 		defer fh.Close()
-		if err := this.Reader(fh); err != nil {
+		if config, err := this.Reader(fh); err != nil {
 			return err
+		} else {
+			this.Lock()
+			defer this.Unlock()
+			this.Services = config.ExpireServices()
+			this.modified = false
 		}
 	}
 
@@ -167,24 +203,29 @@ func (this *Config) Read(path string) error {
 }
 
 // Reader reads the configuration from an io.Reader object
-func (this *Config) Reader(fh io.Reader) error {
+func (this *Config) Reader(fh io.Reader) (*Config, error) {
 	this.Lock()
 	defer this.Unlock()
 
 	dec := json.NewDecoder(fh)
 	config := new(Config)
 	if err := dec.Decode(&config); err != nil {
-		return err
+		return nil, err
 	}
 
-	// Copy over the config
-	this.Services = config.Services
-
-	// Clear modified flag
-	this.modified = false
-
 	// Success
-	return nil
+	return config, nil
+}
+
+// ExpireServices returns an array of unexpired services
+func (this *Config) ExpireServices() []*rpc.ServiceRecord {
+	services := make([]*rpc.ServiceRecord, 0, len(this.Services))
+	for _, service := range this.Services {
+		if service.Expired() == false {
+			services = append(services, service)
+		}
+	}
+	return services
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -198,9 +239,10 @@ FOR_LOOP:
 		select {
 		case <-ticker.C:
 			if this.modified {
-				if err := this.Write(this.path, true); err != nil {
-					// TODO
-					fmt.Println(err)
+				if this.path == "" {
+					// Do nothing
+				} else if err := this.Write(this.path, true); err != nil {
+					this.errors <- err
 				}
 			}
 		case <-stop:
@@ -224,10 +266,12 @@ FOR_LOOP:
 		case <-ticker.C:
 			for _, service := range this.Services {
 				if service.Expired() {
-					// TODO: Remove record
-					fmt.Printf("Expired %v\n", service)
-					this.SetModified()
+					this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_EXPIRED, service))
 				}
+			}
+			if services := this.ExpireServices(); len(services) != len(this.Services) {
+				this.Services = services
+				this.SetModified()
 			}
 			ticker.Reset(EXPIRE_DELTA)
 		case <-stop:
@@ -249,14 +293,16 @@ func (this *Config) Register(service *rpc.ServiceRecord) error {
 	if service == nil || service.TTL() == 0 || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
-	if index := this.IndexForService(service); index == -1 {
+	if service.Service() == MDNS_SERVICE_QUERY {
+		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_NAME, service))
+	} else if index := this.IndexForService(service); index == -1 {
 		this.Services = append(this.Services, service)
 		this.SetModified()
-		fmt.Printf("Added %v\n", service)
+		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_ADDED, service))
 	} else {
 		this.Services[index] = service
 		this.SetModified()
-		fmt.Printf("Updated %v\n", service)
+		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_UPDATED, service))
 	}
 
 	// Success
@@ -272,7 +318,7 @@ func (this *Config) Remove(service *rpc.ServiceRecord) error {
 	} else if err := this.RemoveAtIndex(index); err != nil {
 		return err
 	} else {
-		fmt.Printf("Removed %v\n", service)
+		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_REMOVED, service))
 	}
 
 	// Success

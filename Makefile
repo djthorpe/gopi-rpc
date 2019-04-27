@@ -27,7 +27,10 @@ helloworld-client: protobuf
 helloworld-service: protobuf
 	$(GOINSTALL) $(GOFLAGS) ./cmd/helloworld-service/...
 
-test: 
+dns-discovery:
+	$(GOINSTALL) $(GOFLAGS) ./cmd/dns-discovery/...
+
+test:  protobuf
 	$(GOTEST) -v ./...
 
 clean: 
