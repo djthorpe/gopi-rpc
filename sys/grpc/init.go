@@ -46,27 +46,11 @@ func init() {
 		Name: "rpc/clientpool",
 		Type: gopi.MODULE_TYPE_OTHER,
 		Config: func(config *gopi.AppConfig) {
-			config.AppFlags.FlagBool("rpc.insecure", false, "Disable SSL Connection")
-			config.AppFlags.FlagBool("rpc.skipverify", true, "Skip SSL Verification")
-			config.AppFlags.FlagDuration("rpc.timeout", 0, "Connection timeout")
-			config.AppFlags.FlagString("rpc.service", "", "Comma-separated list of service names")
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
-			insecure, _ := app.AppFlags.GetBool("rpc.insecure")
-			skipverify, _ := app.AppFlags.GetBool("rpc.skipverify")
-			timeout, _ := app.AppFlags.GetDuration("rpc.timeout")
-			service, _ := app.AppFlags.GetString("rpc.service")
-			config := ClientPool{
-				SkipVerify: skipverify,
-				SSL:        (insecure == false),
-				Timeout:    timeout,
-				Service:    service,
-			}
+			config := ClientPool{}
 			if discovery, ok := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery); ok {
 				config.Discovery = discovery
-			}
-			if service == "" {
-				config.Service = app.Service()
 			}
 			return gopi.Open(config, app.Logger)
 		},

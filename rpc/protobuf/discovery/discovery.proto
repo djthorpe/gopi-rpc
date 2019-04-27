@@ -11,15 +11,6 @@ service Discovery {
 
   // Registers a service record
   rpc Register (ServiceRecord) returns (google.protobuf.Empty);
-
-  // Looks up service records
-  rpc Lookup (LookupRequest) returns (LookupReply);
-
-  // Removes a service record
-  rpc Remove (LookupRequest) returns (google.protobuf.Empty);
-
-  // Streams discovery events
-  rpc StreamEvents (LookupRequest) returns (stream Event);
 }
 
 // Event type
@@ -34,10 +25,10 @@ enum EventType {
 // An RPCServiceRecord
 message ServiceRecord {
     string name = 1;
-    string type = 2;
+    string service = 2;
     uint32 port = 3;
-    repeated string txt = 4;
-    string host = 5;
+    string host = 4;
+    repeated string txt = 5;
     repeated string ip4 = 6;
     repeated string ip6 = 7;
     google.protobuf.Duration ttl = 8;
@@ -47,7 +38,6 @@ message ServiceRecord {
 message LookupRequest {
     string name = 1;
     string type = 2;
-    uint32 port = 3;
 }
 
 // Return zero or more service records

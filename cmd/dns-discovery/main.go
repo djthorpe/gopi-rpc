@@ -20,7 +20,7 @@ import (
 	tablewriter "github.com/olekukonko/tablewriter"
 
 	// Modules
-	_ "github.com/djthorpe/gopi-rpc/sys/discovery"
+	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
 	_ "github.com/djthorpe/gopi/sys/logger"
 )
 
@@ -57,69 +57,32 @@ func RenderIP(service gopi.RPCServiceRecord) string {
 	return strings.Join(ips, " ")
 }
 
-func Listener(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) error {
-	discovery := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery)
-	events := discovery.Subscribe()
-	start <- gopi.DONE
-
-FOR_LOOP:
-	for {
-		select {
-		case evt := <-events:
-			if evt_, ok := evt.(gopi.RPCEvent); ok {
-				RenderEvent(evt_)
-			}
-		case <-stop:
-			break FOR_LOOP
-		}
-	}
-
-	discovery.Unsubscribe(events)
-	return nil
-}
-
-func EnumerateServices(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) error {
-	discovery := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery)
-	start <- gopi.DONE
-
-	// If there is an argument, then quit this backgroun task
-	args := app.AppFlags.Args()
-	if len(args) != 0 {
-		return nil
-	}
-
-	// Create context with timeout
-	timeout, _ := app.AppFlags.GetDuration("timeout")
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-
-	// Wait for cancel in the background
-	go func() {
-		<-stop
-		cancel()
-	}()
-
-	if services, err := discovery.EnumerateServices(ctx); err != nil {
-		return err
-	} else {
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Service"})
-		for _, service := range services {
-			table.Append([]string{service})
-		}
-		table.Render()
-	}
-
-	// Success
-	return nil
-}
-
 func Lookup(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) error {
 	discovery := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery)
 	start <- gopi.DONE
 
 	// If there is an argument, then this is the service to lookup
 	args := app.AppFlags.Args()
-	if len(args) != 1 {
+	watch, _ := app.AppFlags.GetBool("watch")
+	service := ""
+	if len(args) == 1 {
+		service = args[0]
+	} else if len(args) > 1 {
+		return gopi.ErrHelp
+	} else if len(args) == 0 && watch {
+		events := discovery.Subscribe()
+	FOR_LOOP:
+		for {
+			select {
+			case evt := <-events:
+				if evt_, ok := evt.(gopi.RPCEvent); ok {
+					RenderEvent(evt_)
+				}
+			case <-stop:
+				break FOR_LOOP
+			}
+		}
+		discovery.Unsubscribe(events)
 		return nil
 	}
 
@@ -133,25 +96,40 @@ func Lookup(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) 
 		cancel()
 	}()
 
-	// Perform lookup
-	if services, err := discovery.Lookup(ctx, args[0]); err != nil {
-		return err
-	} else {
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Service", "Name", "Host", "IP"})
-		for _, service := range services {
-			table.Append([]string{
-				service.Service(),
-				service.Name(),
-				RenderHost(service),
-				RenderIP(service),
-			})
+	if service == "" {
+		// Enumerate service names
+		if services, err := discovery.EnumerateServices(ctx); err != nil {
+			return err
+		} else {
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetHeader([]string{"Service"})
+			for _, service := range services {
+				table.Append([]string{service})
+			}
+			table.Render()
 		}
-		table.Render()
+
+	} else {
+		// Perform lookup
+		if services, err := discovery.Lookup(ctx, args[0]); err != nil {
+			return err
+		} else {
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetHeader([]string{"Service", "Name", "Host", "IP"})
+			for _, service := range services {
+				table.Append([]string{
+					service.Service(),
+					service.Name(),
+					RenderHost(service),
+					RenderIP(service),
+				})
+			}
+			table.Render()
+		}
 	}
 
-	// Return success
-	return nil
+	// Signal end
+	return app.SendSignal()
 }
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
@@ -168,8 +146,9 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 func main() {
 	// Create the configuration
 	config := gopi.NewAppConfig("discovery")
-	config.AppFlags.FlagDuration("timeout", time.Millisecond*500, "Timeout for lookup")
+	config.AppFlags.FlagDuration("timeout", time.Millisecond*750, "Timeout for lookup")
+	config.AppFlags.FlagBool("watch", false, "Watch for stream of service records")
 
 	// Run the command line tool
-	os.Exit(gopi.CommandLineTool2(config, Main, Lookup, EnumerateServices, Listener))
+	os.Exit(gopi.CommandLineTool2(config, Main, Lookup))
 }

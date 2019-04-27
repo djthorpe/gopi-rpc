@@ -148,7 +148,7 @@ func (this *server) GRPCServer() *grpc.Server {
 ///////////////////////////////////////////////////////////////////////////////
 // SERVICE
 
-func (this *server) Service(service string, text ...string) *gopi.RPCServiceRecord {
+func (this *server) Service(service string, text ...string) gopi.RPCServiceRecord {
 	if hostname, err := os.Hostname(); err != nil {
 		this.log.Error("<grpc.Server>Service: %v", err)
 		return nil
@@ -157,11 +157,12 @@ func (this *server) Service(service string, text ...string) *gopi.RPCServiceReco
 	}
 }
 
-func (this *server) ServiceWithName(service, name string, text ...string) *gopi.RPCServiceRecord {
+func (this *server) ServiceWithName(service, name string, text ...string) gopi.RPCServiceRecord {
 	// Can't return a service unless the server is started
 	if this.addr == nil {
 		return nil
 	}
+
 	// Can't return non-TCP
 	if this.addr.Network() != "tcp" {
 		return nil
@@ -170,16 +171,13 @@ func (this *server) ServiceWithName(service, name string, text ...string) *gopi.
 	if strings.TrimSpace(name) == "" {
 		return nil
 	}
-	// Return service
-	if addr, ok := this.addr.(*net.TCPAddr); ok == false {
+	// Return service - TODO
+	if _, ok := this.addr.(*net.TCPAddr); ok == false {
 		return nil
 	} else {
-		return &gopi.RPCServiceRecord{
-			Name: strings.TrimSpace(name),
-			Type: serviceType(service, addr.Network()),
-			Port: uint(addr.Port),
-			Text: text,
-		}
+		// TODO
+		r := rpc.NewServiceRecord()
+		return r
 	}
 }
 

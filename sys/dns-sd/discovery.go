@@ -92,9 +92,12 @@ func (this *discovery) Close() error {
 ////////////////////////////////////////////////////////////////////////////////
 // REGISTER AND BROWSE
 
-// Register a service record on the network
+// Register a service record
 func (this *discovery) Register(service gopi.RPCServiceRecord) error {
 	this.log.Debug2("<rpc.discovery.Register>{ service=%v }", service)
+	if service == nil {
+		return gopi.ErrBadParameter
+	}
 	return gopi.ErrNotImplemented
 }
 
