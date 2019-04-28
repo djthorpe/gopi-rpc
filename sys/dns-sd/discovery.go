@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 
 	// Frameworks
@@ -48,7 +49,7 @@ type discovery struct {
 // OPEN AND CLOSE
 
 func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
-	logger.Debug("<rpc.discovery.Open>{ interface=%v domain='%v' }", config.Interface, config.Domain)
+	logger.Debug("<rpc.discovery.Open>{ interface=%v domain='%v' flags=%v }", config.Interface, config.Domain, config.Flags)
 
 	this := new(discovery)
 	this.errors = make(chan error)
@@ -205,6 +206,18 @@ func (this *discovery) EnumerateServices(ctx context.Context) ([]string, error) 
 	} else {
 		return nil, err
 	}
+}
+
+// ServiceInstances returns all cached servicerecords for a particular service name
+func (this *discovery) ServiceInstances(service string) []gopi.RPCServiceRecord {
+	this.log.Debug2("<rpc.discovery.ServiceRecords>{ service=%v }", strconv.Quote(service))
+	records := make([]gopi.RPCServiceRecord, 0, len(this.Config.Services))
+	for _, record := range this.Config.Services {
+		if service == "" || (record.Service() == service && strings.TrimSpace(record.Service()) != "") {
+			records = append(records, record)
+		}
+	}
+	return records
 }
 
 ////////////////////////////////////////////////////////////////////////////////

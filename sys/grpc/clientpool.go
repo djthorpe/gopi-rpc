@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/djthorpe/gopi/util/errors"
+
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
@@ -27,7 +29,6 @@ import (
 // TYPES
 
 type ClientPool struct {
-	Discovery  gopi.RPCServiceDiscovery
 	SSL        bool
 	SkipVerify bool
 	Timeout    time.Duration
@@ -38,7 +39,8 @@ type clientpool struct {
 
 	log        gopi.Logger
 	discovery  gopi.RPCServiceDiscovery
-	clients    map[string]gopi.RPCNewClientFunc
+	services   map[string]gopi.RPCNewClientFunc
+	clients    []*clientconn
 	ssl        bool
 	skipverify bool
 	timeout    time.Duration
@@ -48,15 +50,15 @@ type clientpool struct {
 // OPEN AND CLOSE
 
 func (config ClientPool) Open(log gopi.Logger) (gopi.Driver, error) {
-	log.Debug("<grpc.clientpool>Open{ discovery=%v ssl=%v skipverify=%v timeout=%v }", config.Discovery, config.SSL, config.SkipVerify, config.Timeout)
+	log.Debug("<grpc.clientpool>Open{ ssl=%v skipverify=%v timeout=%v }", config.SSL, config.SkipVerify, config.Timeout)
 
 	this := new(clientpool)
 	this.log = log
-	this.discovery = config.Discovery
 	this.ssl = config.SSL
 	this.skipverify = config.SkipVerify
 	this.timeout = config.Timeout
-	this.clients = make(map[string]gopi.RPCNewClientFunc, 10)
+	this.services = make(map[string]gopi.RPCNewClientFunc, 10)
+	this.clients = make([]*clientconn, 0)
 
 	// Success
 	return this, nil
@@ -68,11 +70,21 @@ func (this *clientpool) Close() error {
 	// Unsubscribe listeners
 	this.Publisher.Close()
 
-	// Release resources
-	this.discovery = nil
-	this.clients = nil
+	// Close clients
+	errs := errors.CompoundError{}
+	for _, client := range this.clients {
+		if client.Connected() {
+			errs.Add(client.Disconnect())
+		}
+	}
 
-	return nil
+	// Release resources
+	this.clients = nil
+	this.discovery = nil
+	this.services = nil
+
+	// Return any errors
+	return errs.ErrorOrSelf()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -114,11 +126,11 @@ func (this *clientpool) RegisterClient(service string, callback gopi.RPCNewClien
 	this.log.Debug2("<grpc.clientpool.RegisterClient>{ service=%v callback=%v }", strconv.Quote(service), callback)
 	if service == "" || callback == nil {
 		return gopi.ErrBadParameter
-	} else if _, exists := this.clients[service]; exists {
+	} else if _, exists := this.services[service]; exists {
 		this.log.Warn("<rpc.clientpool>RegisterClient: Duplicate service: %v", service)
 		return gopi.ErrBadParameter
 	} else {
-		this.clients[service] = callback
+		this.services[service] = callback
 		return nil
 	}
 
@@ -129,7 +141,7 @@ func (this *clientpool) NewClient(service string, conn gopi.RPCClientConn) gopi.
 	this.log.Debug2("<grpc.clientpool.NewClient>{ service=%v conn=%v }", strconv.Quote(service), conn)
 
 	// Obtain the module with which to create a new client
-	if callback, exists := this.clients[service]; exists == false {
+	if callback, exists := this.services[service]; exists == false {
 		this.log.Warn("<grpc.clientpool>NewClient: Not Found: %v", service)
 		return nil
 	} else {
@@ -140,9 +152,9 @@ func (this *clientpool) NewClient(service string, conn gopi.RPCClientConn) gopi.
 func (this *clientpool) Lookup(ctx context.Context, service, addr string, max int) ([]gopi.RPCServiceRecord, error) {
 	this.log.Debug2("<grpc.clientpool.Lookup>{ service=%v addr=%v max=%v }", strconv.Quote(service), strconv.Quote(addr), max)
 
-	if this.discovery == nil {
-		// If there is no discovery service, then return the service record
-		// with the address only
+	if this.discovery == nil || service == "" {
+		// If there is no discovery service or the service string is empty,
+		// then return the service record with the address only
 		if record := serviceRecordWithAddr(service, addr); record == nil {
 			return nil, gopi.ErrBadParameter
 		} else {
@@ -166,7 +178,7 @@ func (this *clientpool) Lookup(ctx context.Context, service, addr string, max in
 // STRINGIFY
 
 func (this *clientpool) String() string {
-	return fmt.Sprintf("<grpc.clientpool>{ discovery=%v clients=%v }", this.discovery, this.clients)
+	return fmt.Sprintf("<grpc.clientpool>{ discovery=%v services=%v }", this.discovery, this.services)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -48,18 +48,9 @@ func init() {
 		Name: "rpc/clientpool",
 		Type: gopi.MODULE_TYPE_OTHER,
 		Config: func(config *gopi.AppConfig) {
-			// Flags
 			config.AppFlags.FlagDuration("rpc.timeout", 5*time.Second, "Connection timeout")
 			config.AppFlags.FlagBool("rpc.insecure", false, "Allow plaintext connections")
 			config.AppFlags.FlagBool("rpc.skipverify", true, "Skip SSL certificate verification")
-
-			// If there is a discovery module, make it a requirement
-			if discovery := gopi.ModuleByName("discovery"); discovery != nil {
-				// Inject dependpency
-				if clientpool := gopi.ModuleByName("rpc/clientpool"); clientpool != nil {
-					clientpool.Requires = append(clientpool.Requires, discovery.Name)
-				}
-			}
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
 			insecure, _ := app.AppFlags.GetBool("rpc.insecure")
@@ -70,10 +61,14 @@ func init() {
 				SkipVerify: skipverify,
 				Timeout:    timeout,
 			}
-			if discovery := app.ModuleInstance("discovery"); discovery != nil {
-				config.Discovery = discovery.(gopi.RPCServiceDiscovery)
-			}
 			return gopi.Open(config, app.Logger)
+		},
+		Run: func(app *gopi.AppInstance, driver gopi.Driver) error {
+			// Hook in the discovery module if it's found
+			if discovery := app.ModuleInstance("discovery"); discovery != nil {
+				driver.(*clientpool).discovery = discovery.(gopi.RPCServiceDiscovery)
+			}
+			return nil
 		},
 	})
 }

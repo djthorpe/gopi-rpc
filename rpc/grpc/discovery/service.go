@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -100,26 +101,72 @@ func (this *service) Register(ctx context.Context, service *pb.ServiceRecord) (*
 
 func (this *service) Enumerate(ctx context.Context, req *pb.EnumerateRequest) (*pb.EnumerateReply, error) {
 	this.log.Debug("<grpc.service.discovery.Enumerate>{ type=%v }", req.Type)
-	if services, err := this.discovery.EnumerateServices(ctx); err != nil {
-		return nil, err
-	} else {
-		return &pb.EnumerateReply{Service: services}, nil
+
+	// Adjust the deadline to allow for communicating back to the client
+	if timeout, ok := ctx.Deadline(); ok {
+		deadline := timeout.Sub(time.Now()) - 100*time.Millisecond
+		if deadline > 0 {
+			ctx, _ = context.WithTimeout(ctx, deadline)
+		}
 	}
+
+	// Enumerate using DNS
+	if req.Type == pb.DiscoveryType_DISCOVERY_DNS {
+		if services, err := this.discovery.EnumerateServices(ctx); err != nil {
+			return nil, err
+		} else {
+			return &pb.EnumerateReply{Service: services}, nil
+		}
+	}
+
+	// Enumerate using Cache
+	if req.Type == pb.DiscoveryType_DISCOVERY_DB {
+		services := make(map[string]bool)
+		for _, instance := range this.discovery.ServiceInstances("") {
+			services[instance.Service()] = true
+		}
+		services_ := make([]string, 0, len(services))
+		for key := range services {
+			services_ = append(services_, key)
+		}
+		return &pb.EnumerateReply{Service: services_}, nil
+	}
+
+	// Return error
+	return nil, gopi.ErrBadParameter
 }
 
 func (this *service) Lookup(ctx context.Context, req *pb.LookupRequest) (*pb.LookupReply, error) {
 	this.log.Debug("<grpc.service.discovery.Lookup>{ type=%v service=%v }", req.Type, strconv.Quote(req.Service))
+
+	// Check incoming parameters
 	if req.Service == "" {
 		return nil, gopi.ErrBadParameter
 	}
-	if req.Type != pb.DiscoveryType_DISCOVERY_DNS {
-		return nil, gopi.ErrNotImplemented
+
+	// Adjust the deadline to allow for communicating back to the client
+	if timeout, ok := ctx.Deadline(); ok {
+		deadline := timeout.Sub(time.Now()) - 100*time.Millisecond
+		if deadline > 0 {
+			ctx, _ = context.WithTimeout(ctx, deadline)
+		}
 	}
-	if reply, err := this.discovery.Lookup(ctx, req.Service); err != nil {
-		return nil, err
-	} else {
+
+	if req.Type == pb.DiscoveryType_DISCOVERY_DNS {
+		if reply, err := this.discovery.Lookup(ctx, req.Service); err != nil {
+			return nil, err
+		} else {
+			return &pb.LookupReply{
+				Service: protoFromServiceRecords(reply),
+			}, nil
+		}
+	}
+
+	if req.Type == pb.DiscoveryType_DISCOVERY_DB {
 		return &pb.LookupReply{
-			Service: protoFromServiceRecords(reply),
+			Service: protoFromServiceRecords(this.discovery.ServiceInstances(req.Service)),
 		}, nil
 	}
+	// Return error
+	return nil, gopi.ErrBadParameter
 }

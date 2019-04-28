@@ -10,12 +10,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
+	tablewriter "github.com/olekukonko/tablewriter"
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
@@ -34,6 +35,8 @@ func Conn(app *gopi.AppInstance) (gopi.RPCClientConn, error) {
 	addr, _ := app.AppFlags.GetString("addr")
 	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
 	ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
+
+	// If service is nil, then use the address
 	if records, err := pool.Lookup(ctx, "", addr, 1); err != nil {
 		return nil, err
 	} else if len(records) == 0 {
@@ -78,8 +81,15 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 		return err
 	} else if err := client.Ping(); err != nil {
 		return err
+	} else if services, err := client.Enumerate(rpc.DISCOVERY_TYPE_DB, 0); err != nil {
+		return err
 	} else {
-		fmt.Println("Conn=", client)
+		table := tablewriter.NewWriter(os.Stdout)
+		table.SetHeader([]string{"Service"})
+		for _, service := range services {
+			table.Append([]string{service})
+		}
+		table.Render()
 	}
 
 	// Success
@@ -90,7 +100,7 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/discovery:client", "rpc/version:client")
+	config := gopi.NewAppConfig("rpc/discovery:client", "rpc/version:client", "discovery")
 
 	// Set flags
 	config.AppFlags.FlagString("addr", "localhost:8080", "Gateway address")

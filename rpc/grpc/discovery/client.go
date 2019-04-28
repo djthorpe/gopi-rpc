@@ -105,6 +105,27 @@ func (this *Client) Enumerate(t rpc.DiscoveryType, timeout time.Duration) ([]str
 	}
 }
 
+// Lookup service instances
+func (this *Client) Lookup(service string, t rpc.DiscoveryType, timeout time.Duration) ([]gopi.RPCServiceRecord, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	// If timeout is zero, use the connection timeout, but it can't be zero
+	if timeout == 0 && this.conn.Timeout() == 0 {
+		return nil, gopi.ErrBadParameter
+	}
+
+	// Perform lookup
+	if _, err := this.DiscoveryClient.Lookup(this.NewContext(timeout), &pb.LookupRequest{
+		Service: service,
+		Type:    protoFromDiscoveryType(t),
+	}); err != nil {
+		return nil, err
+	} else {
+		return nil, nil
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 

@@ -66,10 +66,10 @@ func (this *Listener) Init(config Discovery, errors chan<- error, services chan<
 	if errors == nil || services == nil {
 		return gopi.ErrBadParameter
 	}
-	if config.Flags|gopi.RPC_FLAG_INET_V4 != 0 {
+	if config.Flags&gopi.RPC_FLAG_INET_V4 != 0 {
 		this.ipv4, _ = net.ListenMulticastUDP("udp4", config.Interface, MDNS_ADDR_IPV4)
 	}
-	if config.Flags|gopi.RPC_FLAG_INET_V6 != 0 {
+	if config.Flags&gopi.RPC_FLAG_INET_V6 != 0 {
 		this.ipv6, _ = net.ListenMulticastUDP("udp6", config.Interface, MDNS_ADDR_IPV6)
 	}
 	if this.ipv4 == nil && this.ipv6 == nil {
