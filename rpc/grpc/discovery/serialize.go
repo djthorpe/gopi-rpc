@@ -13,14 +13,13 @@ import (
 	"net"
 	"time"
 
-	"github.com/golang/protobuf/ptypes"
-
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/discovery"
+	ptypes "github.com/golang/protobuf/ptypes"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -104,6 +103,53 @@ func (this *servicerecord) IP6() []net.IP {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// OPAQUE EVENT
+
+type rpcevent struct {
+	r *pb.Event
+}
+
+func (this *rpcevent) Source() gopi.Driver {
+	return nil
+}
+
+func (this *rpcevent) Name() string {
+	return "RPCEvent"
+}
+
+func (this *rpcevent) Type() gopi.RPCEventType {
+	if this.r == nil {
+		return gopi.RPC_EVENT_NONE
+	}
+	switch this.r.Type {
+	case pb.EventType_EVENT_ADD:
+		return gopi.RPC_EVENT_SERVICE_ADDED
+	case pb.EventType_EVENT_EXPIRE:
+		return gopi.RPC_EVENT_SERVICE_EXPIRED
+	case pb.EventType_EVENT_NAME:
+		return gopi.RPC_EVENT_SERVICE_NAME
+	case pb.EventType_EVENT_REMOVE:
+		return gopi.RPC_EVENT_SERVICE_REMOVED
+	case pb.EventType_EVENT_CHANGE:
+		return gopi.RPC_EVENT_SERVICE_UPDATED
+	default:
+		return gopi.RPC_EVENT_NONE
+	}
+}
+
+func (this *rpcevent) ServiceRecord() gopi.RPCServiceRecord {
+	if this.r == nil {
+		return nil
+	} else {
+		return protoToServiceRecord(this.r.Service)
+	}
+}
+
+func (this *rpcevent) String() string {
+	return fmt.Sprintf("<protobuf.RPCEvent>{ %v }", this.r)
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // DISCOVERY TYPE
 
 func protoToDiscoveryType(t pb.DiscoveryType) rpc.DiscoveryType {
@@ -159,7 +205,6 @@ func protoFromServiceRecords(records []gopi.RPCServiceRecord) []*pb.ServiceRecor
 }
 
 func protoToServiceRecords(proto []*pb.ServiceRecord) []gopi.RPCServiceRecord {
-	fmt.Println(proto)
 	if proto == nil {
 		return nil
 	}
@@ -168,4 +213,41 @@ func protoToServiceRecords(proto []*pb.ServiceRecord) []gopi.RPCServiceRecord {
 		records[i] = protoToServiceRecord(record)
 	}
 	return records
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RPCEVENT
+
+func protoFromEventType(type_ gopi.RPCEventType) pb.EventType {
+	switch type_ {
+	case gopi.RPC_EVENT_SERVICE_ADDED:
+		return pb.EventType_EVENT_ADD
+	case gopi.RPC_EVENT_SERVICE_EXPIRED:
+		return pb.EventType_EVENT_EXPIRE
+	case gopi.RPC_EVENT_SERVICE_NAME:
+		return pb.EventType_EVENT_NAME
+	case gopi.RPC_EVENT_SERVICE_REMOVED:
+		return pb.EventType_EVENT_REMOVE
+	case gopi.RPC_EVENT_SERVICE_UPDATED:
+		return pb.EventType_EVENT_CHANGE
+	default:
+		return pb.EventType_EVENT_NONE
+	}
+}
+
+func protoFromEvent(event gopi.RPCEvent) *pb.Event {
+	if event == nil {
+		return nil
+	}
+	return &pb.Event{
+		Type:    protoFromEventType(event.Type()),
+		Service: protoFromServiceRecord(event.ServiceRecord()),
+	}
+}
+
+func protoToEvent(proto *pb.Event) gopi.RPCEvent {
+	if proto == nil {
+		return nil
+	}
+	return &rpcevent{proto}
 }

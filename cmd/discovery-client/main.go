@@ -101,6 +101,42 @@ func VersionClient(app *gopi.AppInstance) (*version.Client, error) {
 	}
 }
 
+func Watch(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) error {
+	start <- gopi.DONE
+	service := ""
+
+	if watch, _ := app.AppFlags.GetBool("watch"); watch == false {
+		return nil
+	}
+	if args := app.AppFlags.Args(); len(args) == 1 {
+		service = args[0]
+	}
+
+	events := make(chan gopi.RPCEvent)
+	go func() {
+		fmt.Println("START")
+	FOR_LOOP:
+		for {
+			select {
+			case evt := <-events:
+				fmt.Println(evt)
+			case <-stop:
+				break FOR_LOOP
+			}
+		}
+		fmt.Println("STOP")
+	}()
+
+	if client, err := DiscoveryClient(app); err != nil {
+		return err
+	} else if err := client.StreamEvents(service, events); err != nil {
+		return err
+	}
+
+	// Success
+	return nil
+}
+
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 	t := rpc.DISCOVERY_TYPE_DB
 	service := ""
@@ -160,7 +196,8 @@ func main() {
 	// Set flags
 	config.AppFlags.FlagString("addr", "localhost:8080", "Gateway address")
 	config.AppFlags.FlagBool("dns", false, "Use DNS lookup rather than cache")
+	config.AppFlags.FlagBool("watch", false, "Watch for discovery changes")
 
 	// Run the command line tool
-	os.Exit(gopi.CommandLineTool(config, Main))
+	os.Exit(gopi.CommandLineTool2(config, Main, Watch))
 }

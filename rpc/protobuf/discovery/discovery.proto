@@ -17,6 +17,9 @@ service Discovery {
 
   // Lookup Service Instances
   rpc Lookup (LookupRequest) returns (LookupReply);
+
+  // Stream change events
+  rpc StreamEvents (StreamEventsRequest) returns (stream Event); 
 }
 
 // DiscoveryType
@@ -33,6 +36,7 @@ enum EventType {
     EVENT_CHANGE = 2;
     EVENT_EXPIRE = 3;
     EVENT_REMOVE = 4;
+    EVENT_NAME = 5;
 }
 
 // An RPCServiceRecord
@@ -66,6 +70,11 @@ message LookupReply {
 // Return an enumeration of services
 message EnumerateReply {
     repeated string service = 2;
+}
+
+// Filter for stream events request
+message StreamEventsRequest {
+    string service = 1;
 }
 
 // Monitor discovery changes

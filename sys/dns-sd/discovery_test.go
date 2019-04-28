@@ -13,7 +13,9 @@ import (
 )
 
 func Test_Discovery_001(t *testing.T) {
-	if driver, err := gopi.Open(discovery.Discovery{}, nil); err != nil {
+	if driver, err := gopi.Open(discovery.Discovery{
+		Flags: gopi.RPC_FLAG_INET_V4,
+	}, nil); err != nil {
 		t.Error(err)
 	} else {
 		defer driver.Close()

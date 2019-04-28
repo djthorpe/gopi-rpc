@@ -56,15 +56,11 @@ const (
 ////////////////////////////////////////////////////////////////////////////////
 // INIT / DEINIT
 
-func (this *Config) Init(source gopi.Driver, path string, errors chan<- error) error {
+func (this *Config) Init(path string, source gopi.Driver, errors chan<- error) error {
 	this.Services = make([]*rpc.ServiceRecord, 0)
 	this.modified = false
 
-	// Check incoming parameters
-	if errors == nil || source == nil {
-		return gopi.ErrBadParameter
-	}
-
+	// Allow nil for source and errors
 	this.source = source
 	this.errors = errors
 
@@ -241,7 +237,7 @@ FOR_LOOP:
 			if this.modified {
 				if this.path == "" {
 					// Do nothing
-				} else if err := this.Write(this.path, true); err != nil {
+				} else if err := this.Write(this.path, true); err != nil && this.errors != nil {
 					this.errors <- err
 				}
 			}

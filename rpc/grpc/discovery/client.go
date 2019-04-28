@@ -11,6 +11,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	// Frameworks
@@ -124,6 +125,33 @@ func (this *Client) Lookup(service string, t rpc.DiscoveryType, timeout time.Dur
 	} else {
 		return protoToServiceRecords(reply.Service), nil
 	}
+}
+
+// Stream events
+func (this *Client) StreamEvents(service string, events chan<- gopi.RPCEvent) error {
+	// One request per connection
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	// Keep reading from stream
+	if stream, err := this.DiscoveryClient.StreamEvents(this.NewContext(0), &pb.StreamEventsRequest{
+		Service: service,
+	}); err != nil {
+		return err
+	} else {
+		for {
+			if msg, err := stream.Recv(); err == io.EOF {
+				break
+			} else if err != nil {
+				return err
+			} else if evt := protoToEvent(msg); evt != nil {
+				events <- evt
+			}
+		}
+	}
+
+	// Success
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
