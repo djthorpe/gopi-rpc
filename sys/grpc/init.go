@@ -1,6 +1,6 @@
 /*
   Go Language Raspberry Pi Interface
-  (c) Copyright David Thorpe 2016-2017
+  (c) Copyright David Thorpe 2016-2019
   All Rights Reserved
 
   Documentation http://djthorpe.github.io/gopi/
@@ -10,6 +10,8 @@
 package grpc
 
 import (
+	"time"
+
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	grpc "google.golang.org/grpc"
@@ -46,11 +48,30 @@ func init() {
 		Name: "rpc/clientpool",
 		Type: gopi.MODULE_TYPE_OTHER,
 		Config: func(config *gopi.AppConfig) {
+			// Flags
+			config.AppFlags.FlagDuration("rpc.timeout", 5*time.Second, "Connection timeout")
+			config.AppFlags.FlagBool("rpc.insecure", false, "Allow plaintext connections")
+			config.AppFlags.FlagBool("rpc.skipverify", true, "Skip SSL certificate verification")
+
+			// If there is a discovery module, make it a requirement
+			if discovery := gopi.ModuleByName("discovery"); discovery != nil {
+				// Inject dependpency
+				if clientpool := gopi.ModuleByName("rpc/clientpool"); clientpool != nil {
+					clientpool.Requires = append(clientpool.Requires, discovery.Name)
+				}
+			}
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
-			config := ClientPool{}
-			if discovery, ok := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery); ok {
-				config.Discovery = discovery
+			insecure, _ := app.AppFlags.GetBool("rpc.insecure")
+			skipverify, _ := app.AppFlags.GetBool("rpc.skipverify")
+			timeout, _ := app.AppFlags.GetDuration("rpc.timeout")
+			config := ClientPool{
+				SSL:        (insecure == false),
+				SkipVerify: skipverify,
+				Timeout:    timeout,
+			}
+			if discovery := app.ModuleInstance("discovery"); discovery != nil {
+				config.Discovery = discovery.(gopi.RPCServiceDiscovery)
 			}
 			return gopi.Open(config, app.Logger)
 		},

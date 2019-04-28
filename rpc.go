@@ -51,29 +51,27 @@ type Duration struct {
 	Duration time.Duration
 }
 
+// DiscoveryType is either DNS (using DNS-SD) or DB (using internal database)
+type DiscoveryType uint
+
 ////////////////////////////////////////////////////////////////////////////////
-// SERVICERECORD IMPLEMENTATION
+// CONSTANTS
+
+const (
+	DISCOVERY_TYPE_NONE DiscoveryType = 0
+	DISCOVERY_TYPE_DNS  DiscoveryType = 1
+	DISCOVERY_TYPE_DB   DiscoveryType = 2
+)
+
+////////////////////////////////////////////////////////////////////////////////
+// gopi.RPCServiceRecord IMPLEMENTATION
 
 func NewServiceRecord() *ServiceRecord {
 	return &ServiceRecord{
 		Ts_:   time.Now(),
 		Ipv4_: make([]net.IP, 0, 1),
 		Ipv6_: make([]net.IP, 0, 1),
-	}
-}
-
-func NewServiceRecordWithAddr(name, addr string) *ServiceRecord {
-	if host, port_, err := net.SplitHostPort(addr); err != nil {
-		return nil
-	} else if port, err := strconv.ParseUint(strings.TrimPrefix(port_, ":"), 10, 32); err != nil {
-		return nil
-	} else if service := NewServiceRecord(); service == nil {
-		return nil
-	} else {
-		service.Name_ = name
-		service.Host_ = host
-		service.Port_ = uint(port)
-		return service
+		Txt_:  make([]string, 0),
 	}
 }
 
@@ -219,7 +217,7 @@ func (s *ServiceRecord) String() string {
 	if len(s.Ipv6_) > 0 {
 		p += fmt.Sprintf("ipv6=%v ", s.Ipv6_)
 	}
-	if s.Ttl_.Duration > 0 {
+	if s.Ttl_ != nil && s.Ttl_.Duration > 0 {
 		p += fmt.Sprintf("ttl=%v ", s.Ttl_.Duration)
 	}
 	if len(s.Txt_) > 0 {
@@ -232,6 +230,7 @@ func (s *ServiceRecord) String() string {
 		}
 		p += "]"
 	}
+
 	return fmt.Sprintf("<gopi.RPCServiceRecord>{ %v }", strings.TrimSpace(p))
 }
 

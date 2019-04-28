@@ -11,6 +11,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -94,5 +95,31 @@ func (this *service) Register(ctx context.Context, service *pb.ServiceRecord) (*
 		return nil, err
 	} else {
 		return &empty.Empty{}, nil
+	}
+}
+
+func (this *service) Enumerate(ctx context.Context, req *pb.EnumerateRequest) (*pb.EnumerateReply, error) {
+	this.log.Debug("<grpc.service.discovery.Enumerate>{ type=%v }", req.Type)
+	if services, err := this.discovery.EnumerateServices(ctx); err != nil {
+		return nil, err
+	} else {
+		return &pb.EnumerateReply{Service: services}, nil
+	}
+}
+
+func (this *service) Lookup(ctx context.Context, req *pb.LookupRequest) (*pb.LookupReply, error) {
+	this.log.Debug("<grpc.service.discovery.Lookup>{ type=%v service=%v }", req.Type, strconv.Quote(req.Service))
+	if req.Service == "" {
+		return nil, gopi.ErrBadParameter
+	}
+	if req.Type != pb.DiscoveryType_DISCOVERY_DNS {
+		return nil, gopi.ErrNotImplemented
+	}
+	if reply, err := this.discovery.Lookup(ctx, req.Service); err != nil {
+		return nil, err
+	} else {
+		return &pb.LookupReply{
+			Service: protoFromServiceRecords(reply),
+		}, nil
 	}
 }
