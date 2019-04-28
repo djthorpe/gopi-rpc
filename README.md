@@ -356,11 +356,113 @@ Note that the client module for the helloworld service is called
 `rpc/helloworld:client` and in order to register it you need to
 import the module from `github.com/djthorpe/gopi-rpc/rpc/grpc/helloworld`.
 
-## Generating a protocol buffer file for your service
+## Writing a service command
 
-__TODO__
+A server is a long-running process which can be composed of one or more
+RPC services. If you have already created the service definitions (which
+is described in the sections below) you'll simply need to import the
+service module files and use the `gopi.RPCServerTool` function to start
+the server. For example, the following command publishes the
+`gopi.Greeter` and `gopi.Version` services:
+
+```go
+package main
+
+import (
+  "os"
+
+  // Frameworks
+  gopi "github.com/djthorpe/gopi"
+
+  // Modules
+  _ "github.com/djthorpe/gopi-rpc/sys/grpc"
+  _ "github.com/djthorpe/gopi/sys/logger"
+
+  // Services
+  _ "github.com/djthorpe/gopi-rpc/rpc/grpc/helloworld"
+  _ "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
+)
+
+////////////////////////////////////////////////////////////////////////////////
+
+func main() {
+  // Create the configuration
+  config := gopi.NewAppConfig("rpc/helloworld:service", "rpc/version:service")
+
+  // Run the server and register all the services
+  os.Exit(gopi.RPCServerTool(config))
+}
+```
 
 ## Creating a new service and client
 
+In order to create your own microservice and clients, you'll need to do the following:
+
+  1. Define your service methods and messages in a protocol buffer file;
+  2. Generate the gRPC client and service stubs;
+  3. Write the module code to interface to the service stub (`service.go`);
+  4. Write the module code to interface to the client stub (`client.go`);
+  5. Write the initialization code to register the modules (`init.go`);
+  6. Optionally, write some serialization logic to translate between native types & protobuf types.
+
+It may seem daunting, and ultimately it's a lot of work and quite a bit of boilerplate. To
+make it even more daunting, the folder and file structure could look like this, 
+if you were to create a new microservice called `foobar` for example:
+
+```
+foobar/
+  -> foobar.go
+  -> rpc/
+    -> protobuf/
+      -> protobuf.go
+      -> foobar/
+        -> foobar.proto
+    -> gprc/
+      -> foobar/
+        -> client.go
+        -> service.go
+        -> init.go
+        -> serialize.go
+  -> sys/
+    -> foobar/
+      -> foobar.go
+      -> init.go
+```
+
+In short,
+
+  * The `foobar/foobar.go` file may comtain interface and type definitions when you want to
+    import foobar elsewhere;
+  * The `foobar/sys/foobar` folder contains the module code for your foobar business logic,
+    including the `foobar.go` driver and the module initialization code `init.go`;
+  * The `foobar/rpc/protobuf/foobar/foobar.proto` contains your service definition;
+  * The `foobar/rpc/protobuf/protobuf.go` contains a single `generate` directive to create
+    the client and server stubs;
+  * The `foobar/grpc/foobar` folder contains the client, server and serialization code
+    and also the module initialization code in `init.go`.
+
+The next few subsections describes what you need to put in all the files.
+
+### Generating a protocol buffer file for your service definition
+
 __TODO__
 
+### Generating the stubs
+
+__TODO__
+
+### Writing the service module
+
+__TODO__
+
+### Writing the client module
+
+__TODO__
+
+### The initalization code
+
+__TODO__
+
+### Serialization code
+
+__TODO__
