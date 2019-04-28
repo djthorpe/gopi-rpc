@@ -238,7 +238,8 @@ bash% dns-discovery -timeout 2s -watch -dns-sd.db cache.json
 ADDED      _ipp._tcp                      Brother\ HL-3170CDW\ series (brother-eth.local.:631)
 ```
 
-Press CTRL+C to interrupt. A file `cache.json` will be maintained in your home folder
+The command will stream the records onto your screen, either ADDED, UPDATED, EXPIRED
+or REMOVED. Press CTRL+C to interrupt. A file `cache.json` will be maintained in your home folder
 which contains discovered service instances on the network, whilst the command is running.
 
 ## Using a client in your own application
@@ -252,7 +253,108 @@ If you want to use a client in your own application, you'll need to do the follo
   5. Create a gRPC client with the connection;
   6. Use the client to call remote service methods.
 
-__TODO__
+The `RPCClientPool` interface provides you with all the method required to do this:
+
+```go
+package gopi
+
+type RPCClientPool interface {
+  // Lookup one or more service records
+  Lookup(ctx context.Context, name, addr string, max int) ([]RPCServiceRecord, error)
+
+  // Connect to a service instance
+	Connect(service RPCServiceRecord, flags RPCFlag) (RPCClientConn, error)
+
+  // Create an RPCClient
+  NewClient(string, RPCClientConn) RPCClient
+}
+```
+
+For example, here is a function in `helloworld-client` which creates a new connection:
+
+```
+func Conn(service,addr string,timeout time.Duration) (gopi.RPCClientConn, error) {
+	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+	ctx, cancel := context.WithTimeout(context.Background(),timeout)
+  defer cancel()
+
+	if records, err := pool.Lookup(ctx,service,addr, 1); err != nil {
+		return nil, err
+	} else if len(records) == 0 {
+		return nil, gopi.ErrNotFound
+	} else if conn, err := pool.Connect(records[0],gopi.RPC_FLAG_NONE); err != nil {
+		return nil, err
+	} else {
+		return conn, nil
+	}
+}
+```
+
+The `Lookup` function arguments are:
+
+  * The service name to connect to, or if empty will connect to any remote service instance;
+  * The address of the instance including the port. If empty, will connect to any service instance;
+  * The maximum number of service records to return, or zero for unlimited.
+
+The `Connect` function can be used to return an `RPCClientConn` object from a service record. The second
+argument can be `RPC_FLAG_INET_V4` or `RPC_FLAG_INET_V6` if you want to select one protocol or the other:
+
+```go
+package gopi
+
+type RPCClientConn interface {
+  // Remote address and port
+  Addr() string
+
+  // Return list of services published by remote service instance
+  Services() ([]string, error)
+}
+```
+
+Once you have a client connection, you can create an RPC client, which can then be used to call remote
+methods. In order to do this, a client module needs to be registered. For example,
+
+```go
+package main
+
+import (
+  gopi  "github.com/djthorpe/gopi"
+  hw    "github.com/djthorpe/gopi-rpc/rpc/grpc/helloworld"
+)
+
+////////////////////////////////////////////////////////////////////////////////
+
+func Main(app *gopi.AppInstance, done chan<- struct{}) error {  
+	if conn, err := Conn(app); err != nil {
+		return err
+	} else {
+    client_ := pool.NewClient("gopi.Greeter", conn).(*hw.Client)
+    if reply, err := client.SayHello(name); err != nil {
+		  return err
+	  } else {
+      fmt.Println("Service says:",reply)
+    }
+	}
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func main() {
+	// Create the configuration
+	config := gopi.NewAppConfig("rpc/helloworld:client")
+
+	// Set flags
+	config.AppFlags.FlagString("addr", "localhost:8080", "Gateway address")
+
+	// Run the command line tool
+	os.Exit(gopi.CommandLineTool(config, Main))
+}
+```
+
+Note that the client module for the helloworld service is called
+`rpc/helloworld:client` and in order to register it you need to
+import the module from `github.com/djthorpe/gopi-rpc/rpc/grpc/helloworld`.
 
 ## Generating a protocol buffer file for your service
 
