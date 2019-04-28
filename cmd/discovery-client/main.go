@@ -10,7 +10,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	// Frameworks
@@ -29,6 +31,29 @@ import (
 )
 
 ////////////////////////////////////////////////////////////////////////////////
+
+func RenderHost(service gopi.RPCServiceRecord) string {
+	if service.Port() == 0 {
+		return service.Host()
+	} else {
+		return fmt.Sprintf("%v:%v", service.Host(), service.Port())
+	}
+}
+
+func RenderIP(service gopi.RPCServiceRecord) string {
+	ips := make([]string, 0)
+	for _, ip := range service.IP4() {
+		ips = append(ips, fmt.Sprint(ip))
+	}
+	for _, ip := range service.IP6() {
+		ips = append(ips, fmt.Sprint(ip))
+	}
+	return strings.Join(ips, "\n")
+}
+
+func RenderTxt(service gopi.RPCServiceRecord) string {
+	return strings.Join(service.Text(), "\n")
+}
 
 func Conn(app *gopi.AppInstance) (gopi.RPCClientConn, error) {
 	// Return a single connection
@@ -77,19 +102,49 @@ func VersionClient(app *gopi.AppInstance) (*version.Client, error) {
 }
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
+	t := rpc.DISCOVERY_TYPE_DB
+	service := ""
+	if dns, _ := app.AppFlags.GetBool("dns"); dns {
+		t = rpc.DISCOVERY_TYPE_DNS
+	}
+	if args := app.AppFlags.Args(); len(args) == 1 {
+		service = args[0]
+	} else if len(args) > 1 {
+		return gopi.ErrHelp
+	}
+
 	if client, err := DiscoveryClient(app); err != nil {
 		return err
 	} else if err := client.Ping(); err != nil {
 		return err
-	} else if services, err := client.Enumerate(rpc.DISCOVERY_TYPE_DB, 0); err != nil {
-		return err
-	} else {
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Service"})
-		for _, service := range services {
-			table.Append([]string{service})
+	} else if service == "" {
+		if services, err := client.Enumerate(t, 0); err != nil {
+			return err
+		} else {
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetHeader([]string{"Service"})
+			for _, service := range services {
+				table.Append([]string{service})
+			}
+			table.Render()
 		}
-		table.Render()
+	} else {
+		if instances, err := client.Lookup(service, t, 0); err != nil {
+			return err
+		} else {
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetHeader([]string{"Service", "Name", "Host", "Addr", "TXT"})
+			for _, instance := range instances {
+				table.Append([]string{
+					instance.Service(),
+					instance.Name(),
+					RenderHost(instance),
+					RenderIP(instance),
+					RenderTxt(instance),
+				})
+			}
+			table.Render()
+		}
 	}
 
 	// Success
@@ -104,6 +159,7 @@ func main() {
 
 	// Set flags
 	config.AppFlags.FlagString("addr", "localhost:8080", "Gateway address")
+	config.AppFlags.FlagBool("dns", false, "Use DNS lookup rather than cache")
 
 	// Run the command line tool
 	os.Exit(gopi.CommandLineTool(config, Main))

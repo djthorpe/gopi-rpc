@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	// Frameworks
-	"github.com/djthorpe/gopi-rpc/sys/discovery"
+	discovery "github.com/djthorpe/gopi-rpc/sys/dns-sd"
 )
 
 func Test_Config_001(t *testing.T) {

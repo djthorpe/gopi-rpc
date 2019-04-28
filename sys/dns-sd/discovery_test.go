@@ -8,7 +8,7 @@ import (
 	"github.com/djthorpe/gopi"
 
 	// Modules
-	discovery "github.com/djthorpe/gopi-rpc/sys/discovery"
+	discovery "github.com/djthorpe/gopi-rpc/sys/dns-sd"
 	_ "github.com/djthorpe/gopi/sys/logger"
 )
 

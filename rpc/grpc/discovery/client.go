@@ -116,13 +116,13 @@ func (this *Client) Lookup(service string, t rpc.DiscoveryType, timeout time.Dur
 	}
 
 	// Perform lookup
-	if _, err := this.DiscoveryClient.Lookup(this.NewContext(timeout), &pb.LookupRequest{
+	if reply, err := this.DiscoveryClient.Lookup(this.NewContext(timeout), &pb.LookupRequest{
 		Service: service,
 		Type:    protoFromDiscoveryType(t),
 	}); err != nil {
 		return nil, err
 	} else {
-		return nil, nil
+		return protoToServiceRecords(reply.Service), nil
 	}
 }
 
