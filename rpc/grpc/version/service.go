@@ -11,6 +11,9 @@ package version
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -18,6 +21,7 @@ import (
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/version"
+	ptypes "github.com/golang/protobuf/ptypes"
 	empty "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -88,7 +92,34 @@ func (this *service) Ping(context.Context, *empty.Empty) (*empty.Empty, error) {
 func (this *service) Version(context.Context, *empty.Empty) (*pb.VersionReply, error) {
 	this.log.Debug("<grpc.service.version.Version>{ }")
 
-	// TODO
+	params := make(map[string]string, gopi.PARAM_MAX-gopi.PARAM_MIN+1)
+	for param := gopi.PARAM_MIN; param <= gopi.PARAM_MAX; param++ {
+		key := strings.ToLower(strings.TrimPrefix(fmt.Sprint(param), "PARAM_"))
+		value := fmt.Sprint(this.flags.GetParam(param))
+		if param == gopi.PARAM_TIMESTAMP {
+			continue
+		}
+		if value == "" {
+			continue
+		}
+		params[key] = value
+	}
 
-	return &pb.VersionReply{}, nil
+	// Set hostname
+	hostname := ""
+	if hostname_, err := os.Hostname(); err == nil {
+		hostname = hostname_
+	}
+
+	// Set uptime
+	service_uptime := time.Duration(0)
+	if ts_, ok := this.flags.GetParam(gopi.PARAM_TIMESTAMP).(time.Time); ok {
+		service_uptime = time.Now().Sub(ts_)
+	}
+
+	return &pb.VersionReply{
+		Hostname:      hostname,
+		ServiceUptime: ptypes.DurationProto(service_uptime),
+		Param:         params,
+	}, nil
 }

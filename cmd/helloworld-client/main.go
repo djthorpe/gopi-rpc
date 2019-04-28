@@ -18,6 +18,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	"github.com/olekukonko/tablewriter"
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
@@ -58,8 +59,17 @@ func RunVersion(app *gopi.AppInstance, conn gopi.RPCClientConn) error {
 		return gopi.ErrAppError
 	} else if err := client.Ping(); err != nil {
 		return err
-	} else if err := client.Version(); err != nil {
+	} else if params, err := client.Version(); err != nil {
 		return err
+	} else {
+		table := tablewriter.NewWriter(os.Stdout)
+		table.SetHeader([]string{"Key", "Value"})
+		for k, v := range params {
+			table.Append([]string{
+				k, v,
+			})
+		}
+		table.Render()
 	}
 	return nil
 }

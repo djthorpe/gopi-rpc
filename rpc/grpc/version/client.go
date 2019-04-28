@@ -11,6 +11,9 @@ package version
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/golang/protobuf/ptypes"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -67,16 +70,24 @@ func (this *Client) Ping() error {
 	}
 }
 
-func (this *Client) Version() error {
+func (this *Client) Version() (map[string]string, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
 	// Perform SayHello
-	if _, err := this.VersionClient.Version(this.NewContext(), &empty.Empty{}); err != nil {
-		return err
+	if reply, err := this.VersionClient.Version(this.NewContext(), &empty.Empty{}); err != nil {
+		return nil, err
 	} else {
-		// TODO
-		return nil
+		if reply.Hostname != "" {
+			reply.Param["hostname"] = reply.Hostname
+		}
+		if uptime, err := ptypes.Duration(reply.HostUptime); err == nil && uptime != 0 {
+			reply.Param["hostuptime"] = fmt.Sprint(uptime.Truncate(time.Second))
+		}
+		if uptime, err := ptypes.Duration(reply.ServiceUptime); err == nil && uptime != 0 {
+			reply.Param["serviceuptime"] = fmt.Sprint(uptime.Truncate(time.Second))
+		}
+		return reply.Param, nil
 	}
 }
 

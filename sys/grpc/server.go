@@ -243,7 +243,3 @@ func portString(port uint) string {
 		return fmt.Sprint(":", port)
 	}
 }
-
-func serviceType(service, network string) string {
-	return "_" + service + "._" + network
-}
