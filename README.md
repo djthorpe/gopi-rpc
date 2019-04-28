@@ -263,7 +263,7 @@ type RPCClientPool interface {
   Lookup(ctx context.Context, name, addr string, max int) ([]RPCServiceRecord, error)
 
   // Connect to a service instance
-	Connect(service RPCServiceRecord, flags RPCFlag) (RPCClientConn, error)
+  Connect(service RPCServiceRecord, flags RPCFlag) (RPCClientConn, error)
 
   // Create an RPCClient
   NewClient(string, RPCClientConn) RPCClient
@@ -274,19 +274,19 @@ For example, here is a function in `helloworld-client` which creates a new conne
 
 ```
 func Conn(service,addr string,timeout time.Duration) (gopi.RPCClientConn, error) {
-	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
-	ctx, cancel := context.WithTimeout(context.Background(),timeout)
+  pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+  ctx, cancel := context.WithTimeout(context.Background(),timeout)
   defer cancel()
 
-	if records, err := pool.Lookup(ctx,service,addr, 1); err != nil {
-		return nil, err
-	} else if len(records) == 0 {
-		return nil, gopi.ErrNotFound
-	} else if conn, err := pool.Connect(records[0],gopi.RPC_FLAG_NONE); err != nil {
-		return nil, err
-	} else {
-		return conn, nil
-	}
+  if records, err := pool.Lookup(ctx,service,addr, 1); err != nil {
+    return nil, err
+  } else if len(records) == 0 {
+    return nil, gopi.ErrNotFound
+  } else if conn, err := pool.Connect(records[0],gopi.RPC_FLAG_NONE); err != nil {
+    return nil, err
+  } else {
+    return conn, nil
+  }
 }
 ```
 
@@ -325,30 +325,30 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {  
-	if conn, err := Conn(app); err != nil {
-		return err
-	} else {
+  if conn, err := Conn(app); err != nil {
+    return err
+  } else {
     client_ := pool.NewClient("gopi.Greeter", conn).(*hw.Client)
     if reply, err := client.SayHello(name); err != nil {
-		  return err
-	  } else {
+      return err
+    } else {
       fmt.Println("Service says:",reply)
     }
-	}
-	return nil
+  }
+  return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func main() {
-	// Create the configuration
-	config := gopi.NewAppConfig("rpc/helloworld:client")
+  // Create the configuration
+  config := gopi.NewAppConfig("rpc/helloworld:client")
 
-	// Set flags
-	config.AppFlags.FlagString("addr", "localhost:8080", "Gateway address")
+  // Set flags
+  config.AppFlags.FlagString("addr", "localhost:8080", "Gateway address")
 
-	// Run the command line tool
-	os.Exit(gopi.CommandLineTool(config, Main))
+  // Run the command line tool
+  os.Exit(gopi.CommandLineTool(config, Main))
 }
 ```
 
