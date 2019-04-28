@@ -65,6 +65,48 @@ const (
 )
 
 ////////////////////////////////////////////////////////////////////////////////
+// INTERFACES
+
+type GreeterClient interface {
+	gopi.RPCClient
+
+	// Ping the remote service instance
+	Ping() error
+
+	// Return a message from the remote service
+	SayHello(name string) (string, error)
+}
+
+type VersionClient interface {
+	gopi.RPCClient
+
+	// Ping the remote service instance
+	Ping() error
+
+	// Return version parameters from the remote service
+	Version() (map[string]string, error)
+}
+
+type DiscoveryClient interface {
+	gopi.RPCClient
+
+	// Ping the remote service instance
+	Ping() error
+
+	// Register a service record
+	Register(gopi.RPCServiceRecord) error
+
+	// Enumerate service names
+	Enumerate(DiscoveryType, time.Duration) ([]string, error)
+
+	// Lookup service instances
+	Lookup(string, DiscoveryType, time.Duration) ([]gopi.RPCServiceRecord, error)
+
+	// Stream discovery events. filtering by service name
+	StreamEvents(string, chan<- gopi.RPCEvent) error
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // gopi.RPCServiceRecord IMPLEMENTATION
 
 func NewServiceRecord() *ServiceRecord {
