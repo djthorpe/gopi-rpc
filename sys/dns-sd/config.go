@@ -283,20 +283,66 @@ FOR_LOOP:
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// RETURN SERVICES
+
+func (this *Config) EnumerateServices(local bool) []string {
+	this.Lock()
+	defer this.Unlock()
+
+	records := make(map[string]bool, 1)
+	for _, record := range this.Services {
+		if local == true && record.Local_ == false {
+			continue
+		}
+		records[record.Service_] = true
+	}
+	records_ := make([]string, 0, len(records))
+	for key := range records {
+		records_ = append(records_, key)
+	}
+	return records_
+}
+
+func (this *Config) GetServices(service string, local bool) []*rpc.ServiceRecord {
+	this.Lock()
+	defer this.Unlock()
+
+	records := make([]*rpc.ServiceRecord, 0)
+	for _, record := range this.Services {
+		if local == true && record.Local_ == false {
+			continue
+		}
+		if service != "" && service != record.Service_ {
+			continue
+		}
+		if record.Expired() {
+			continue
+		}
+		records = append(records, record)
+	}
+	return records
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // REGISTER & REMOVE SERVICES
 
 func (this *Config) Register(service *rpc.ServiceRecord) error {
-	if service == nil || service.TTL() == 0 || service.Key() == "" {
+	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
+
 	if service.Service() == MDNS_SERVICE_QUERY {
 		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_NAME, service))
 	} else if index := this.IndexForService(service); index == -1 {
+		this.Lock()
 		this.Services = append(this.Services, service)
+		this.Unlock()
 		this.SetModified()
 		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_ADDED, service))
 	} else {
+		this.Lock()
 		this.Services[index] = service
+		this.Unlock()
 		this.SetModified()
 		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_UPDATED, service))
 	}

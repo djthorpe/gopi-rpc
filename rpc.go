@@ -37,6 +37,7 @@ type ServiceRecord struct {
 	Ipv6_    []net.IP  `json:"ipv6"`
 	Ts_      time.Time `json:"ts"`
 	Ttl_     *Duration `json:"ttl"`
+	Local_   bool      `json:"local"`
 }
 
 // RPCEvent implementation
@@ -96,7 +97,11 @@ func (this *ServiceRecord) Port() uint {
 }
 
 func (this *ServiceRecord) TTL() time.Duration {
-	return this.Ttl_.Duration
+	if this.Ttl_ == nil {
+		return 0
+	} else {
+		return this.Ttl_.Duration
+	}
 }
 
 func (this *ServiceRecord) Timestamp() time.Time {

@@ -40,9 +40,10 @@ type discovery struct {
 	Config
 	Listener
 
-	errors   chan error
-	services chan *rpc.ServiceRecord
-	log      gopi.Logger
+	errors    chan error
+	services  chan *rpc.ServiceRecord
+	questions chan string
+	log       gopi.Logger
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -54,10 +55,11 @@ func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
 	this := new(discovery)
 	this.errors = make(chan error)
 	this.services = make(chan *rpc.ServiceRecord)
+	this.questions = make(chan string)
 
 	if err := this.Config.Init(config.Path, this, this.errors); err != nil {
 		return nil, err
-	} else if err := this.Listener.Init(config, this.errors, this.services); err != nil {
+	} else if err := this.Listener.Init(config, this.errors, this.services, this.questions); err != nil {
 		return nil, err
 	} else {
 		this.log = logger
@@ -86,6 +88,11 @@ func (this *discovery) Close() error {
 		return err
 	}
 
+	// Close channels
+	close(this.errors)
+	close(this.services)
+	close(this.questions)
+
 	// Return success
 	return nil
 }
@@ -96,10 +103,29 @@ func (this *discovery) Close() error {
 // Register a service record
 func (this *discovery) Register(service gopi.RPCServiceRecord) error {
 	this.log.Debug2("<rpc.discovery.Register>{ service=%v }", service)
-	if service == nil {
+	if service == nil || service.Name() == "" || service.Service() == "" {
 		return gopi.ErrBadParameter
+	} else {
+		// Make a service record which can be stored
+		key := fmt.Sprintf("%v.%v.%v.", strings.Trim(service.Name(), "."), strings.Trim(service.Service(), "."), strings.Trim(this.domain, "."))
+		if err := this.Config.Register(&rpc.ServiceRecord{
+			Key_:     key,
+			Name_:    service.Name(),
+			Host_:    service.Host(),
+			Service_: service.Service(),
+			Port_:    service.Port(),
+			Txt_:     service.Text(),
+			Ipv4_:    service.IP4(),
+			Ipv6_:    service.IP6(),
+			Ttl_:     &rpc.Duration{service.TTL()},
+			Local_:   true,
+		}); err != nil {
+			return err
+		}
 	}
-	return gopi.ErrNotImplemented
+
+	// Success
+	return nil
 }
 
 // Lookup service instances from service name
@@ -231,7 +257,7 @@ func (this *discovery) String() string {
 // BACKGROUND TASKS
 
 func (this *discovery) BackgroundTask(start chan<- event.Signal, stop <-chan event.Signal) error {
-	this.log.Debug("BackgroundTask started")
+	this.log.Debug2("<rpc.discovery.BackgroundTask> started")
 	start <- gopi.DONE
 
 	// TODO
@@ -246,12 +272,20 @@ FOR_LOOP:
 			} else {
 				this.Config.Register(service)
 			}
+		case question := <-this.questions:
+			if question == MDNS_SERVICE_QUERY {
+				if locals := this.Config.EnumerateServices(true); len(locals) > 0 {
+					this.log.Debug2("rpc.discovery.Broadcast: %v", locals)
+				}
+			} else if locals := this.Config.GetServices(question, true); len(locals) > 0 {
+				this.log.Debug2("rpc.discovery.Broadcast: %v", locals)
+			}
 		case <-stop:
 			break FOR_LOOP
 		}
 	}
 
 	// Success
-	this.log.Debug("BackgroundTask completed")
+	this.log.Debug2("<rpc.discovery.BackgroundTask> completed")
 	return nil
 }

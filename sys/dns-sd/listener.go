@@ -31,12 +31,13 @@ import (
 type Listener struct {
 	sync.WaitGroup
 
-	domain   string
-	end      bool
-	ipv4     *net.UDPConn
-	ipv6     *net.UDPConn
-	errors   chan<- error
-	services chan<- *rpc.ServiceRecord
+	domain    string
+	end       bool
+	ipv4      *net.UDPConn
+	ipv6      *net.UDPConn
+	errors    chan<- error
+	services  chan<- *rpc.ServiceRecord
+	questions chan<- string
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +57,7 @@ var (
 ////////////////////////////////////////////////////////////////////////////////
 // INIT / DEINIT
 
-func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- *rpc.ServiceRecord) error {
+func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- *rpc.ServiceRecord, questions chan<- string) error {
 	if config.Domain == "" {
 		config.Domain = MDNS_DEFAULT_DOMAIN
 	}
@@ -80,6 +81,7 @@ func (this *Listener) Init(config Discovery, errors chan<- error, services chan<
 	this.domain = config.Domain
 	this.errors = errors
 	this.services = services
+	this.questions = questions
 
 	// Start listening to connections
 	go this.recv_loop(this.ipv4)
@@ -135,6 +137,13 @@ func (this *Listener) Query(msg *dns.Msg, ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ANSWER
+
+func (this *Listener) AnswerEnum(name string, ttl time.Duration) {
+	fmt.Println("ANSWER", name, ttl)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -200,6 +209,14 @@ func (this *Listener) send(q *dns.Msg) error {
 	return nil
 }
 
+// answer questions from remote
+func (this *Listener) answer_questions(q dns.Question, from net.Addr) {
+	domain := "." + strings.Trim(this.domain, ".") + "."
+	if strings.HasSuffix(q.Name, domain) && this.questions != nil {
+		this.questions <- strings.TrimSuffix(q.Name, domain)
+	}
+}
+
 // parse packets into service records
 func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRecord, error) {
 	var msg dns.Msg
@@ -207,13 +224,21 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 		return nil, err
 	}
 	if msg.Opcode != dns.OpcodeQuery {
-		return nil, fmt.Errorf("Query with non-zero Opcode %v", msg.Opcode)
+		return nil, fmt.Errorf("Query with invalid Opcode %v (expected %v)", msg.Opcode, dns.OpcodeQuery)
 	}
 	if msg.Rcode != 0 {
 		return nil, fmt.Errorf("Query with non-zero Rcode %v", msg.Rcode)
 	}
 	if msg.Truncated {
 		return nil, fmt.Errorf("Support for DNS requests with high truncated bit not implemented")
+	}
+
+	// Deal with questions
+	for _, q := range msg.Question {
+		this.answer_questions(q, from)
+	}
+	if len(msg.Answer) == 0 {
+		return nil, nil
 	}
 
 	// Make the entry
