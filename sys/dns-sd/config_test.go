@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	// Frameworks
-	"github.com/djthorpe/gopi-rpc/sys/discovery"
+	discovery "github.com/djthorpe/gopi-rpc/sys/dns-sd"
 )
 
 func Test_Config_001(t *testing.T) {
 	config := new(discovery.Config)
-	if err := config.Init(); err != nil {
+	if err := config.Init("", nil, nil); err != nil {
 		t.Error(err)
 	} else {
 		defer config.Destroy()
@@ -21,7 +21,7 @@ func Test_Config_001(t *testing.T) {
 
 func Test_Config_002(t *testing.T) {
 	config := new(discovery.Config)
-	if err := config.Init(); err != nil {
+	if err := config.Init("", nil, nil); err != nil {
 		t.Error(err)
 	} else {
 		defer config.Destroy()
@@ -36,7 +36,7 @@ func Test_Config_002(t *testing.T) {
 
 func Test_Config_003(t *testing.T) {
 	config := new(discovery.Config)
-	if err := config.Init(); err != nil {
+	if err := config.Init("", nil, nil); err != nil {
 		t.Error(err)
 	} else {
 		defer config.Destroy()
@@ -45,7 +45,7 @@ func Test_Config_003(t *testing.T) {
 			t.Fatal(err)
 		}
 		r := strings.NewReader(b.String())
-		if err := config.Reader(r); err != nil {
+		if _, err := config.Reader(r); err != nil {
 			t.Fatal(err)
 		}
 	}

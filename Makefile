@@ -16,7 +16,7 @@ GOFLAGS = -ldflags "-s -w $(GOLDFLAGS)"
 
 all: test install
 
-install: helloworld-client helloworld-service
+install: helloworld-client helloworld-service discovery-service discovery-client dns-discovery
 
 protobuf:
 	$(GOGEN) -x ./rpc/...
@@ -27,7 +27,16 @@ helloworld-client: protobuf
 helloworld-service: protobuf
 	$(GOINSTALL) $(GOFLAGS) ./cmd/helloworld-service/...
 
-test: 
+discovery-service: protobuf
+	$(GOINSTALL) $(GOFLAGS) ./cmd/discovery-service/...
+
+discovery-client: protobuf
+	$(GOINSTALL) $(GOFLAGS) ./cmd/discovery-client/...
+
+dns-discovery:
+	$(GOINSTALL) $(GOFLAGS) ./cmd/dns-discovery/...
+
+test:  protobuf
 	$(GOTEST) -v ./...
 
 clean: 

@@ -12,14 +12,21 @@ service Discovery {
   // Registers a service record
   rpc Register (ServiceRecord) returns (google.protobuf.Empty);
 
-  // Looks up service records
+  // Enumerates Services
+  rpc Enumerate (EnumerateRequest) returns (EnumerateReply);
+
+  // Lookup Service Instances
   rpc Lookup (LookupRequest) returns (LookupReply);
 
-  // Removes a service record
-  rpc Remove (LookupRequest) returns (google.protobuf.Empty);
+  // Stream change events
+  rpc StreamEvents (StreamEventsRequest) returns (stream Event); 
+}
 
-  // Streams discovery events
-  rpc StreamEvents (LookupRequest) returns (stream Event);
+// DiscoveryType
+enum DiscoveryType {
+    DISCOVERY_NONE = 0;
+    DISCOVERY_DNS = 1;
+    DISCOVERY_DB = 2;
 }
 
 // Event type
@@ -29,30 +36,45 @@ enum EventType {
     EVENT_CHANGE = 2;
     EVENT_EXPIRE = 3;
     EVENT_REMOVE = 4;
+    EVENT_NAME = 5;
 }
 
 // An RPCServiceRecord
 message ServiceRecord {
     string name = 1;
-    string type = 2;
+    string service = 2;
     uint32 port = 3;
-    repeated string txt = 4;
-    string host = 5;
+    string host = 4;
+    repeated string txt = 5;
     repeated string ip4 = 6;
     repeated string ip6 = 7;
     google.protobuf.Duration ttl = 8;
 }
 
-// Filter for lookup, remove or stream
+// Filter for lookup request
 message LookupRequest {
-    string name = 1;
-    string type = 2;
-    uint32 port = 3;
+    DiscoveryType type = 1;
+    string service = 2;
+}
+
+// Filter for enumerate request
+message EnumerateRequest {
+    DiscoveryType type = 1;
 }
 
 // Return zero or more service records
 message LookupReply {
-    repeated ServiceRecord service = 1;
+    repeated ServiceRecord service = 2;
+}
+
+// Return an enumeration of services
+message EnumerateReply {
+    repeated string service = 2;
+}
+
+// Filter for stream events request
+message StreamEventsRequest {
+    string service = 1;
 }
 
 // Monitor discovery changes

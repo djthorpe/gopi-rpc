@@ -1,6 +1,6 @@
 /*
   Go Language Raspberry Pi Interface
-  (c) Copyright David Thorpe 2016-2017
+  (c) Copyright David Thorpe 2016-2019
   All Rights Reserved
 
   Documentation http://djthorpe.github.io/gopi/
@@ -10,6 +10,8 @@
 package grpc
 
 import (
+	"time"
+
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	grpc "google.golang.org/grpc"
@@ -46,29 +48,27 @@ func init() {
 		Name: "rpc/clientpool",
 		Type: gopi.MODULE_TYPE_OTHER,
 		Config: func(config *gopi.AppConfig) {
-			config.AppFlags.FlagBool("rpc.insecure", false, "Disable SSL Connection")
-			config.AppFlags.FlagBool("rpc.skipverify", true, "Skip SSL Verification")
-			config.AppFlags.FlagDuration("rpc.timeout", 0, "Connection timeout")
-			config.AppFlags.FlagString("rpc.service", "", "Comma-separated list of service names")
+			config.AppFlags.FlagDuration("rpc.timeout", 5*time.Second, "Connection timeout")
+			config.AppFlags.FlagBool("rpc.insecure", false, "Allow plaintext connections")
+			config.AppFlags.FlagBool("rpc.skipverify", true, "Skip SSL certificate verification")
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
 			insecure, _ := app.AppFlags.GetBool("rpc.insecure")
 			skipverify, _ := app.AppFlags.GetBool("rpc.skipverify")
 			timeout, _ := app.AppFlags.GetDuration("rpc.timeout")
-			service, _ := app.AppFlags.GetString("rpc.service")
 			config := ClientPool{
-				SkipVerify: skipverify,
 				SSL:        (insecure == false),
+				SkipVerify: skipverify,
 				Timeout:    timeout,
-				Service:    service,
-			}
-			if discovery, ok := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery); ok {
-				config.Discovery = discovery
-			}
-			if service == "" {
-				config.Service = app.Service()
 			}
 			return gopi.Open(config, app.Logger)
+		},
+		Run: func(app *gopi.AppInstance, driver gopi.Driver) error {
+			// Hook in the discovery module if it's found
+			if discovery := app.ModuleInstance("discovery"); discovery != nil {
+				driver.(*clientpool).discovery = discovery.(gopi.RPCServiceDiscovery)
+			}
+			return nil
 		},
 	})
 }

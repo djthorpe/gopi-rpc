@@ -1,6 +1,6 @@
 /*
 	Go Language Raspberry Pi Interface
-	(c) Copyright David Thorpe 2016-2018
+	(c) Copyright David Thorpe 2016-2019
 	All Rights Reserved
 
 	Documentation http://djthorpe.github.io/gopi/
@@ -15,12 +15,13 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/djthorpe/gopi/util/errors"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	rpc "github.com/djthorpe/gopi-rpc/rpc"
+	rpc "github.com/djthorpe/gopi-rpc"
 	event "github.com/djthorpe/gopi/util/event"
 )
 
@@ -28,523 +29,233 @@ import (
 // TYPES
 
 type ClientPool struct {
-	SkipVerify bool
 	SSL        bool
+	SkipVerify bool
 	Timeout    time.Duration
-	Discovery  gopi.RPCServiceDiscovery
-	Service    string
 }
 
 type clientpool struct {
-	log        gopi.Logger
-	skipverify bool
-	ssl        bool
-	timeout    time.Duration
-	discovery  gopi.RPCServiceDiscovery
-	services   map[string]*servicetuple
-	clients    map[string]gopi.RPCNewClientFunc
-	records    map[string]*gopi.RPCServiceRecord
-	done       chan struct{}
-	sync.Mutex
 	event.Publisher
+
+	log        gopi.Logger
+	discovery  gopi.RPCServiceDiscovery
+	services   map[string]gopi.RPCNewClientFunc
+	clients    []*clientconn
+	ssl        bool
+	skipverify bool
+	timeout    time.Duration
 }
-
-type servicetuple struct {
-	cancelfunc context.CancelFunc
-	deadline   time.Duration
-	flags      gopi.RPCFlag
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// STRINGIFY
-
-func (this *clientpool) String() string {
-	return fmt.Sprintf("<grpc.clientpool>{ ssl=%v skipverify=%v timeout=%v clients=%v services=%v records=%v", this.ssl, this.skipverify, this.timeout, this.clients, this.services, this.records)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// CONFIGURATION
-
-const (
-	DEFAULT_DISCOVERY_DEADLINE = 5 * time.Second
-	DEFAULT_DISCOVERY_DELTA    = 60 * time.Second
-)
 
 ////////////////////////////////////////////////////////////////////////////////
 // OPEN AND CLOSE
 
-func (config ClientPool) Services() []string {
-	if config.Service == "" {
-		return nil
-	} else {
-		return strings.Split(config.Service, ",")
-	}
-}
-
 func (config ClientPool) Open(log gopi.Logger) (gopi.Driver, error) {
-	log.Debug("<grpc.clientpool>Open{ services=%v SSL=%v skipverify=%v timeout=%v mdns=%v }", config.Services(), config.SSL, config.SkipVerify, config.Timeout, config.Discovery)
+	log.Debug("<grpc.clientpool>Open{ ssl=%v skipverify=%v timeout=%v }", config.SSL, config.SkipVerify, config.Timeout)
+
 	this := new(clientpool)
 	this.log = log
-	this.skipverify = config.SkipVerify
 	this.ssl = config.SSL
+	this.skipverify = config.SkipVerify
 	this.timeout = config.Timeout
-	this.clients = make(map[string]gopi.RPCNewClientFunc)
-	this.discovery = config.Discovery
-	this.records = make(map[string]*gopi.RPCServiceRecord)
-
-	// Start the discovery in the background if it's available
-	if this.discovery != nil {
-		this.done = make(chan struct{})
-		this.services = make(map[string]*servicetuple)
-		// Check for rediscovery every 1 min
-		go this.mdnsEventLoop(DEFAULT_DISCOVERY_DELTA)
-		// For each service, discovery is run for 5 seconds
-		for _, service := range config.Services() {
-			if err := this.mdnsDiscovery(service, DEFAULT_DISCOVERY_DEADLINE, 0); err != nil {
-				return nil, err
-			}
-		}
-	}
+	this.services = make(map[string]gopi.RPCNewClientFunc, 10)
+	this.clients = make([]*clientconn, 0)
 
 	// Success
 	return this, nil
 }
 
 func (this *clientpool) Close() error {
-	this.log.Debug("<grpc.clientpool>Close{}")
+	this.log.Debug("<grpc.clientpool>Close{ discovery=%v }", this.discovery)
 
-	// Cancel all browsing
-	for service, _ := range this.services {
-		this.mdnsDoCancel(service)
-	}
+	// Unsubscribe listeners
+	this.Publisher.Close()
 
-	// Stop discovery
-	if this.done != nil {
-		this.done <- gopi.DONE
-		<-this.done
+	// Close clients
+	errs := errors.CompoundError{}
+	for _, client := range this.clients {
+		if client.Connected() {
+			errs.Add(client.Disconnect())
+		}
 	}
 
 	// Release resources
-	this.Publisher.Close()
 	this.clients = nil
 	this.discovery = nil
-	this.done = nil
 	this.services = nil
-	this.records = nil
 
-	return nil
+	// Return any errors
+	return errs.ErrorOrSelf()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// CONNECT
+// IMPLEMENTATION
 
 func (this *clientpool) Connect(service gopi.RPCServiceRecord, flags gopi.RPCFlag) (gopi.RPCClientConn, error) {
-	this.log.Debug2("<grpc.clientpool>Connect{ service=%v flags=%v }", service, flags)
+	this.log.Debug2("<grpc.clientpool.Connect>{ service=%v flags=%v }", service, flags)
 
-	// Determine the address
-	if addr := addressFor(service, flags); addr == "" {
+	// Check incoming parameters
+	if service == nil {
 		return nil, gopi.ErrBadParameter
-	} else if clientconn_, err := gopi.Open(ClientConn{
-		Name:       service.Name(),
-		Addr:       addr + ":" + fmt.Sprint(service.Port()),
-		SSL:        this.ssl,
-		SkipVerify: this.skipverify,
-		Timeout:    this.timeout,
-	}, this.log); err != nil {
+	}
+	if flags&(gopi.RPC_FLAG_INET_V4|gopi.RPC_FLAG_INET_V6) == 0 {
+		flags = gopi.RPC_FLAG_INET_V4 | gopi.RPC_FLAG_INET_V6
+	}
+
+	// Get addresses in order of preference
+	if addrs, err := this.addressesFor(service, flags); err != nil {
 		return nil, err
-	} else if clientconn, ok := clientconn_.(*clientconn); ok == false {
-		return nil, gopi.ErrOutOfOrder
+	} else if len(addrs) == 0 {
+		return nil, gopi.ErrNotFound
+	} else if conn, err := this.connectTo(service.Name(), addrs[0], service.Port(), this.ssl, this.skipverify, this.timeout); err != nil {
+		return nil, err
 	} else {
-		// Do connection
-		if err := clientconn.Connect(); err != nil {
-			return nil, err
-		}
-
-		// Emit a connected event
-		this.Emit(rpc.NewEvent(clientconn, gopi.RPC_EVENT_CLIENT_CONNECTED, service))
-
-		// Return success
-		return clientconn, nil
+		return conn, nil
 	}
 }
 
 func (this *clientpool) Disconnect(conn gopi.RPCClientConn) error {
-	this.log.Debug2("<grpc.clientpool>Disconnect{ conn=%v }", conn)
-
-	// Emit a disconnect event - event happens just before disconnect occurs
-	this.Emit(rpc.NewEvent(conn, gopi.RPC_EVENT_CLIENT_DISCONNECTED, nil))
-
-	return conn.(*clientconn).Disconnect()
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// CLIENTS
-
-func (this *clientpool) RegisterClient(service string, callback gopi.RPCNewClientFunc) error {
-	this.log.Debug2("<grpc.clientpool>RegisterClient{ service=%v func=%v }", service, callback)
-	if service == "" || callback == nil {
-		return gopi.ErrBadParameter
-	} else if _, exists := this.clients[service]; exists {
-		this.log.Debug("<rpc.clientpool>RegisterClient: Duplicate service: %v", service)
-		return gopi.ErrBadParameter
+	this.log.Debug2("<grpc.clientpool.Disconnect>{ conn=%v }", conn)
+	if conn_, ok := conn.(*clientconn); ok {
+		return conn_.Disconnect()
 	} else {
-		this.clients[service] = callback
-		return nil
+		return gopi.ErrBadParameter
 	}
 }
 
+func (this *clientpool) RegisterClient(service string, callback gopi.RPCNewClientFunc) error {
+	this.log.Debug2("<grpc.clientpool.RegisterClient>{ service=%v callback=%v }", strconv.Quote(service), callback)
+	if service == "" || callback == nil {
+		return gopi.ErrBadParameter
+	} else if _, exists := this.services[service]; exists {
+		this.log.Warn("<rpc.clientpool>RegisterClient: Duplicate service: %v", service)
+		return gopi.ErrBadParameter
+	} else {
+		this.services[service] = callback
+		return nil
+	}
+
+	return gopi.ErrNotImplemented
+}
+
 func (this *clientpool) NewClient(service string, conn gopi.RPCClientConn) gopi.RPCClient {
-	this.log.Debug2("<grpc.clientpool>NewClient{ service=%v conn=%v }", service, conn)
+	this.log.Debug2("<grpc.clientpool.NewClient>{ service=%v conn=%v }", strconv.Quote(service), conn)
 
 	// Obtain the module with which to create a new client
-	if callback, exists := this.clients[service]; exists == false {
-		this.log.Debug("<grpc.clientpool>NewClient: Not Found: %v", service)
+	if callback, exists := this.services[service]; exists == false {
+		this.log.Warn("<grpc.clientpool>NewClient: Not Found: %v", service)
 		return nil
 	} else {
 		return callback(conn)
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// LOOKUP
+func (this *clientpool) Lookup(ctx context.Context, service, addr string, max int) ([]gopi.RPCServiceRecord, error) {
+	this.log.Debug2("<grpc.clientpool.Lookup>{ service=%v addr=%v max=%v }", strconv.Quote(service), strconv.Quote(addr), max)
 
-func (this *clientpool) Lookup(ctx context.Context, name, addr string, max int) ([]gopi.RPCServiceRecord, error) {
-	this.log.Debug2("<grpc.clientpool>Lookup{ name='%v' addr='%v' max='%v' }", name, addr, max)
-
-	// If there is no discovery subsystem
-	if this.discovery == nil {
-		host, port := lookupMatchSplitAddr(addr)
-		if host == "" || port == 0 {
+	if this.discovery == nil || service == "" {
+		// If there is no discovery service or the service string is empty,
+		// then return the service record with the address only
+		if record := serviceRecordWithAddr(service, addr); record == nil {
 			return nil, gopi.ErrBadParameter
-		}
-		record := &gopi.RPCServiceRecord{
-			Name: name,
-			Port: port,
-			Host: host,
-		}
-		return []gopi.RPCServiceRecord{record}, nil
-	}
-
-	// Make a buffered channel of all service records and put them in
-	records := make(chan *gopi.RPCServiceRecord, len(this.records)+2)
-	matched := make([]*gopi.RPCServiceRecord, 0, max)
-
-	// Queue up the records we know about
-	for _, record := range this.records {
-		records <- record
-	}
-
-	// Subscribe to receive events
-	pool_events := this.Subscribe()
-
-	// The loop continues until the context is done, all existing
-	// records are consumed and all new records are matched up to
-	// the 'max' number of records (or unlimited if max is zero)
-FOR_LOOP:
-	for {
-		select {
-		case <-ctx.Done():
-			break FOR_LOOP
-		case record := <-records:
-			if record != nil && lookupMatch(name, addr, record) {
-				matched = append(matched, record)
-				if max != 0 && len(matched) >= max {
-					break FOR_LOOP
-				}
-			}
-		case event := <-pool_events:
-			if event != nil {
-				if rpc_event := event.(gopi.RPCEvent); rpc_event.Type() == gopi.RPC_EVENT_SERVICE_RECORD {
-					// Emit the service record for matching
-					records <- rpc_event.ServiceRecord()
-				}
-			}
-		}
-	}
-
-	// Cleanup
-	this.Unsubscribe(pool_events)
-	close(records)
-
-	// If we have reached max matched records, then return them
-	// without an error or else return 'DeadlineExceeded'
-	if len(matched) == 0 {
-		return nil, gopi.ErrDeadlineExceeded
-	} else if len(matched) < max {
-		return matched, gopi.ErrDeadlineExceeded
-	} else {
-		return matched, nil
-	}
-}
-
-func lookupMatch(name, addr string, record *gopi.RPCServiceRecord) bool {
-	if name != "" && name == record.Name {
-		return true
-	}
-	if addr != "" {
-		host, port := lookupMatchSplitAddr(addr)
-		if host == "" && port == 0 {
-			// Parse error occured here
-			return false
-		}
-		if host != "" {
-			// We return false if any host doesn't match
-			if lookupMatchHost(host, record) == false && lookupMatchIP(host, record) == false {
-				return false
-			}
-		}
-		if port != 0 && port != record.Port {
-			return false
-		}
-		return true
-	}
-	// No conditions so match
-	return true
-}
-
-func lookupMatchSplitAddr(addr string) (string, uint) {
-	if host, port_, err := net.SplitHostPort(addr); err != nil {
-		if strings.HasSuffix(err.Error(), "missing port in address") {
-			return addr, 0
 		} else {
-			return "", 0
+			return []gopi.RPCServiceRecord{record}, nil
 		}
-	} else if port, err := strconv.ParseUint(strings.TrimPrefix(port_, ":"), 10, 32); err != nil {
-		return addr, 0
+	} else if records, err := this.discovery.Lookup(ctx, service); err != nil {
+		// TODO: Lookup should end when 'max' is reached
+		// Error from lookup
+		return nil, err
+	} else if len(records) == 0 {
+		// Return timeout error
+		return nil, gopi.ErrDeadlineExceeded
 	} else {
-		return host, uint(port)
+		// TODO: filter by address
+		this.log.Debug("records=%v", records)
+		return nil, gopi.ErrNotImplemented
 	}
 }
 
-func lookupMatchHost(addr string, record *gopi.RPCServiceRecord) bool {
-	// Fully-qualify address
-	if strings.HasSuffix(addr, ".") == false {
-		addr += "."
-	}
-	return strings.ToLower(addr) == strings.ToLower(record.Host)
-}
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
 
-func lookupMatchIP(addr string, record *gopi.RPCServiceRecord) bool {
-	if ip := net.ParseIP(addr); ip != nil {
-		for _, ip4 := range record.IP4 {
-			if ip4.Equal(ip) {
-				return true
-			}
-		}
-		for _, ip6 := range record.IP6 {
-			if ip6.Equal(ip) {
-				return true
-			}
-		}
-	}
-	return false
+func (this *clientpool) String() string {
+	return fmt.Sprintf("<grpc.clientpool>{ discovery=%v services=%v }", this.discovery, this.services)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
-func addressFor(service gopi.RPCServiceRecord, flags gopi.RPCFlag) string {
-	if flags&gopi.RPC_FLAG_INET_UDP != 0 {
-		// We don't support UDP connections
-		return ""
-	} else if flags&gopi.RPC_FLAG_INET_V6 != 0 {
-		if len(service.IP6()) == 0 {
-			return ""
+func serviceRecordWithAddr(service, addr string) gopi.RPCServiceRecord {
+	if host, port_, err := net.SplitHostPort(addr); err != nil {
+		return nil
+	} else if port, err := strconv.ParseUint(strings.TrimPrefix(port_, ":"), 10, 32); err != nil {
+		return nil
+	} else if record := rpc.NewServiceRecord(); record == nil {
+		return nil
+	} else {
+		record.Name_ = service
+		record.Host_ = host
+		record.Port_ = uint(port)
+		return record
+	}
+}
+
+func (this *clientpool) addressesFor(service gopi.RPCServiceRecord, flags gopi.RPCFlag) ([]net.IP, error) {
+
+	// Check incoming parameters
+	if service == nil {
+		return nil, gopi.ErrBadParameter
+	}
+
+	// Obtain addresses from service record
+	addrs := make([]net.IP, 0, len(service.IP4())+len(service.IP6()))
+	if flags&gopi.RPC_FLAG_INET_V4 != 0 && len(service.IP4()) != 0 {
+		addrs = append(addrs, service.IP4()...)
+	}
+	if flags&gopi.RPC_FLAG_INET_V6 != 0 && len(service.IP6()) != 0 {
+		addrs = append(addrs, service.IP6()...)
+	}
+
+	// Where there are no addresses found then lookup by hostname
+	if len(addrs) == 0 && service.Host() != "" {
+		if addrs_, err := net.LookupHost(service.Host()); err != nil {
+			return nil, err
 		} else {
-			return service.IP6()[0].String()
-		}
-	} else if flags&gopi.RPC_FLAG_INET_V4 != 0 {
-		if len(service.IP4()) == 0 {
-			return ""
-		} else {
-			return service.IP4()[0].String()
-		}
-	} else {
-		return service.Host()
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DISCOVERY METHODS
-
-func (this *clientpool) mdnsEventLoop(delta time.Duration) {
-	mdns_events := this.discovery.Subscribe()
-	timer := time.NewTicker(delta)
-FOR_LOOP:
-	for {
-		select {
-		case <-this.done:
-			break FOR_LOOP
-		case evt := <-mdns_events:
-			if evt != nil {
-				this.mdnsHandleEvent(evt.(gopi.RPCEvent))
-			}
-		case <-timer.C:
-			this.mdnsRediscovery()
-		}
-	}
-	timer.Stop()
-	this.discovery.Unsubscribe(mdns_events)
-	close(this.done)
-}
-
-func (this *clientpool) mdnsHandleEvent(evt gopi.RPCEvent) {
-	// Check for event being a service record
-	if evt.Type() != gopi.RPC_EVENT_SERVICE_RECORD {
-		return
-	}
-	// Now create a hash for the service record
-	new_sr := evt.ServiceRecord()
-	if hash := mdnsRecordHash(new_sr); hash == "" {
-		return
-	} else if sr, exists := this.records[hash]; exists == false {
-		this.records[hash] = new_sr
-		this.Emit(rpc.NewEvent(this, evt.Type(), new_sr))
-	} else if mdnsRecordEquals(sr, new_sr) {
-		// Do nothing
-	} else {
-		// Copy over the details from the new_sr
-		sr.Host = new_sr.Host
-		sr.IP4 = new_sr.IP4
-		sr.IP6 = new_sr.IP6
-		sr.Name = new_sr.Name
-		sr.Port = new_sr.Port
-		sr.Text = new_sr.Text
-		sr.TTL = new_sr.TTL
-		sr.Type = new_sr.Type
-		this.Emit(rpc.NewEvent(this, evt.Type(), sr))
-
-		// If TTL is zero then we delete the record
-		if sr.TTL == 0 {
-			delete(this.records, hash)
-		}
-	}
-}
-
-func mdnsRecordHash(record *gopi.RPCServiceRecord) string {
-	// The hash is a combo of host.port.type
-	if record.Host == "" || record.Port == 0 || record.Type == "" {
-		return ""
-	}
-	return strings.Join([]string{record.Host, fmt.Sprint(record.Port), record.Type}, " ")
-}
-
-func mdnsRecordEquals(a, b *gopi.RPCServiceRecord) bool {
-	if a.Host != b.Host {
-		return false
-	}
-	if a.Type != b.Type {
-		return false
-	}
-	if a.Port != b.Port {
-		return false
-	}
-	if a.TTL != b.TTL {
-		return false
-	}
-	if len(a.Text) != len(b.Text) {
-		return false
-	}
-	for i := range a.Text {
-		if a.Text[i] != b.Text[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (this *clientpool) mdnsRediscovery() {
-	// Critical section
-	this.Lock()
-	defer this.Unlock()
-
-	for service, tuple := range this.services {
-		if tuple.cancelfunc == nil {
-			this.log.Debug2("<grpc.clientpool>mdnsRediscovery{ service=%v }", service)
-			if err := this.mdnsDiscovery(service, tuple.deadline, tuple.flags); err != nil {
-				this.log.Error("<grpc.clientpool>mdnsRediscovery{ service=%v }: %v", service, err)
+			for _, addr := range addrs_ {
+				if ip := net.ParseIP(addr); ip != nil {
+					if ip.To4() == nil && flags&gopi.RPC_FLAG_INET_V6 != 0 {
+						addrs = append(addrs, ip)
+					} else if ip.To4() != nil && flags&gopi.RPC_FLAG_INET_V4 != 0 {
+						addrs = append(addrs, ip)
+					}
+				}
 			}
 		}
 	}
-}
 
-func (this *clientpool) mdnsDoCancel(service string) {
-	if tuple, exists := this.services[service]; exists {
-		if tuple.cancelfunc != nil {
-			tuple.cancelfunc()
-		}
-	}
-}
-
-func (this *clientpool) mdnsSetCancel(service string, cancel context.CancelFunc) *servicetuple {
-	// Critical section
-	this.Lock()
-	defer this.Unlock()
-
-	// Make a servicetuple if it doesn't exist yet
-	if _, exists := this.services[service]; exists == false {
-		this.services[service] = &servicetuple{
-			cancelfunc: nil,
-		}
-	}
-
-	// Set tuple parameters
-	tuple := this.services[service]
-
-	if cancel != nil {
-		tuple.cancelfunc = cancel
+	// Return not found or success
+	if len(addrs) == 0 {
+		return nil, gopi.ErrNotFound
 	} else {
-		tuple.cancelfunc = nil
+		return addrs, nil
 	}
-
-	// Return the service tuple
-	return tuple
 }
 
-func (this *clientpool) mdnsDiscovery(service string, deadline time.Duration, flags gopi.RPCFlag) error {
+func (this *clientpool) connectTo(name string, addr net.IP, port uint, ssl, skipverify bool, timeout time.Duration) (gopi.RPCClientConn, error) {
+	this.log.Debug2("<grpc.clientpool.Connect>{ name=%v addr=%v port=%v ssl=%v skipverify=%v timeout=%v }", strconv.Quote(name), addr, port, ssl, skipverify, timeout)
 
-	// If no discovery module then return error
-	if this.discovery == nil {
-		return gopi.ErrAppError
-	}
-
-	this.log.Debug2("<grpc.clientpool>mdnsDiscovery{ service=%v deadline=%v flags=%v }", service, deadline, flags)
-
-	// Cancel current browse
-	this.mdnsDoCancel(service)
-
-	// Obtain service type
-	if service_type, err := gopi.RPCServiceType(service, flags); err != nil {
-		return err
+	if conn, err := gopi.Open(ClientConn{
+		Name:       name,
+		Addr:       fmt.Sprintf("[%v]:%v", addr.String(), port),
+		SSL:        ssl,
+		SkipVerify: skipverify,
+		Timeout:    timeout,
+	}, this.log); err != nil {
+		return nil, err
+	} else if conn_, ok := conn.(*clientconn); ok == false {
+		return nil, gopi.ErrAppError
+	} else if err := conn_.Connect(); err != nil {
+		return nil, err
 	} else {
-		// Fire up service discovery
-		go func() {
-			// Create context and tuple
-			ctx, cancel := mdnsContextWithDeadline(deadline)
-			tuple := this.mdnsSetCancel(service, cancel)
-
-			// Set other tuple parameters
-			tuple.deadline = deadline
-			tuple.flags = flags
-
-			// Start the browse and on end of the browse, return any error
-			this.log.Debug2("<grpc.clientpool>mdnsDiscovery: Start: %v", service_type)
-			if err := this.discovery.Browse(ctx, service_type); err != nil {
-				this.log.Debug2("<grpc.clientpool>mdnsDiscovery: %v", err)
-			}
-			this.log.Debug2("<grpc.clientpool>mdnsDiscovery: Stop: %v", service_type)
-			this.mdnsSetCancel(service, nil)
-		}()
-	}
-
-	// Return success
-	return nil
-}
-
-func mdnsContextWithDeadline(deadline time.Duration) (context.Context, context.CancelFunc) {
-	if deadline == 0 {
-		return context.WithCancel(context.Background())
-	} else {
-		return context.WithTimeout(context.Background(), deadline)
+		return conn_, nil
 	}
 }

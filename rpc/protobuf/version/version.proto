@@ -16,15 +16,12 @@ service Version {
 }
 
 /////////////////////////////////////////////////////////////////////
-// EMPTY REQUEST AND REPLY
-
-message EmptyRequest { }
-message EmptyReply { }
-
-/////////////////////////////////////////////////////////////////////
 // HOST METRICS REPLY
 
 message VersionReply {
-    google.protobuf.Duration service_uptime = 1;    
+    string hostname = 1;
+    google.protobuf.Duration host_uptime = 2; 
+    google.protobuf.Duration service_uptime = 3;
+    map<string, string> param = 4;
 }
 
