@@ -123,11 +123,33 @@ func (this *ServiceRecord) Key() string {
 }
 
 func (this *ServiceRecord) Name() string {
-	return this.Name_
+	if s, err := strconv.Unquote("\"" + this.Name_ + "\""); err == nil {
+		fmt.Println(this.Name_, "=>", s)
+		return s
+	} else {
+		fmt.Println(this.Name_, "=> ERROR", err)
+		return this.Name_
+	}
 }
 
 func (this *ServiceRecord) Service() string {
-	return this.Service_
+	parts := strings.SplitN(this.Service_, "._sub.", 1)
+	if len(parts) == 1 {
+		return parts[0]
+	} else if len(parts) == 2 {
+		return parts[1]
+	} else {
+		return ""
+	}
+}
+
+func (this *ServiceRecord) Subtype() string {
+	parts := strings.SplitN(this.Service_, "._sub.", 1)
+	if len(parts) == 2 {
+		return parts[0]
+	} else {
+		return ""
+	}
 }
 
 func (this *ServiceRecord) Host() string {

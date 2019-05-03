@@ -175,7 +175,11 @@ func (this *server) Service(service string, text ...string) gopi.RPCServiceRecor
 }
 
 func (this *server) ServiceWithName(service, name string, text ...string) gopi.RPCServiceRecord {
-	this.log.Debug2("<grpc.ServiceWithName>{ service=%v name=%v text=%v }", strconv.Quote(service), strconv.Quote(name), text)
+	return this.ServiceWithSubtypeName(service, "", name, text...)
+}
+
+func (this *server) ServiceWithSubtypeName(service, subtype, name string, text ...string) gopi.RPCServiceRecord {
+	this.log.Debug2("<grpc.ServiceWithSubtypeName>{ service=%v subtype=%v name=%v text=%v }", strconv.Quote(service), strconv.Quote(subtype), strconv.Quote(name), text)
 
 	// Can't return a service unless the server is started
 	if this.addr == nil {
@@ -200,13 +204,14 @@ func (this *server) ServiceWithName(service, name string, text ...string) gopi.R
 		return nil
 	} else {
 		r := rpc.NewServiceRecord()
-		if service_, err := gopi.RPCServiceType(service, 0); err != nil {
+		if service_, err := gopi.RPCServiceType(service, subtype, gopi.RPC_FLAG_NONE); err != nil {
 			this.log.Warn("grpc.ServiceWithName: %v", err)
 			return nil
 		} else {
 			r.Service_ = service_
 		}
 		// Set name, port and TXT records
+		// TODO: Quote name
 		r.Name_ = name
 		r.Port_ = this.Port()
 		r.Txt_ = text

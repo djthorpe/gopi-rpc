@@ -106,13 +106,23 @@ func (this *discovery) Register(service gopi.RPCServiceRecord) error {
 	if service == nil || service.Name() == "" || service.Service() == "" {
 		return gopi.ErrBadParameter
 	} else {
+		// Generate service name including subtype
+		service_subtype := service.Service()
+		if service.Subtype() != "" {
+			service_subtype = service.Subtype() + "._sub." + service.Service()
+		}
+		service_subtype = strings.Trim(service_subtype, ".")
+
 		// Make a service record which can be stored
-		key := fmt.Sprintf("%v.%v.%v.", strings.Trim(service.Name(), "."), strings.Trim(service.Service(), "."), strings.Trim(this.domain, "."))
+		key := fmt.Sprintf("%v.%v.%v.", strings.Trim(service.Name(), "."), service, strings.Trim(this.domain, "."))
+
+		// TODO: Quote Name_
+
 		if err := this.Config.Register(&rpc.ServiceRecord{
 			Key_:     key,
 			Name_:    service.Name(),
 			Host_:    service.Host(),
-			Service_: service.Service(),
+			Service_: service_subtype,
 			Port_:    service.Port(),
 			Txt_:     service.Text(),
 			Ipv4_:    service.IP4(),

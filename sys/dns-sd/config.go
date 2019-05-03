@@ -312,7 +312,7 @@ func (this *Config) GetServices(service string, local bool) []*rpc.ServiceRecord
 		if local == true && record.Local_ == false {
 			continue
 		}
-		if service != "" && service != record.Service_ {
+		if service != "" && service != record.Service() {
 			continue
 		}
 		if record.Expired() {
@@ -331,7 +331,7 @@ func (this *Config) Register(service *rpc.ServiceRecord) error {
 		return gopi.ErrBadParameter
 	}
 
-	if service.Service() == MDNS_SERVICE_QUERY {
+	if service.Service_ == MDNS_SERVICE_QUERY {
 		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_NAME, service))
 	} else if index := this.IndexForService(service); index == -1 {
 		this.Lock()
