@@ -11,7 +11,6 @@ package rpc
 
 import (
 	"fmt"
-	"regexp"
 	"time"
 
 	// Frameworks
@@ -115,33 +114,4 @@ func (this *Event) String() string {
 	} else {
 		return fmt.Sprintf("<rpc.event>{ type=%v }", this.t)
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// VARIABLES
-
-var (
-	reService = regexp.MustCompile("[A-za-z][A-Za-z0-9\\-]*")
-)
-
-////////////////////////////////////////////////////////////////////////////////
-
-// RPCServiceType returns a service type from a name and
-// optional subtype
-func RPCServiceType(name, subtype string, flags gopi.RPCFlag) (string, error) {
-	if reService.MatchString(name) == false {
-		return "", gopi.ErrBadParameter
-	}
-	if flags&gopi.RPC_FLAG_INET_UDP != 0 {
-		name = "_" + name + "._udp"
-	} else {
-		name = "_" + name + "._tcp"
-	}
-	if subtype == "" {
-		return name, nil
-	}
-	if reService.MatchString(subtype) == false {
-		return "", gopi.ErrBadParameter
-	}
-	return "_" + subtype + "._sub." + name, nil
 }

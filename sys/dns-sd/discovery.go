@@ -19,7 +19,6 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	rpc "github.com/djthorpe/gopi-rpc"
 	event "github.com/djthorpe/gopi/util/event"
 	dns "github.com/miekg/dns"
 )
@@ -41,7 +40,7 @@ type discovery struct {
 	Listener
 
 	errors    chan error
-	services  chan *rpc.ServiceRecord
+	services  chan *ServiceRecord
 	questions chan string
 	log       gopi.Logger
 }
@@ -54,7 +53,7 @@ func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
 
 	this := new(discovery)
 	this.errors = make(chan error)
-	this.services = make(chan *rpc.ServiceRecord)
+	this.services = make(chan *ServiceRecord)
 	this.questions = make(chan string)
 
 	if err := this.Config.Init(config.Path, this, this.errors); err != nil {
@@ -118,7 +117,7 @@ func (this *discovery) Register(service gopi.RPCServiceRecord) error {
 
 		// TODO: Quote Name_
 
-		if err := this.Config.Register(&rpc.ServiceRecord{
+		if err := this.Config.Register(&ServiceRecord{
 			Key_:     key,
 			Name_:    service.Name(),
 			Host_:    service.Host(),
@@ -127,7 +126,7 @@ func (this *discovery) Register(service gopi.RPCServiceRecord) error {
 			Txt_:     service.Text(),
 			Ipv4_:    service.IP4(),
 			Ipv6_:    service.IP6(),
-			Ttl_:     &rpc.Duration{service.TTL()},
+			Ttl_:     &Duration{service.TTL()},
 			Local_:   true,
 		}); err != nil {
 			return err

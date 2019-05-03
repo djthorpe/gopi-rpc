@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -42,6 +43,13 @@ type server struct {
 	ssl    bool
 	event.Publisher
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// GLOBAL VARIABLES
+
+var (
+	reService = regexp.MustCompile("[A-za-z][A-Za-z0-9\\-]*")
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // SERVER OPEN AND CLOSE
@@ -204,7 +212,7 @@ func (this *server) ServiceWithSubtypeName(service, subtype, name string, text .
 		return nil
 	} else {
 		r := rpc.NewServiceRecord()
-		if service_, err := gopi.RPCServiceType(service, subtype, gopi.RPC_FLAG_NONE); err != nil {
+		if service_, err := serviceType(service, subtype, gopi.RPC_FLAG_NONE); err != nil {
 			this.log.Warn("grpc.ServiceWithName: %v", err)
 			return nil
 		} else {
@@ -247,4 +255,23 @@ func portString(port uint) string {
 	} else {
 		return fmt.Sprint(":", port)
 	}
+}
+
+// serviceType returns a service type from a name and optional subtype
+func serviceType(name, subtype string, flags gopi.RPCFlag) (string, error) {
+	if reService.MatchString(name) == false {
+		return "", gopi.ErrBadParameter
+	}
+	if flags&gopi.RPC_FLAG_INET_UDP != 0 {
+		name = "_" + name + "._udp"
+	} else {
+		name = "_" + name + "._tcp"
+	}
+	if subtype == "" {
+		return name, nil
+	}
+	if reService.MatchString(subtype) == false {
+		return "", gopi.ErrBadParameter
+	}
+	return "_" + subtype + "._sub." + name, nil
 }

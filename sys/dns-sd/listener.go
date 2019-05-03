@@ -20,7 +20,6 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
-	rpc "github.com/djthorpe/gopi-rpc"
 	errors "github.com/djthorpe/gopi/util/errors"
 	dns "github.com/miekg/dns"
 )
@@ -36,7 +35,7 @@ type Listener struct {
 	ipv4      *net.UDPConn
 	ipv6      *net.UDPConn
 	errors    chan<- error
-	services  chan<- *rpc.ServiceRecord
+	services  chan<- *ServiceRecord
 	questions chan<- string
 }
 
@@ -57,7 +56,7 @@ var (
 ////////////////////////////////////////////////////////////////////////////////
 // INIT / DEINIT
 
-func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- *rpc.ServiceRecord, questions chan<- string) error {
+func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- *ServiceRecord, questions chan<- string) error {
 	if config.Domain == "" {
 		config.Domain = MDNS_DEFAULT_DOMAIN
 	}
@@ -218,7 +217,7 @@ func (this *Listener) answer_questions(q dns.Question, from net.Addr) {
 }
 
 // parse packets into service records
-func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRecord, error) {
+func (this *Listener) parse_packet(packet []byte, from net.Addr) (*ServiceRecord, error) {
 	var msg dns.Msg
 	if err := msg.Unpack(packet); err != nil {
 		return nil, err
@@ -242,7 +241,7 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (*rpc.ServiceRe
 	}
 
 	// Make the entry
-	entry := rpc.NewServiceRecord()
+	entry := NewServiceRecord()
 
 	// Process sections of the response
 	sections := append(msg.Answer, msg.Ns...)
