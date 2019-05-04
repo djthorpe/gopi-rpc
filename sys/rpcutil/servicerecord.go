@@ -7,7 +7,7 @@
   For Licensing and Usage information, please see LICENSE.md
 */
 
-package discovery
+package rpcutil
 
 import (
 	"encoding/json"
@@ -23,8 +23,8 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-// RPCServiceRecord implementation
-type ServiceRecord struct {
+// record implements a gopi.RPCServiceRecord
+type record struct {
 	Key_     string    `json:"key"`
 	Name_    string    `json:"name"`
 	Host_    string    `json:"host"`
@@ -34,20 +34,20 @@ type ServiceRecord struct {
 	Ipv4_    []net.IP  `json:"ipv4"`
 	Ipv6_    []net.IP  `json:"ipv6"`
 	Ts_      time.Time `json:"ts"`
-	Ttl_     *Duration `json:"ttl"`
+	Ttl_     *duration `json:"ttl"`
 	Local_   bool      `json:"local"`
 }
 
 // Duration type to read and write JSON better
-type Duration struct {
+type duration struct {
 	Duration time.Duration
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // RPCServiceRecord Implementation
 
-func NewServiceRecord() *ServiceRecord {
-	return &ServiceRecord{
+func (this *rpcutil) NewServiceRecord() *record {
+	return &record{
 		Ts_:   time.Now(),
 		Ipv4_: make([]net.IP, 0, 1),
 		Ipv6_: make([]net.IP, 0, 1),
@@ -55,11 +55,11 @@ func NewServiceRecord() *ServiceRecord {
 	}
 }
 
-func (this *ServiceRecord) Key() string {
+func (this *record) Key() string {
 	return this.Key_
 }
 
-func (this *ServiceRecord) Name() string {
+func (this *record) Name() string {
 	if s, err := strconv.Unquote("\"" + this.Name_ + "\""); err == nil {
 		fmt.Println(this.Name_, "=>", s)
 		return s
@@ -69,7 +69,7 @@ func (this *ServiceRecord) Name() string {
 	}
 }
 
-func (this *ServiceRecord) Service() string {
+func (this *record) Service() string {
 	parts := strings.SplitN(this.Service_, "._sub.", 1)
 	if len(parts) == 1 {
 		return parts[0]
@@ -80,7 +80,7 @@ func (this *ServiceRecord) Service() string {
 	}
 }
 
-func (this *ServiceRecord) Subtype() string {
+func (this *record) Subtype() string {
 	parts := strings.SplitN(this.Service_, "._sub.", 1)
 	if len(parts) == 2 {
 		return parts[0]
@@ -89,15 +89,15 @@ func (this *ServiceRecord) Subtype() string {
 	}
 }
 
-func (this *ServiceRecord) Host() string {
+func (this *record) Host() string {
 	return this.Host_
 }
 
-func (this *ServiceRecord) Port() uint {
+func (this *record) Port() uint {
 	return this.Port_
 }
 
-func (this *ServiceRecord) TTL() time.Duration {
+func (this *record) TTL() time.Duration {
 	if this.Ttl_ == nil {
 		return 0
 	} else {
@@ -105,27 +105,27 @@ func (this *ServiceRecord) TTL() time.Duration {
 	}
 }
 
-func (this *ServiceRecord) Timestamp() time.Time {
+func (this *record) Timestamp() time.Time {
 	return this.Ts_
 }
 
-func (this *ServiceRecord) Text() []string {
+func (this *record) Text() []string {
 	return this.Txt_
 }
 
-func (this *ServiceRecord) IP4() []net.IP {
+func (this *record) IP4() []net.IP {
 	return this.Ipv4_
 }
 
-func (this *ServiceRecord) IP6() []net.IP {
+func (this *record) IP6() []net.IP {
 	return this.Ipv6_
 }
 
-func (this *ServiceRecord) SetPTR(zone string, rr *dns.PTR) {
+func (this *record) SetPTR(zone string, rr *dns.PTR) {
 	this.Key_ = rr.Ptr
 	this.Name_ = strings.TrimSuffix(strings.Replace(rr.Ptr, rr.Hdr.Name, "", -1), ".")
 	this.Service_ = rr.Hdr.Name
-	this.Ttl_ = &Duration{time.Second * time.Duration(rr.Hdr.Ttl)}
+	this.Ttl_ = &duration{time.Second * time.Duration(rr.Hdr.Ttl)}
 
 	// Sanitize zone and service
 	if zone != "" {
@@ -134,24 +134,24 @@ func (this *ServiceRecord) SetPTR(zone string, rr *dns.PTR) {
 	}
 }
 
-func (this *ServiceRecord) SetSRV(rr *dns.SRV) {
+func (this *record) SetSRV(rr *dns.SRV) {
 	this.Host_ = rr.Target
 	this.Port_ = uint(rr.Port)
 }
 
-func (this *ServiceRecord) SetTXT(rr *dns.TXT) {
+func (this *record) SetTXT(rr *dns.TXT) {
 	this.Txt_ = rr.Txt
 }
 
-func (this *ServiceRecord) AppendIP4(rr *dns.A) {
+func (this *record) AppendIP4(rr *dns.A) {
 	this.Ipv4_ = append(this.Ipv4_, rr.A)
 }
 
-func (this *ServiceRecord) AppendIP6(rr *dns.AAAA) {
+func (this *record) AppendIP6(rr *dns.AAAA) {
 	this.Ipv6_ = append(this.Ipv6_, rr.AAAA)
 }
 
-func (this *ServiceRecord) Expired() bool {
+func (this *record) Expired() bool {
 	if this.Ts_.IsZero() {
 		return false
 	} else if this.Ttl_.Duration == 0 {
@@ -168,7 +168,7 @@ func (this *ServiceRecord) Expired() bool {
 ////////////////////////////////////////////////////////////////////////////////
 // Stringify
 
-func (s *ServiceRecord) String() string {
+func (s *record) String() string {
 	p := ""
 	if s.Name_ != "" {
 		p += fmt.Sprintf("name=%v ", strconv.Quote(s.Name_))
@@ -208,11 +208,11 @@ func (s *ServiceRecord) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // JSON SERIALIZATION
 
-func (this *Duration) MarshalJSON() ([]byte, error) {
+func (this *duration) MarshalJSON() ([]byte, error) {
 	return []byte(strconv.Quote(fmt.Sprint(this.Duration))), nil
 }
 
-func (this *Duration) UnmarshalJSON(data []byte) error {
+func (this *duration) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err

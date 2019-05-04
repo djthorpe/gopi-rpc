@@ -33,6 +33,7 @@ type Server struct {
 	SSLCertificate string
 	Port           uint
 	ServerOption   []grpc.ServerOption
+	Util           rpc.RPCUtil
 }
 
 type server struct {
@@ -41,6 +42,8 @@ type server struct {
 	server *grpc.Server
 	addr   net.Addr
 	ssl    bool
+	util   rpc.RPCUtil
+
 	event.Publisher
 }
 
@@ -62,6 +65,11 @@ func (config Server) Open(log gopi.Logger) (gopi.Driver, error) {
 	this.log = log
 	this.port = config.Port
 	this.ssl = false
+	this.util = config.Util
+
+	if this.util == nil {
+		return nil, gopi.ErrBadParameter
+	}
 
 	if config.SSLKey != "" && config.SSLCertificate != "" {
 		if creds, err := credentials.NewServerTLSFromFile(config.SSLCertificate, config.SSLKey); err != nil {
@@ -118,10 +126,10 @@ func (this *server) Start() error {
 	} else {
 		// Start server
 		this.addr = lis.Addr()
-		this.Emit(rpc.NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED, nil))
+		this.Emit(this.util.NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED, nil))
 		this.log.Debug("<grpc.Server>{ addr=%v }", this.addr)
 		err := this.server.Serve(lis) // blocking call
-		this.Emit(rpc.NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED, nil))
+		this.Emit(this.util.NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED, nil))
 		this.addr = nil
 		return err
 	}
@@ -211,7 +219,7 @@ func (this *server) ServiceWithSubtypeName(service, subtype, name string, text .
 	if _, ok := this.addr.(*net.TCPAddr); ok == false {
 		return nil
 	} else {
-		r := rpc.NewServiceRecord()
+		r := this.util.NewServiceRecord()
 		if service_, err := serviceType(service, subtype, gopi.RPC_FLAG_NONE); err != nil {
 			this.log.Warn("grpc.ServiceWithName: %v", err)
 			return nil

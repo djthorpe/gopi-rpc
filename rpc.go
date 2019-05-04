@@ -10,19 +10,11 @@
 package rpc
 
 import (
-	"fmt"
 	"time"
 
 	// Frameworks
 	"github.com/djthorpe/gopi"
 )
-
-// RPCEvent implementation
-type Event struct {
-	s gopi.Driver
-	t gopi.RPCEventType
-	r gopi.RPCServiceRecord
-}
 
 // DiscoveryType is either DNS (using DNS-SD) or DB (using internal database)
 type DiscoveryType uint
@@ -38,6 +30,16 @@ const (
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERFACES
+
+type RPCUtil interface {
+	gopi.Driver
+
+	// NewEvent creates a new event from source, type and service record
+	NewEvent(gopi.Driver, gopi.RPCEventType, gopi.RPCServiceRecord) gopi.RPCEvent
+
+	// NewServiceRecord creates an empty service record
+	NewServiceRecord() gopi.RPCServiceRecord
+}
 
 type GreeterClient interface {
 	gopi.RPCClient
@@ -76,42 +78,4 @@ type DiscoveryClient interface {
 
 	// Stream discovery events. filtering by service name
 	StreamEvents(string, chan<- gopi.RPCEvent) error
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// EVENT IMPLEMENTATION
-
-func NewEvent(source gopi.Driver, type_ gopi.RPCEventType, service gopi.RPCServiceRecord) *Event {
-	return &Event{s: source, t: type_, r: service}
-}
-
-// Return the type of event
-func (this *Event) Type() gopi.RPCEventType {
-	return this.t
-}
-
-// Return the service record
-func (this *Event) ServiceRecord() gopi.RPCServiceRecord {
-	return this.r
-}
-
-// Return name of event
-func (*Event) Name() string {
-	return "RPCEvent"
-}
-
-// Return source of event
-func (this *Event) Source() gopi.Driver {
-	return this.s
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// STRINGIFY
-
-func (this *Event) String() string {
-	if this.r != nil {
-		return fmt.Sprintf("<rpc.event>{ type=%v record=%v }", this.t, this.r)
-	} else {
-		return fmt.Sprintf("<rpc.event>{ type=%v }", this.t)
-	}
 }

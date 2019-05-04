@@ -16,6 +16,9 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+
+	// Modules
+	_ "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -24,8 +27,9 @@ import (
 func init() {
 	// Register InputManager
 	gopi.RegisterModule(gopi.Module{
-		Name: "rpc/discovery",
-		Type: gopi.MODULE_TYPE_DISCOVERY,
+		Name:     "rpc/discovery",
+		Requires: []string{"rpc/util"},
+		Type:     gopi.MODULE_TYPE_DISCOVERY,
 		Config: func(config *gopi.AppConfig) {
 			config.AppFlags.FlagString("dns-sd.iface", "", "Service Discovery Interface")
 			config.AppFlags.FlagString("dns-sd.domain", "local.", "Service Discovery Domain")

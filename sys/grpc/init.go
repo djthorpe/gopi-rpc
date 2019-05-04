@@ -14,7 +14,11 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 	grpc "google.golang.org/grpc"
+
+	// Modules
+	_ "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -23,8 +27,9 @@ import (
 func init() {
 	// Register GRPC rpc/server
 	gopi.RegisterModule(gopi.Module{
-		Name: "rpc/server",
-		Type: gopi.MODULE_TYPE_OTHER,
+		Name:     "rpc/server",
+		Type:     gopi.MODULE_TYPE_OTHER,
+		Requires: []string{"rpc/util"},
 		Config: func(config *gopi.AppConfig) {
 			config.AppFlags.FlagUint("rpc.port", 0, "Server Port")
 			config.AppFlags.FlagString("rpc.sslcert", "", "SSL Certificate Path")
@@ -39,14 +44,16 @@ func init() {
 				SSLCertificate: cert,
 				SSLKey:         key,
 				ServerOption:   []grpc.ServerOption{},
+				Util:           app.ModuleInstance("rpc/util").(rpc.RPCUtil),
 			}, app.Logger)
 		},
 	})
 
 	// Register GRPC rpc/clientpool module
 	gopi.RegisterModule(gopi.Module{
-		Name: "rpc/clientpool",
-		Type: gopi.MODULE_TYPE_OTHER,
+		Name:     "rpc/clientpool",
+		Type:     gopi.MODULE_TYPE_OTHER,
+		Requires: []string{"rpc/util"},
 		Config: func(config *gopi.AppConfig) {
 			config.AppFlags.FlagDuration("rpc.timeout", 5*time.Second, "Connection timeout")
 			config.AppFlags.FlagBool("rpc.insecure", false, "Allow plaintext connections")
@@ -60,6 +67,7 @@ func init() {
 				SSL:        (insecure == false),
 				SkipVerify: skipverify,
 				Timeout:    timeout,
+				Util:       app.ModuleInstance("rpc/util").(rpc.RPCUtil),
 			}
 			return gopi.Open(config, app.Logger)
 		},

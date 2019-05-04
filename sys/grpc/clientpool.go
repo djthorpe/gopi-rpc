@@ -32,6 +32,7 @@ type ClientPool struct {
 	SSL        bool
 	SkipVerify bool
 	Timeout    time.Duration
+	Util       rpc.RPCUtil
 }
 
 type clientpool struct {
@@ -44,6 +45,7 @@ type clientpool struct {
 	ssl        bool
 	skipverify bool
 	timeout    time.Duration
+	util       rpc.RPCUtil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +56,7 @@ func (config ClientPool) Open(log gopi.Logger) (gopi.Driver, error) {
 
 	this := new(clientpool)
 	this.log = log
+	this.util = config.Util
 	this.ssl = config.SSL
 	this.skipverify = config.SkipVerify
 	this.timeout = config.Timeout
@@ -155,7 +158,7 @@ func (this *clientpool) Lookup(ctx context.Context, service, addr string, max in
 	if this.discovery == nil || service == "" {
 		// If there is no discovery service or the service string is empty,
 		// then return the service record with the address only
-		if record := serviceRecordWithAddr(service, addr); record == nil {
+		if record := this.serviceRecordWithAddr(service, addr); record == nil {
 			return nil, gopi.ErrBadParameter
 		} else {
 			return []gopi.RPCServiceRecord{record}, nil
@@ -184,12 +187,12 @@ func (this *clientpool) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
-func serviceRecordWithAddr(service, addr string) gopi.RPCServiceRecord {
+func (this *clientpool) serviceRecordWithAddr(service, addr string) gopi.RPCServiceRecord {
 	if host, port_, err := net.SplitHostPort(addr); err != nil {
 		return nil
 	} else if port, err := strconv.ParseUint(strings.TrimPrefix(port_, ":"), 10, 32); err != nil {
 		return nil
-	} else if record := rpc.NewServiceRecord(); record == nil {
+	} else if record := this.util.NewServiceRecord(); record == nil {
 		return nil
 	} else {
 		record.Name_ = service
