@@ -16,6 +16,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/rpcutil"
@@ -47,6 +48,7 @@ func init() {
 				return nil, err
 			} else {
 				config.Path = path
+				config.Util = app.ModuleInstance("rpc/util").(rpc.Util)
 				return gopi.Open(config, app.Logger)
 			}
 		},

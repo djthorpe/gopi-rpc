@@ -44,7 +44,7 @@ func init() {
 				SSLCertificate: cert,
 				SSLKey:         key,
 				ServerOption:   []grpc.ServerOption{},
-				Util:           app.ModuleInstance("rpc/util").(rpc.RPCUtil),
+				Util:           app.ModuleInstance("rpc/util").(rpc.Util),
 			}, app.Logger)
 		},
 	})

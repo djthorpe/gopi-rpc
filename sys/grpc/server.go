@@ -33,7 +33,7 @@ type Server struct {
 	SSLCertificate string
 	Port           uint
 	ServerOption   []grpc.ServerOption
-	Util           rpc.RPCUtil
+	Util           rpc.Util
 }
 
 type server struct {
@@ -42,7 +42,7 @@ type server struct {
 	server *grpc.Server
 	addr   net.Addr
 	ssl    bool
-	util   rpc.RPCUtil
+	util   rpc.Util
 
 	event.Publisher
 }

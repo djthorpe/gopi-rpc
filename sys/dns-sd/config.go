@@ -35,7 +35,7 @@ type Config struct {
 	event.Publisher
 
 	// Public members
-	Services []*ServiceRecord `json:"services"`
+	Services []rpc.ServiceRecord `json:"services"`
 
 	// Private members
 	errors   chan<- error
@@ -57,7 +57,7 @@ const (
 // INIT / DEINIT
 
 func (this *Config) Init(path string, source gopi.Driver, errors chan<- error) error {
-	this.Services = make([]*ServiceRecord, 0)
+	this.Services = make([]rpc.ServiceRecord, 0)
 	this.modified = false
 
 	// Allow nil for source and errors
@@ -214,8 +214,8 @@ func (this *Config) Reader(fh io.Reader) (*Config, error) {
 }
 
 // ExpireServices returns an array of unexpired services
-func (this *Config) ExpireServices() []*ServiceRecord {
-	services := make([]*ServiceRecord, 0, len(this.Services))
+func (this *Config) ExpireServices() []rpc.ServiceRecord {
+	services := make([]rpc.ServiceRecord, 0, len(this.Services))
 	for _, service := range this.Services {
 		if service.Expired() == false {
 			services = append(services, service)
@@ -303,11 +303,11 @@ func (this *Config) EnumerateServices(local bool) []string {
 	return records_
 }
 
-func (this *Config) GetServices(service string, local bool) []*ServiceRecord {
+func (this *Config) GetServices(service string, local bool) []rpc.ServiceRecord {
 	this.Lock()
 	defer this.Unlock()
 
-	records := make([]*ServiceRecord, 0)
+	records := make([]rpc.ServiceRecord, 0)
 	for _, record := range this.Services {
 		if local == true && record.Local_ == false {
 			continue
@@ -326,7 +326,7 @@ func (this *Config) GetServices(service string, local bool) []*ServiceRecord {
 ////////////////////////////////////////////////////////////////////////////////
 // REGISTER & REMOVE SERVICES
 
-func (this *Config) Register(service *ServiceRecord) error {
+func (this *Config) Register(service rpc.ServiceRecord) error {
 	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
@@ -351,7 +351,7 @@ func (this *Config) Register(service *ServiceRecord) error {
 	return nil
 }
 
-func (this *Config) Remove(service *ServiceRecord) error {
+func (this *Config) Remove(service rpc.ServiceRecord) error {
 	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
@@ -378,7 +378,7 @@ func (this *Config) RemoveAtIndex(index int) error {
 	return nil
 }
 
-func (this *Config) IndexForService(service *ServiceRecord) int {
+func (this *Config) IndexForService(service rpc.ServiceRecord) int {
 	if service == nil {
 		return -1
 	}

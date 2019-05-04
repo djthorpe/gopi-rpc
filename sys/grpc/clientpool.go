@@ -32,7 +32,7 @@ type ClientPool struct {
 	SSL        bool
 	SkipVerify bool
 	Timeout    time.Duration
-	Util       rpc.RPCUtil
+	Util       rpc.Util
 }
 
 type clientpool struct {
@@ -45,7 +45,7 @@ type clientpool struct {
 	ssl        bool
 	skipverify bool
 	timeout    time.Duration
-	util       rpc.RPCUtil
+	util       rpc.Util
 }
 
 ////////////////////////////////////////////////////////////////////////////////

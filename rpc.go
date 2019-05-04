@@ -16,6 +16,9 @@ import (
 	"github.com/djthorpe/gopi"
 )
 
+////////////////////////////////////////////////////////////////////////////////
+// TYPES
+
 // DiscoveryType is either DNS (using DNS-SD) or DB (using internal database)
 type DiscoveryType uint
 
@@ -31,7 +34,7 @@ const (
 ////////////////////////////////////////////////////////////////////////////////
 // INTERFACES
 
-type RPCUtil interface {
+type Util interface {
 	gopi.Driver
 
 	// NewEvent creates a new event from source, type and service record
@@ -40,6 +43,16 @@ type RPCUtil interface {
 	// NewServiceRecord creates an empty service record
 	NewServiceRecord() gopi.RPCServiceRecord
 }
+
+type ServiceRecord interface {
+	gopi.RPCServiceRecord
+
+	// Expired returns true if TTL has been reached
+	Expired() bool
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RPC CLIENTS
 
 type GreeterClient interface {
 	gopi.RPCClient

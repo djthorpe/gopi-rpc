@@ -29,7 +29,7 @@ type event struct {
 ////////////////////////////////////////////////////////////////////////////////
 // EVENT IMPLEMENTATION
 
-func (this *rpcutil) NewEvent(source gopi.Driver, type_ gopi.RPCEventType, service gopi.RPCServiceRecord) gopi.RPCEvent {
+func (this *util) NewEvent(source gopi.Driver, type_ gopi.RPCEventType, service gopi.RPCServiceRecord) gopi.RPCEvent {
 	return &event{s: source, t: type_, r: service}
 }
 

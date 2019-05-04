@@ -23,7 +23,7 @@ func init() {
 		Name: "rpc/util",
 		Type: gopi.MODULE_TYPE_OTHER,
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
-			return gopi.Open(RPCUtil{}, app.Logger)
+			return gopi.Open(Util{}, app.Logger)
 		},
 	})
 }

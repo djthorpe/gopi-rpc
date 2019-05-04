@@ -46,7 +46,7 @@ type duration struct {
 ////////////////////////////////////////////////////////////////////////////////
 // RPCServiceRecord Implementation
 
-func (this *rpcutil) NewServiceRecord() *record {
+func (this *util) NewServiceRecord() *record {
 	return &record{
 		Ts_:   time.Now(),
 		Ipv4_: make([]net.IP, 0, 1),

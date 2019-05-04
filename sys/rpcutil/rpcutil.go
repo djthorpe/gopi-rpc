@@ -14,11 +14,11 @@ import (
 	gopi "github.com/djthorpe/gopi"
 )
 
-type RPCUtil struct {
+type Util struct {
 	// No members
 }
 
-type rpcutil struct {
+type util struct {
 	// No members
 }
 
@@ -26,17 +26,17 @@ type rpcutil struct {
 // OPEN AND CLOSE
 
 // Open a client
-func (config RPCUtil) Open(log gopi.Logger) (gopi.Driver, error) {
-	return new(rpcutil), nil
+func (config Util) Open(log gopi.Logger) (gopi.Driver, error) {
+	return new(util), nil
 }
 
-func (this *rpcutil) Close() error {
+func (this *util) Close() error {
 	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
-func (this *rpcutil) String() string {
+func (this *util) String() string {
 	return "<rpc.util>{}"
 }

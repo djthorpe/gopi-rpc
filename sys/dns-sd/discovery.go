@@ -19,6 +19,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 	event "github.com/djthorpe/gopi/util/event"
 	dns "github.com/miekg/dns"
 )
@@ -31,6 +32,7 @@ type Discovery struct {
 	Interface *net.Interface
 	Domain    string
 	Flags     gopi.RPCFlag
+	Util      rpc.Util
 }
 
 type discovery struct {
@@ -40,9 +42,10 @@ type discovery struct {
 	Listener
 
 	errors    chan error
-	services  chan *ServiceRecord
+	services  chan rpc.ServiceRecord
 	questions chan string
 	log       gopi.Logger
+	util      rpc.Util
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,8 +63,11 @@ func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
 		return nil, err
 	} else if err := this.Listener.Init(config, this.errors, this.services, this.questions); err != nil {
 		return nil, err
+	} else if config.Util == nil {
+		return nil, gopi.ErrBadParameter
 	} else {
 		this.log = logger
+		this.util = config.Util
 	}
 
 	// Start task to catch errors, receive services and expire records
