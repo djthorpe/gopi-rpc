@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/djthorpe/gopi/util/errors"
@@ -158,8 +157,10 @@ func (this *clientpool) Lookup(ctx context.Context, service, addr string, max in
 	if this.discovery == nil || service == "" {
 		// If there is no discovery service or the service string is empty,
 		// then return the service record with the address only
-		if record := this.serviceRecordWithAddr(service, addr); record == nil {
+		if record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB); record == nil {
 			return nil, gopi.ErrBadParameter
+		} else if err := record.SetAddr(addr); err != nil {
+			return nil, err
 		} else {
 			return []gopi.RPCServiceRecord{record}, nil
 		}
@@ -186,21 +187,6 @@ func (this *clientpool) String() string {
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
-
-func (this *clientpool) serviceRecordWithAddr(service, addr string) gopi.RPCServiceRecord {
-	if host, port_, err := net.SplitHostPort(addr); err != nil {
-		return nil
-	} else if port, err := strconv.ParseUint(strings.TrimPrefix(port_, ":"), 10, 32); err != nil {
-		return nil
-	} else if record := this.util.NewServiceRecord(); record == nil {
-		return nil
-	} else {
-		record.Name_ = service
-		record.Host_ = host
-		record.Port_ = uint(port)
-		return record
-	}
-}
 
 func (this *clientpool) addressesFor(service gopi.RPCServiceRecord, flags gopi.RPCFlag) ([]net.IP, error) {
 

@@ -31,6 +31,7 @@ import (
 type Listener struct {
 	sync.WaitGroup
 
+	util      rpc.Util
 	domain    string
 	end       bool
 	ipv4      *net.UDPConn
@@ -45,7 +46,6 @@ type Listener struct {
 
 const (
 	MDNS_DEFAULT_DOMAIN = "local."
-	MDNS_SERVICE_QUERY  = "_services._dns-sd._udp"
 	DELTA_QUERY         = 5 * time.Second
 )
 
@@ -66,6 +66,11 @@ func (this *Listener) Init(config Discovery, errors chan<- error, services chan<
 	}
 	if errors == nil || services == nil {
 		return gopi.ErrBadParameter
+	}
+	if config.Util == nil {
+		return gopi.ErrBadParameter
+	} else {
+		this.util = config.Util
 	}
 	if config.Flags&gopi.RPC_FLAG_INET_V4 != 0 {
 		this.ipv4, _ = net.ListenMulticastUDP("udp4", config.Interface, MDNS_ADDR_IPV4)
@@ -233,7 +238,7 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (rpc.ServiceRec
 		return nil, fmt.Errorf("Support for DNS requests with high truncated bit not implemented")
 	}
 
-	// Deal with questions
+	// Deal with questions, and return nil if no answers
 	for _, q := range msg.Question {
 		this.answer_questions(q, from)
 	}
@@ -242,7 +247,7 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (rpc.ServiceRec
 	}
 
 	// Make the entry
-	entry := this.util.NewServiceRecord()
+	record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DNS)
 
 	// Process sections of the response
 	sections := append(msg.Answer, msg.Ns...)
@@ -250,41 +255,47 @@ func (this *Listener) parse_packet(packet []byte, from net.Addr) (rpc.ServiceRec
 	for _, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.PTR:
-			entry.SetPTR(this.domain, rr)
+			if err := record.SetPTR(this.domain, rr); err != nil {
+				return nil, err
+			}
 		case *dns.SRV:
-			entry.SetSRV(rr)
+			if err := record.SetSRV(rr); err != nil {
+				return nil, err
+			}
 		case *dns.TXT:
-			entry.SetTXT(rr)
+			if err := record.SetTXT(rr.Txt); err != nil {
+				return nil, err
+			}
 		}
+	}
+
+	// If this is a reverse lookup (.ip6.arpa. or .in-addr.arpa.) then ignore it
+	if strings.HasSuffix(record.Service(), ".ip6.arpa.") {
+		return nil, nil
+	}
+	if strings.HasSuffix(record.Service(), ".in-addr.arpa.") {
+		return nil, nil
 	}
 
 	// Associate IPs in a second round
 	for _, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.A:
-			entry.AppendIP4(rr)
+			if err := record.AppendIP(rr.A); err != nil {
+				return nil, err
+			}
 		case *dns.AAAA:
-			entry.AppendIP6(rr)
+			if err := record.AppendIP(rr.AAAA); err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	// Check the entry is valid
-	if entry.Key() == "" {
-		// Ensure entry is complete
+	if record.Key() == "" {
 		return nil, nil
-	} else if strings.HasSuffix(entry.Key(), "."+this.domain) == false {
-		// Domain doesn't match
-		return nil, nil
-	} else if entry.Service_ == MDNS_SERVICE_QUERY {
-		// Strip domain
-		entry.Name_ = strings.TrimPrefix(entry.Name_, ".") + "."
-		if strings.HasSuffix(entry.Name(), "."+this.domain) == false {
-			return nil, nil
-		} else {
-			entry.Name_ = strings.TrimSuffix(entry.Name(), "."+this.domain)
-		}
 	}
 
 	// Success
-	return entry, nil
+	return record, nil
 }

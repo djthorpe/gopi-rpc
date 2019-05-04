@@ -10,10 +10,12 @@
 package rpc
 
 import (
+	"net"
 	"time"
 
 	// Frameworks
 	"github.com/djthorpe/gopi"
+	"github.com/miekg/dns"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -31,6 +33,10 @@ const (
 	DISCOVERY_TYPE_DB   DiscoveryType = 2
 )
 
+const (
+	DISCOVERY_SERVICE_QUERY = "_services._dns-sd._udp"
+)
+
 ////////////////////////////////////////////////////////////////////////////////
 // INTERFACES
 
@@ -41,14 +47,31 @@ type Util interface {
 	NewEvent(gopi.Driver, gopi.RPCEventType, gopi.RPCServiceRecord) gopi.RPCEvent
 
 	// NewServiceRecord creates an empty service record
-	NewServiceRecord() gopi.RPCServiceRecord
+	NewServiceRecord(source DiscoveryType) ServiceRecord
 }
 
 type ServiceRecord interface {
 	gopi.RPCServiceRecord
 
+	// Key returns the PTR record for the service record
+	Key() string
+
 	// Expired returns true if TTL has been reached
 	Expired() bool
+
+	// Source returns the source of the record
+	Source() DiscoveryType
+
+	// Set parameters
+	SetService(service, subtype string) error
+	SetName(name string) error
+	SetAddr(addr string) error
+	SetPTR(zone string, rr *dns.PTR) error
+	SetSRV(rr *dns.SRV) error
+	SetTXT([]string) error
+	SetTTL(time.Duration) error
+	AppendIP(...net.IP) error
+	AppendTXT(value string) error
 }
 
 ////////////////////////////////////////////////////////////////////////////////

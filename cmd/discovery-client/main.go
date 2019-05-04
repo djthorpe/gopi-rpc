@@ -40,6 +40,14 @@ func RenderHost(service gopi.RPCServiceRecord) string {
 	}
 }
 
+func RenderService(service gopi.RPCServiceRecord) string {
+	if service.Subtype() == "" {
+		return service.Service()
+	} else {
+		return fmt.Sprintf("%v, %v", service.Subtype(), service.Service())
+	}
+}
+
 func RenderIP(service gopi.RPCServiceRecord) string {
 	ips := make([]string, 0)
 	for _, ip := range service.IP4() {
@@ -172,7 +180,7 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 			table.SetHeader([]string{"Service", "Name", "Host", "Addr", "TXT"})
 			for _, instance := range instances {
 				table.Append([]string{
-					instance.Service(),
+					RenderService(instance),
 					instance.Name(),
 					RenderHost(instance),
 					RenderIP(instance),

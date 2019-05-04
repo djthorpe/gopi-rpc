@@ -127,7 +127,7 @@ func (this *server) Start() error {
 		// Start server
 		this.addr = lis.Addr()
 		this.Emit(this.util.NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED, nil))
-		this.log.Debug("<grpc.Server>{ addr=%v }", this.addr)
+		this.log.Info("Listening on addresss: %v", this.addr)
 		err := this.server.Serve(lis) // blocking call
 		this.Emit(this.util.NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED, nil))
 		this.addr = nil
@@ -181,37 +181,24 @@ func (this *server) GRPCServer() *grpc.Server {
 ///////////////////////////////////////////////////////////////////////////////
 // SERVICE
 
-func (this *server) Service(service string, text ...string) gopi.RPCServiceRecord {
-	if hostname, err := os.Hostname(); err != nil {
-		this.log.Error("<grpc.Server>Service: %v", err)
-		return nil
-	} else {
-		return this.ServiceWithName(service, hostname, text...)
-	}
-}
-
-func (this *server) ServiceWithName(service, name string, text ...string) gopi.RPCServiceRecord {
-	return this.ServiceWithSubtypeName(service, "", name, text...)
-}
-
-func (this *server) ServiceWithSubtypeName(service, subtype, name string, text ...string) gopi.RPCServiceRecord {
-	this.log.Debug2("<grpc.ServiceWithSubtypeName>{ service=%v subtype=%v name=%v text=%v }", strconv.Quote(service), strconv.Quote(subtype), strconv.Quote(name), text)
+func (this *server) Service(service, subtype, name string, text ...string) gopi.RPCServiceRecord {
+	this.log.Debug2("<grpc.Service>{ service=%v subtype=%v name=%v text=%v }", strconv.Quote(service), strconv.Quote(subtype), strconv.Quote(name), text)
 
 	// Can't return a service unless the server is started
 	if this.addr == nil {
-		this.log.Warn("grpc.ServiceWithName: No address")
+		this.log.Warn("grpc.Service: No address")
 		return nil
 	}
 
 	// Can't return non-TCP
 	if this.addr.Network() != "tcp" {
-		this.log.Warn("grpc.ServiceWithName: Not TCP")
+		this.log.Warn("grpc.Service: Not TCP")
 		return nil
 	}
 
 	// Can't register if name is blank
 	if strings.TrimSpace(name) == "" {
-		this.log.Warn("grpc.ServiceWithName: No name")
+		this.log.Warn("grpc.Service: No name")
 		return nil
 	}
 
@@ -219,24 +206,39 @@ func (this *server) ServiceWithSubtypeName(service, subtype, name string, text .
 	if _, ok := this.addr.(*net.TCPAddr); ok == false {
 		return nil
 	} else {
-		r := this.util.NewServiceRecord()
-		if service_, err := serviceType(service, subtype, gopi.RPC_FLAG_NONE); err != nil {
-			this.log.Warn("grpc.ServiceWithName: %v", err)
+		r := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB)
+
+		// Set service, subtype, etc.
+		if err := r.SetService(service, subtype); err != nil {
+			this.log.Warn("grpc.Service: %v", err)
+			return nil
+		} else if err := r.SetName(name); err != nil {
+			this.log.Warn("grpc.Service: %v", err)
+			return nil
+		} else if hostname, err := os.Hostname(); err != nil {
+			this.log.Warn("grpc.Service: %v", err)
+			return nil
+		} else if err := r.SetAddr(fmt.Sprintf("%v:%v", hostname, this.Port())); err != nil {
+			this.log.Warn("grpc.Service: %v", err)
+			return nil
+		} else if ips, err := net.LookupIP(hostname); err != nil {
+			this.log.Warn("grpc.Service: %v", err)
 			return nil
 		} else {
-			r.Service_ = service_
+			for _, ip := range ips {
+				if err := r.AppendIP(ip); err != nil {
+					this.log.Warn("grpc.Service: %v", err)
+					return nil
+				}
+			}
 		}
-		// Set name, port and TXT records
-		// TODO: Quote name
-		r.Name_ = name
-		r.Port_ = this.Port()
-		r.Txt_ = text
-		// TODO: Add IP4 and IP6 here
-		if this.ssl {
-			r.Txt_ = append(r.Txt_, "ssl=1")
-		} else {
-			r.Txt_ = append(r.Txt_, "ssl=0")
+
+		// Set a TXT record for SSL
+		if err := r.AppendTXT(toSslTXT(this.ssl)); err != nil {
+			this.log.Warn("grpc.Service: %v", err)
+			return nil
 		}
+
 		return r
 	}
 }
@@ -257,29 +259,18 @@ func (this *server) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
+func toSslTXT(ssl bool) string {
+	if ssl {
+		return "ssl=1"
+	} else {
+		return "ssl=0"
+	}
+}
+
 func portString(port uint) string {
 	if port == 0 {
 		return ""
 	} else {
 		return fmt.Sprint(":", port)
 	}
-}
-
-// serviceType returns a service type from a name and optional subtype
-func serviceType(name, subtype string, flags gopi.RPCFlag) (string, error) {
-	if reService.MatchString(name) == false {
-		return "", gopi.ErrBadParameter
-	}
-	if flags&gopi.RPC_FLAG_INET_UDP != 0 {
-		name = "_" + name + "._udp"
-	} else {
-		name = "_" + name + "._tcp"
-	}
-	if subtype == "" {
-		return name, nil
-	}
-	if reService.MatchString(subtype) == false {
-		return "", gopi.ErrBadParameter
-	}
-	return "_" + subtype + "._sub." + name, nil
 }

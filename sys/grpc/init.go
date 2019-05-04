@@ -67,7 +67,7 @@ func init() {
 				SSL:        (insecure == false),
 				SkipVerify: skipverify,
 				Timeout:    timeout,
-				Util:       app.ModuleInstance("rpc/util").(rpc.RPCUtil),
+				Util:       app.ModuleInstance("rpc/util").(rpc.Util),
 			}
 			return gopi.Open(config, app.Logger)
 		},

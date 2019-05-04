@@ -32,18 +32,18 @@ func init() {
 		Requires: []string{"rpc/util"},
 		Type:     gopi.MODULE_TYPE_DISCOVERY,
 		Config: func(config *gopi.AppConfig) {
-			config.AppFlags.FlagString("dns-sd.iface", "", "Service Discovery Interface")
-			config.AppFlags.FlagString("dns-sd.domain", "local.", "Service Discovery Domain")
-			config.AppFlags.FlagBool("dns-sd.ip4", true, "Bind to IPv4 addresses")
-			config.AppFlags.FlagBool("dns-sd.ip6", true, "Bind to IPv6 addresses")
-			config.AppFlags.FlagString("dns-sd.db", "", "Service database file")
+			config.AppFlags.FlagString("sd.iface", "", "Service Discovery Interface")
+			config.AppFlags.FlagString("sd.domain", "local.", "Service Discovery Domain")
+			config.AppFlags.FlagBool("sd.ip4", true, "Bind to IPv4 addresses")
+			config.AppFlags.FlagBool("sd.ip6", true, "Bind to IPv6 addresses")
+			config.AppFlags.FlagString("sd.cache", "", "Service cache file")
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
-			domain, _ := app.AppFlags.GetString("dns-sd.domain")
-			name, _ := app.AppFlags.GetString("dns-sd.iface")
-			ip4, _ := app.AppFlags.GetBool("dns-sd.ip4")
-			ip6, _ := app.AppFlags.GetBool("dns-sd.ip6")
-			path, _ := app.AppFlags.GetString("dns-sd.db")
+			domain, _ := app.AppFlags.GetString("sd.domain")
+			name, _ := app.AppFlags.GetString("sd.iface")
+			ip4, _ := app.AppFlags.GetBool("sd.ip4")
+			ip6, _ := app.AppFlags.GetBool("sd.ip6")
+			path, _ := app.AppFlags.GetString("sd.cache")
 			if config, err := getDiscoveryConfig(domain, name, ip4, ip6); err != nil {
 				return nil, err
 			} else {
@@ -77,7 +77,7 @@ func getDiscoveryConfig(domain, net_iface_name string, ip4, ip6 bool) (Discovery
 			iface_names += "'" + iface.Name + "',"
 		}
 		if config.Interface == nil {
-			return config, fmt.Errorf("Invalid -dns-sd.iface flag (values: %v)", strings.Trim(iface_names, ","))
+			return config, fmt.Errorf("Invalid -sd.iface flag (values: %v)", strings.Trim(iface_names, ","))
 		}
 		return config, nil
 	}

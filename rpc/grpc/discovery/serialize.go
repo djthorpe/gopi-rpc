@@ -45,6 +45,14 @@ func (this *servicerecord) Service() string {
 	}
 }
 
+func (this *servicerecord) Subtype() string {
+	if this.r != nil {
+		return this.r.Subtype
+	} else {
+		return ""
+	}
+}
+
 func (this *servicerecord) Host() string {
 	if this.r != nil {
 		return this.r.Host
