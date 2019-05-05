@@ -198,11 +198,12 @@ func (this *record) AppendIP(ips ...net.IP) error {
 	return nil
 }
 
-func (this *record) AppendTXT(value string) error {
-	if this.Txt_ == nil || value == "" {
-		return gopi.ErrBadParameter
-	} else {
-		this.Txt_ = append(this.Txt_, value)
+func (this *record) AppendTXT(value ...string) error {
+	if this.Txt_ == nil {
+		this.Txt_ = make([]string, 0, len(value))
+	}
+	if len(value) > 0 {
+		this.Txt_ = append(this.Txt_, value...)
 	}
 	// Success
 	return nil

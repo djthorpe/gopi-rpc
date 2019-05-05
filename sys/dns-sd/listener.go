@@ -12,6 +12,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -37,8 +38,9 @@ type Listener struct {
 
 	util      rpc.Util
 	domain    string
+	enum      string
 	end       int32
-	ifaces    []*net.Interface
+	ifaces    []net.Interface
 	ip4       *ipv4.PacketConn
 	ip6       *ipv6.PacketConn
 	errors    chan<- error
@@ -51,7 +53,8 @@ type Listener struct {
 
 const (
 	MDNS_DEFAULT_DOMAIN = "local."
-	DELTA_QUERY         = 5 * time.Second
+	DELTA_QUERY_MS      = 1000
+	REPEAT_QUERY        = 4
 )
 
 var (
@@ -81,6 +84,7 @@ func (this *Listener) Init(config Discovery, errors chan<- error, services chan<
 		return err
 	} else {
 		this.ifaces = ifaces
+		fmt.Println(ifaces)
 	}
 	if config.Flags&gopi.RPC_FLAG_INET_V4 != 0 {
 		if ip4, err := joinUdp4Multicast(this.ifaces, MDNS_ADDR_IPV4); err != nil {
@@ -101,7 +105,8 @@ func (this *Listener) Init(config Discovery, errors chan<- error, services chan<
 	}
 
 	// Set up the listener
-	this.domain = config.Domain
+	this.domain = strings.Trim(config.Domain, ".")
+	this.enum = rpc.DISCOVERY_SERVICE_QUERY + "." + this.domain + "."
 	this.errors = errors
 	this.services = services
 	this.questions = questions
@@ -149,18 +154,23 @@ func (this *Listener) Destroy() error {
 ////////////////////////////////////////////////////////////////////////////////
 // QUERY
 
-func (this *Listener) Query(msg *dns.Msg, ctx context.Context) error {
-
-	// Send out service message every five seconds
+// QueryAll sends a message to all multicast addresses
+func (this *Listener) QueryAll(msg *dns.Msg, ctx context.Context) error {
+	// Send out message a certain number of times
+	n := REPEAT_QUERY
 	ticker := time.NewTimer(1 * time.Millisecond)
 	for {
 		select {
 		case <-ticker.C:
-			if err := this.send(msg); err != nil {
+			if err := this.multicast_send(msg, 0); err != nil {
 				return err
 			}
-			// Restart timer to send query again
-			ticker.Reset(DELTA_QUERY)
+			if n > 0 {
+				// Restart timer to send query again
+				r := time.Duration(rand.Intn(DELTA_QUERY_MS))
+				ticker.Reset(time.Millisecond * r)
+				n--
+			}
 		case <-ctx.Done():
 			ticker.Stop()
 			return ctx.Err()
@@ -181,7 +191,7 @@ func (this *Listener) AnswerEnum(name string, ttl time.Duration) {
 func (this Listener) String() string {
 	params := ""
 	if this.domain != "" {
-		params += fmt.Sprintf("domain=%v ", strconv.Quote(this.domain))
+		params += fmt.Sprintf("domain=%v ", strconv.Quote(this.domain+"."))
 	}
 	if this.ip4 != nil {
 		params += fmt.Sprintf("ip4=%v ", this.ip4.LocalAddr())
@@ -221,10 +231,8 @@ func (this *Listener) recv_loop4(conn *ipv4.PacketConn) {
 			continue
 		} else if cm == nil {
 			continue
-		} else if service, err := this.parse_packet(buf[:n], cm.IfIndex, from); err != nil {
+		} else if err := this.parse_packet(buf[:n], cm.IfIndex, from); err != nil {
 			this.errors <- err
-		} else if service != nil {
-			this.services <- service
 		}
 	}
 }
@@ -246,10 +254,8 @@ func (this *Listener) recv_loop6(conn *ipv6.PacketConn) {
 			continue
 		} else if cm == nil {
 			continue
-		} else if service, err := this.parse_packet(buf[:n], cm.IfIndex, from); err != nil {
+		} else if err := this.parse_packet(buf[:n], cm.IfIndex, from); err != nil {
 			this.errors <- err
-		} else if service != nil {
-			this.services <- service
 		}
 	}
 }
@@ -278,29 +284,31 @@ func (this *Listener) send(q *dns.Msg) error {
 
 // answer questions from remote
 func (this *Listener) answer_questions(q dns.Question, ifIndex int, from net.Addr) {
-	domain := "." + strings.Trim(this.domain, ".") + "."
-	if strings.HasSuffix(q.Name, domain) && this.questions != nil {
-		// TODO: Handle question on particular interface
-		fmt.Println("answer_questions:", q)
+	if q.Name == this.enum {
+		fmt.Println("enumerate:", q)
 		fmt.Println("    from:", from, "ifIndex:", ifIndex)
-		this.questions <- strings.TrimSuffix(q.Name, domain)
+	} else {
+		fmt.Println("answer_question:", q)
+		fmt.Println("    from:", from, "ifIndex:", ifIndex)
+		// careful something is receiving the question!
+		//this.questions <- strings.TrimSuffix(q.Name, domain)
 	}
 }
 
 // parse packets into service records
-func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) (rpc.ServiceRecord, error) {
+func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) error {
 	var msg dns.Msg
 	if err := msg.Unpack(packet); err != nil {
-		return nil, err
+		return err
 	}
 	if msg.Opcode != dns.OpcodeQuery {
-		return nil, fmt.Errorf("Query with invalid Opcode %v (expected %v)", msg.Opcode, dns.OpcodeQuery)
+		return fmt.Errorf("Query with invalid Opcode %v (expected %v)", msg.Opcode, dns.OpcodeQuery)
 	}
 	if msg.Rcode != 0 {
-		return nil, fmt.Errorf("Query with non-zero Rcode %v", msg.Rcode)
+		return fmt.Errorf("Query with non-zero Rcode %v", msg.Rcode)
 	}
 	if msg.Truncated {
-		return nil, fmt.Errorf("Support for DNS requests with high truncated bit not implemented")
+		return fmt.Errorf("Support for DNS requests with high truncated bit not implemented")
 	}
 
 	// Deal with questions, and return nil if no answers
@@ -308,65 +316,62 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) (r
 		this.answer_questions(q, ifIndex, from)
 	}
 	if len(msg.Answer) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	// Make the entry
 	record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DNS)
-
 	// Process sections of the response
 	sections := append(msg.Answer, msg.Ns...)
 	sections = append(sections, msg.Extra...)
-	for _, answer := range sections {
+	for i, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.PTR:
-			if err := record.SetPTR(this.domain, rr); err != nil {
-				return nil, err
+			if rr.Hdr.Name == this.enum {
+				if err := record.SetPTR(this.domain, rr); err != nil {
+					return err
+				} else if this.services != nil {
+					this.services <- record
+				}
+			} else if err := record.SetPTR(this.domain, rr); err != nil {
+				return err
 			}
 		case *dns.SRV:
 			if err := record.SetSRV(rr); err != nil {
-				return nil, err
+				return err
 			}
 		case *dns.TXT:
-			if err := record.SetTXT(rr.Txt); err != nil {
-				return nil, err
+			if err := record.AppendTXT(rr.Txt...); err != nil {
+				return err
 			}
-		}
-	}
-
-	// If this is a reverse lookup (.ip6.arpa. or .in-addr.arpa.) then ignore it
-	if strings.HasSuffix(record.Service(), ".ip6.arpa.") {
-		return nil, nil
-	} else if strings.HasSuffix(record.Service(), ".in-addr.arpa.") {
-		return nil, nil
-	}
-
-	// Associate IPs in a second round
-	for _, answer := range sections {
-		switch rr := answer.(type) {
 		case *dns.A:
 			if err := record.AppendIP(rr.A); err != nil {
-				return nil, err
+				return err
 			}
 		case *dns.AAAA:
 			if err := record.AppendIP(rr.AAAA); err != nil {
-				return nil, err
+				return err
 			}
+		case *dns.NSEC:
+			continue
+		case *dns.OPT:
+			continue
+		default:
+			fmt.Println("OTHER", i, answer.Header().Rrtype, answer)
 		}
 	}
 
-	// Check the entry is valid
-	if record.Key() == "" {
-		return nil, nil
+	if record != nil && record.Key() != "" {
+		this.services <- record
 	}
 
 	// Success
-	return record, nil
+	return nil
 }
 
 // multicastSend sends a multicast response packet to a particular interface
 // or all interfaces if 0
-func (this *Listener) multicastSend(msg *dns.Msg, ifIndex int) error {
+func (this *Listener) multicast_send(msg *dns.Msg, ifIndex int) error {
 	var buf []byte
 	if msg == nil {
 		return gopi.ErrBadParameter
@@ -403,7 +408,7 @@ func (this *Listener) multicastSend(msg *dns.Msg, ifIndex int) error {
 	return nil
 }
 
-func joinUdp6Multicast(ifaces []*net.Interface, addr *net.UDPAddr) (*ipv6.PacketConn, error) {
+func joinUdp6Multicast(ifaces []net.Interface, addr *net.UDPAddr) (*ipv6.PacketConn, error) {
 	if len(ifaces) == 0 {
 		return nil, gopi.ErrBadParameter
 	} else if conn, err := net.ListenUDP("udp6", addr); err != nil {
@@ -414,7 +419,7 @@ func joinUdp6Multicast(ifaces []*net.Interface, addr *net.UDPAddr) (*ipv6.Packet
 		packet_conn.SetControlMessage(ipv6.FlagInterface, true)
 		errs := &errors.CompoundError{}
 		for _, iface := range ifaces {
-			if err := packet_conn.JoinGroup(iface, &net.UDPAddr{IP: addr.IP}); err != nil {
+			if err := packet_conn.JoinGroup(&iface, &net.UDPAddr{IP: addr.IP}); err != nil {
 				errs.Add(fmt.Errorf("%v: %v", iface.Name, err))
 			}
 		}
@@ -426,7 +431,7 @@ func joinUdp6Multicast(ifaces []*net.Interface, addr *net.UDPAddr) (*ipv6.Packet
 	}
 }
 
-func joinUdp4Multicast(ifaces []*net.Interface, addr *net.UDPAddr) (*ipv4.PacketConn, error) {
+func joinUdp4Multicast(ifaces []net.Interface, addr *net.UDPAddr) (*ipv4.PacketConn, error) {
 	if len(ifaces) == 0 {
 		return nil, gopi.ErrBadParameter
 	} else if conn, err := net.ListenUDP("udp4", addr); err != nil {
@@ -436,9 +441,9 @@ func joinUdp4Multicast(ifaces []*net.Interface, addr *net.UDPAddr) (*ipv4.Packet
 	} else {
 		packet_conn.SetControlMessage(ipv4.FlagInterface, true)
 		errs := &errors.CompoundError{}
-		for _, ifi := range ifaces {
-			if err := packet_conn.JoinGroup(ifi, &net.UDPAddr{IP: addr.IP}); err != nil {
-				errs.Add(fmt.Errorf("%v: %v", ifi.Name, err))
+		for _, iface := range ifaces {
+			if err := packet_conn.JoinGroup(&iface, &net.UDPAddr{IP: addr.IP}); err != nil {
+				errs.Add(fmt.Errorf("%v: %v", iface.Name, err))
 			}
 		}
 		if errs.Success() {
@@ -449,10 +454,10 @@ func joinUdp4Multicast(ifaces []*net.Interface, addr *net.UDPAddr) (*ipv4.Packet
 	}
 }
 
-func listMulticastInterfaces(iface *net.Interface) ([]*net.Interface, error) {
-	if iface != nil {
+func listMulticastInterfaces(iface net.Interface) ([]net.Interface, error) {
+	if iface.Name != "" {
 		if (iface.Flags&net.FlagUp) > 0 && (iface.Flags&net.FlagMulticast) > 0 {
-			return []*net.Interface{iface}, nil
+			return []net.Interface{iface}, nil
 		} else {
 			return nil, fmt.Errorf("Interface %v is not up and/or multicast-enabled", iface.Name)
 		}
@@ -460,15 +465,15 @@ func listMulticastInterfaces(iface *net.Interface) ([]*net.Interface, error) {
 	if ifaces, err := net.Interfaces(); err != nil {
 		return nil, err
 	} else {
-		interfaces := make([]*net.Interface, 0, len(ifaces))
+		interfaces := make([]net.Interface, 0, len(ifaces))
 		for _, ifi := range ifaces {
 			if (ifi.Flags & net.FlagUp) == 0 {
 				continue
 			}
-			if (ifi.Flags & net.FlagMulticast) > 0 {
-				ifi2 := ifi
-				interfaces = append(interfaces, &ifi2)
+			if (ifi.Flags & net.FlagMulticast) == 0 {
+				continue
 			}
+			interfaces = append(interfaces, ifi)
 		}
 		if len(interfaces) > 0 {
 			return interfaces, nil

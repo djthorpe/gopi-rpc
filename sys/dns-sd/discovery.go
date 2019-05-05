@@ -30,7 +30,7 @@ import (
 
 type Discovery struct {
 	Path      string
-	Interface *net.Interface
+	Interface net.Interface
 	Domain    string
 	Flags     gopi.RPCFlag
 	Util      rpc.Util
@@ -95,15 +95,12 @@ func (this *discovery) Close() error {
 	this.Publisher.Close()
 
 	// Release resources, etc
-	fmt.Println("LISTENER END")
 	if err := this.Listener.Destroy(); err != nil {
 		return err
 	}
-	fmt.Println("CONFIG END")
 	if err := this.Config.Destroy(); err != nil {
 		return err
 	}
-	fmt.Println("TASKS CLOSE END")
 	if err := this.Tasks.Close(); err != nil {
 		return err
 	}
@@ -132,14 +129,13 @@ func (this *discovery) Register(service gopi.RPCServiceRecord) error {
 	if err := record.SetName(service.Name()); err != nil {
 		return err
 	}
-	// TODO
 	if err := record.SetService(service.Service(), service.Subtype()); err != nil {
 		return err
 	}
 	if err := record.SetAddr(fmt.Sprintf("%v:%v", service.Host(), service.Port())); err != nil {
 		return err
 	}
-	if err := record.SetTXT(service.Text()); err != nil {
+	if err := record.AppendTXT(service.Text()...); err != nil {
 		return err
 	}
 	if err := record.AppendIP(service.IP4()...); err != nil {
@@ -167,7 +163,7 @@ func (this *discovery) Lookup(ctx context.Context, service string) ([]gopi.RPCSe
 
 	// The message should be to lookup service by name
 	msg := new(dns.Msg)
-	msg.SetQuestion(service+"."+this.domain, dns.TypePTR)
+	msg.SetQuestion(service+"."+this.domain+".", dns.TypePTR)
 	msg.RecursionDesired = false
 
 	// Wait for services
@@ -200,7 +196,7 @@ func (this *discovery) Lookup(ctx context.Context, service string) ([]gopi.RPCSe
 	}()
 
 	// Perform the query and wait for cancellation
-	err := this.Query(msg, ctx)
+	err := this.QueryAll(msg, ctx)
 
 	// Retrieve the service records
 	records := make([]gopi.RPCServiceRecord, 0, len(services))
@@ -247,7 +243,7 @@ func (this *discovery) EnumerateServices(ctx context.Context) ([]string, error) 
 	}()
 
 	// Perform the query and wait for cancellation
-	err := this.Query(msg, ctx)
+	err := this.QueryAll(msg, ctx)
 
 	// Stop collecting names
 	stop <- gopi.DONE
@@ -297,7 +293,7 @@ FOR_LOOP:
 	for {
 		select {
 		case err := <-this.errors:
-			this.log.Warn("Discover error: %v", err)
+			this.log.Warn("rpc.discovery: %v", err)
 		case service := <-this.services:
 			if service.TTL() == 0 {
 				this.Config.Remove(service)

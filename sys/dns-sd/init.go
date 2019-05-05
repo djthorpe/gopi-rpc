@@ -72,12 +72,11 @@ func getDiscoveryConfig(domain, net_iface_name string, ip4, ip6 bool) (Discovery
 		iface_names := ""
 		for _, iface := range ifaces {
 			if iface.Name == net_iface_name {
-				iface2 := iface
-				config.Interface = &iface2
+				config.Interface = iface
 			}
 			iface_names += "'" + iface.Name + "',"
 		}
-		if config.Interface == nil {
+		if config.Interface.Name == "" {
 			return config, fmt.Errorf("Invalid -sd.iface flag (values: %v)", strings.Trim(iface_names, ","))
 		}
 		return config, nil
