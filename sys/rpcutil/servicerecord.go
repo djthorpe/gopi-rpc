@@ -28,7 +28,7 @@ import (
 // TYPES
 
 // Record implements a gopi.RPCServiceRecord
-type Record struct {
+type record struct {
 	Key_     string            `json:"key"`
 	Name_    string            `json:"name"`
 	Host_    string            `json:"host"`
@@ -67,7 +67,7 @@ func (this *util) NewServiceRecord(source rpc.DiscoveryType) rpc.ServiceRecord {
 	if source == rpc.DISCOVERY_TYPE_NONE {
 		return nil
 	}
-	r := &Record{
+	r := &record{
 		Ipv4_:   make([]net.IP, 0, 1),
 		Ipv6_:   make([]net.IP, 0, 1),
 		Txt_:    make([]string, 0),
@@ -84,7 +84,7 @@ func (this *util) NewServiceRecord(source rpc.DiscoveryType) rpc.ServiceRecord {
 // SET
 
 // Set service type, subtype and IP protocol
-func (this *Record) SetService(service, subtype string) error {
+func (this *record) SetService(service, subtype string) error {
 	if service == "" || reServiceType.MatchString(service) == false {
 		return gopi.ErrBadParameter
 	}
@@ -96,20 +96,27 @@ func (this *Record) SetService(service, subtype string) error {
 	} else {
 		this.Service_ = service
 	}
-	this.Key_ = this.Name_ + "." + this.Service()
+	// Set key
+	this.Key_ = this.Name_
+	if this.Service() != "" {
+		this.Key_ += "." + this.Service()
+	}
 	return nil
 }
 
 // SetName sets the name of the service instance
-func (this *Record) SetName(name string) error {
+func (this *record) SetName(name string) error {
 	// TODO: quote
 	this.Name_ = name
-	this.Key_ = this.Name_ + "." + this.Service()
+	this.Key_ = this.Name_
+	if this.Service() != "" {
+		this.Key_ += "." + this.Service()
+	}
 	return nil
 }
 
 // SetPTR sets from PTR record
-func (this *Record) SetPTR(zone string, rr *dns.PTR) error {
+func (this *record) SetPTR(zone string, rr *dns.PTR) error {
 	if rr == nil {
 		return gopi.ErrBadParameter
 	}
@@ -134,7 +141,7 @@ func (this *Record) SetPTR(zone string, rr *dns.PTR) error {
 	return nil
 }
 
-func (this *Record) SetSRV(rr *dns.SRV) error {
+func (this *record) SetSRV(rr *dns.SRV) error {
 	if rr == nil {
 		return gopi.ErrBadParameter
 	} else {
@@ -144,7 +151,7 @@ func (this *Record) SetSRV(rr *dns.SRV) error {
 	}
 }
 
-func (this *Record) SetTXT(txt []string) error {
+func (this *record) SetTXT(txt []string) error {
 	if len(txt) > 0 {
 		this.Txt_ = txt
 	} else {
@@ -155,7 +162,7 @@ func (this *Record) SetTXT(txt []string) error {
 	return nil
 }
 
-func (this *Record) SetAddr(addr string) error {
+func (this *record) SetAddr(addr string) error {
 	if host, port_, err := net.SplitHostPort(addr); err != nil {
 		return nil
 	} else if port, err := strconv.ParseUint(strings.TrimPrefix(port_, ":"), 10, 32); err != nil {
@@ -169,12 +176,12 @@ func (this *Record) SetAddr(addr string) error {
 	return nil
 }
 
-func (this *Record) SetTTL(d time.Duration) error {
+func (this *record) SetTTL(d time.Duration) error {
 	this.Ttl_ = &duration{d.Truncate(time.Second)}
 	return nil
 }
 
-func (this *Record) AppendIP(ips ...net.IP) error {
+func (this *record) AppendIP(ips ...net.IP) error {
 	for _, ip := range ips {
 		if ip == nil {
 			return gopi.ErrBadParameter
@@ -191,7 +198,7 @@ func (this *Record) AppendIP(ips ...net.IP) error {
 	return nil
 }
 
-func (this *Record) AppendTXT(value string) error {
+func (this *record) AppendTXT(value string) error {
 	if this.Txt_ == nil || value == "" {
 		return gopi.ErrBadParameter
 	} else {
@@ -205,20 +212,15 @@ func (this *Record) AppendTXT(value string) error {
 // GET
 
 // Source returns the source of the record
-func (this *Record) Source() rpc.DiscoveryType {
+func (this *record) Source() rpc.DiscoveryType {
 	return this.Source_
 }
 
-func (this *Record) Key() string {
-	if this.Key_ == "" {
-		// is <quoted name>.<service>.<zone>
-		return this.Name_ + "." + this.Service_
-	} else {
-		return this.Key_
-	}
+func (this *record) Key() string {
+	return this.Key_
 }
 
-func (this *Record) Name() string {
+func (this *record) Name() string {
 	if name, err := unquote(this.Name_); err != nil {
 		return this.Name_
 	} else {
@@ -228,7 +230,7 @@ func (this *Record) Name() string {
 
 // Service returns the service type and protocol, including the underscores
 // but removes the subtype information
-func (this *Record) Service() string {
+func (this *record) Service() string {
 	parts := strings.SplitN(this.Service_, "._sub.", 2)
 	if len(parts) == 1 {
 		return parts[0]
@@ -240,7 +242,7 @@ func (this *Record) Service() string {
 }
 
 // Subtype returns the service subtype, but not including the underscore
-func (this *Record) Subtype() string {
+func (this *record) Subtype() string {
 	parts := strings.SplitN(this.Service_, "._sub.", 2)
 	if len(parts) == 2 {
 		return strings.TrimPrefix(parts[0], "_")
@@ -249,15 +251,15 @@ func (this *Record) Subtype() string {
 	}
 }
 
-func (this *Record) Host() string {
+func (this *record) Host() string {
 	return this.Host_
 }
 
-func (this *Record) Port() uint {
+func (this *record) Port() uint {
 	return this.Port_
 }
 
-func (this *Record) TTL() time.Duration {
+func (this *record) TTL() time.Duration {
 	if this.Ttl_ == nil {
 		return 0
 	} else {
@@ -265,7 +267,7 @@ func (this *Record) TTL() time.Duration {
 	}
 }
 
-func (this *Record) Timestamp() time.Time {
+func (this *record) Timestamp() time.Time {
 	if this.Ts_ == nil {
 		return time.Time{}
 	} else {
@@ -273,19 +275,19 @@ func (this *Record) Timestamp() time.Time {
 	}
 }
 
-func (this *Record) Text() []string {
+func (this *record) Text() []string {
 	return this.Txt_
 }
 
-func (this *Record) IP4() []net.IP {
+func (this *record) IP4() []net.IP {
 	return this.Ipv4_
 }
 
-func (this *Record) IP6() []net.IP {
+func (this *record) IP6() []net.IP {
 	return this.Ipv6_
 }
 
-func (this *Record) Expired() bool {
+func (this *record) Expired() bool {
 	if this.Ts_ == nil || this.Ts_.Time.IsZero() {
 		return false
 	} else if this.Ttl_ == nil {
@@ -304,7 +306,7 @@ func (this *Record) Expired() bool {
 ////////////////////////////////////////////////////////////////////////////////
 // Stringify
 
-func (s *Record) String() string {
+func (s *record) String() string {
 	p := ""
 	p += fmt.Sprintf("key=%v ", strconv.Quote(s.Key()))
 	if s.Name_ != "" {

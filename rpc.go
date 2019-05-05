@@ -10,6 +10,7 @@
 package rpc
 
 import (
+	"io"
 	"net"
 	"time"
 
@@ -48,6 +49,10 @@ type Util interface {
 
 	// NewServiceRecord creates an empty service record
 	NewServiceRecord(source DiscoveryType) ServiceRecord
+
+	// Read and write array of service records
+	Writer(fh io.Writer, records []ServiceRecord, indent bool) error
+	Reader(fh io.Reader) ([]ServiceRecord, error)
 }
 
 type ServiceRecord interface {

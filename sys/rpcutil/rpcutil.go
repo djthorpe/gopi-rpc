@@ -11,7 +11,11 @@ package rpcutil
 
 import (
 	// Frameworks
+	"encoding/json"
+	"io"
+
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 )
 
 type Util struct {
@@ -32,6 +36,39 @@ func (config Util) Open(log gopi.Logger) (gopi.Driver, error) {
 
 func (this *util) Close() error {
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// READ AND WRITE
+
+// Writer writes an array of service records to a io.Writer object
+func (this *util) Writer(fh io.Writer, records []rpc.ServiceRecord, indent bool) error {
+	enc := json.NewEncoder(fh)
+	if indent {
+		enc.SetIndent("", "  ")
+	}
+	if err := enc.Encode(records); err != nil {
+		return err
+	}
+	// Success
+	return nil
+}
+
+// Reader reads the configuration from an io.Reader object
+func (this *util) Reader(fh io.Reader) ([]rpc.ServiceRecord, error) {
+	dec := json.NewDecoder(fh)
+	var records []*record
+	if err := dec.Decode(&records); err != nil {
+		return nil, err
+	} else {
+		services := make([]rpc.ServiceRecord, 0, len(records))
+		for _, record := range records {
+			if record.Expired() == false {
+				services = append(services, record)
+			}
+		}
+		return services, nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

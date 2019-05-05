@@ -10,9 +10,7 @@
 package discovery
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,7 +20,6 @@ import (
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
-	rpcutil "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 	event "github.com/djthorpe/gopi/util/event"
 )
 
@@ -160,48 +157,15 @@ func (this *Config) SetModified() {
 
 // Write the configuration file to disk
 func (this *Config) Write(path string, indent bool) error {
+	this.Lock()
+	defer this.Unlock()
 	if fh, err := os.Create(path); err != nil {
 		return err
 	} else {
 		defer fh.Close()
-		return this.Writer(fh, indent)
-	}
-}
-
-// Writer writes the configuration to a io.Writer object
-func (this *Config) Writer(fh io.Writer, indent bool) error {
-	this.Lock()
-	defer this.Unlock()
-
-	enc := json.NewEncoder(fh)
-	if indent {
-		enc.SetIndent("", "  ")
-	}
-	if err := enc.Encode(this.Services); err != nil {
-		return err
-	}
-
-	// Clear modified flag
-	this.modified = false
-
-	// Success
-	return nil
-}
-
-// Read the configuration from a file
-func (this *Config) Read(path string) error {
-	// Read configuration
-	if fh, err := os.Open(path); err != nil {
-		return err
-	} else {
-		defer fh.Close()
-		if records, err := this.Reader(fh); err != nil {
+		if err := this.util.Writer(fh, this.Services, indent); err != nil {
 			return err
 		} else {
-			this.Lock()
-			defer this.Unlock()
-			// TODO: Expire old records
-			this.Services = records
 			this.modified = false
 		}
 	}
@@ -210,28 +174,30 @@ func (this *Config) Read(path string) error {
 	return nil
 }
 
-// Reader reads the configuration from an io.Reader object
-func (this *Config) Reader(fh io.Reader) ([]rpc.ServiceRecord, error) {
+// Read the configuration from a file
+func (this *Config) Read(path string) error {
 	this.Lock()
 	defer this.Unlock()
-
-	dec := json.NewDecoder(fh)
-	var records []*rpcutil.Record
-	if err := dec.Decode(&records); err != nil {
-		return nil, err
+	if fh, err := os.Open(path); err != nil {
+		return err
 	} else {
-		services := make([]rpc.ServiceRecord, 0, len(records))
-		for _, record := range records {
-			if record.Expired() == false {
-				services = append(services, record)
-			}
+		defer fh.Close()
+		if records, err := this.util.Reader(fh); err != nil {
+			return err
+		} else {
+			this.Lock()
+			defer this.Unlock()
+			this.Services = this.UnexpiredServices(records)
+			this.modified = false
 		}
-		return services, nil
 	}
+
+	// Success
+	return nil
 }
 
 // ExpireServices returns an array of unexpired services
-func (this *Config) ExpireServices() []rpc.ServiceRecord {
+func (this *Config) UnexpiredServices(records []rpc.ServiceRecord) []rpc.ServiceRecord {
 	services := make([]rpc.ServiceRecord, 0, len(this.Services))
 	for _, service := range this.Services {
 		if service.Expired() == false {
@@ -282,7 +248,7 @@ FOR_LOOP:
 					this.Emit(this.util.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_EXPIRED, service))
 				}
 			}
-			if services := this.ExpireServices(); len(services) != len(this.Services) {
+			if services := this.UnexpiredServices(this.Services); len(services) != len(this.Services) {
 				this.Services = services
 				this.SetModified()
 			}
