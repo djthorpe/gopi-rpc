@@ -360,10 +360,11 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) er
 
 	// Make the entry
 	record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DNS)
+
 	// Process sections of the response
 	sections := append(msg.Answer, msg.Ns...)
 	sections = append(sections, msg.Extra...)
-	for i, answer := range sections {
+	for _, answer := range sections {
 		switch rr := answer.(type) {
 		case *dns.PTR:
 			if rr.Hdr.Name == this.enum {
@@ -391,18 +392,23 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) er
 			if err := record.AppendIP(rr.AAAA); err != nil {
 				return err
 			}
-		case *dns.NSEC:
-			continue
-		case *dns.OPT:
-			continue
-		default:
-			fmt.Println("OTHER", i, answer.Header().Rrtype, answer)
 		}
 	}
 
-	if record != nil && record.Key() != "" {
-		this.services <- record
+	// Ignore inverse address requests
+	if strings.HasSuffix(record.Service(), ".ip6.arpa.") {
+		return nil
 	}
+	if strings.HasSuffix(record.Service(), ".in-addr.arpa.") {
+		return nil
+	}
+	// Ignore where there is no key
+	if record.Key() == "" {
+		return nil
+	}
+
+	// Transmit
+	this.services <- record
 
 	// Success
 	return nil
