@@ -45,7 +45,14 @@ type Listener struct {
 	ip6       *ipv6.PacketConn
 	errors    chan<- error
 	services  chan<- rpc.ServiceRecord
-	questions chan<- string
+	questions chan<- Question
+}
+
+type Question struct {
+	Message *dns.Msg
+	Query   string
+	IfIndex int
+	From    net.Addr
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +60,7 @@ type Listener struct {
 
 const (
 	MDNS_DEFAULT_DOMAIN = "local."
-	DELTA_QUERY_MS      = 1000
+	DELTA_QUERY_MS      = 500
 	REPEAT_QUERY        = 4
 )
 
@@ -65,7 +72,7 @@ var (
 ////////////////////////////////////////////////////////////////////////////////
 // INIT / DEINIT
 
-func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- rpc.ServiceRecord, questions chan<- string) error {
+func (this *Listener) Init(config Discovery, errors chan<- error, services chan<- rpc.ServiceRecord, questions chan<- Question) error {
 	if config.Domain == "" {
 		config.Domain = MDNS_DEFAULT_DOMAIN
 	}
@@ -181,8 +188,69 @@ func (this *Listener) QueryAll(msg *dns.Msg, ctx context.Context) error {
 ////////////////////////////////////////////////////////////////////////////////
 // ANSWER
 
-func (this *Listener) AnswerEnum(name string, ttl time.Duration) {
-	fmt.Println("ANSWER", name, ttl)
+func (this *Listener) AnswerInstanceMulticast(instances []rpc.ServiceRecord, question Question, ttl time.Duration) error {
+	for _, instance := range instances {
+		r := dns.Msg{}
+		r.SetReply(question.Message)
+		r.RecursionDesired = false
+		r.Authoritative = true
+		r.Question = nil
+		r.Answer = []dns.RR{}
+		r.Extra = []dns.RR{}
+
+		// Add records
+		r.Answer = append(r.Answer, instance.PTR(this.domain, DEFAULT_TTL), instance.SRV(this.domain, DEFAULT_TTL))
+		if len(instance.Text()) > 0 {
+			r.Answer = append(r.Answer, instance.TXT(this.domain, DEFAULT_TTL))
+		}
+		for _, a := range instance.A(this.domain, DEFAULT_TTL) {
+			r.Answer = append(r.Answer, a)
+		}
+		for _, aaaa := range instance.AAAA(this.domain, DEFAULT_TTL) {
+			r.Answer = append(r.Answer, aaaa)
+		}
+
+		// Send
+		if err := this.multicast_send(&r, question.IfIndex); err != nil {
+			return err
+		}
+	}
+
+	// Success
+	return nil
+}
+
+func (this *Listener) AnswerEnumMulticast(services []string, question Question, ttl time.Duration) error {
+	r := dns.Msg{}
+	r.SetReply(question.Message)
+	r.RecursionDesired = false
+	r.Authoritative = true
+	r.Question = nil
+	r.Answer = []dns.RR{}
+	r.Extra = []dns.RR{}
+
+	// Add PTR records
+	for _, service := range services {
+		r.Answer = append(r.Answer, &dns.PTR{
+			Hdr: dns.RR_Header{
+				Name:   this.enum,
+				Rrtype: dns.TypePTR,
+				Class:  dns.ClassINET,
+				Ttl:    uint32(ttl.Seconds()),
+			},
+			Ptr: service + "." + this.domain + ".",
+		})
+	}
+
+	if len(r.Answer) == 0 {
+		return nil
+	}
+	if err := this.multicast_send(&r, question.IfIndex); err != nil {
+		return err
+	}
+
+	// Return success
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -260,41 +328,6 @@ func (this *Listener) recv_loop6(conn *ipv6.PacketConn) {
 	}
 }
 
-// send is used to multicast a query out
-func (this *Listener) send(q *dns.Msg) error {
-	return gopi.ErrNotImplemented
-	/*
-		if buf, err := q.Pack(); err != nil {
-			return err
-		} else {
-			if this.ip4 != nil {
-				if _, err := this.ip4.WriteToUDP(buf, MDNS_ADDR_IPV4); err != nil {
-					return err
-				}
-			}
-			if this.ip6 != nil {
-				if _, err := this.ip6.WriteToUDP(buf, MDNS_ADDR_IPV6); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	*/
-}
-
-// answer questions from remote
-func (this *Listener) answer_questions(q dns.Question, ifIndex int, from net.Addr) {
-	if q.Name == this.enum {
-		fmt.Println("enumerate:", q)
-		fmt.Println("    from:", from, "ifIndex:", ifIndex)
-	} else {
-		fmt.Println("answer_question:", q)
-		fmt.Println("    from:", from, "ifIndex:", ifIndex)
-		// careful something is receiving the question!
-		//this.questions <- strings.TrimSuffix(q.Name, domain)
-	}
-}
-
 // parse packets into service records
 func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) error {
 	var msg dns.Msg
@@ -313,7 +346,13 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) er
 
 	// Deal with questions, and return nil if no answers
 	for _, q := range msg.Question {
-		this.answer_questions(q, ifIndex, from)
+		if this.questions != nil {
+			if q.Name == this.enum {
+				this.questions <- Question{&msg, rpc.DISCOVERY_SERVICE_QUERY, ifIndex, from}
+			} else if strings.HasSuffix(q.Name, "."+this.domain+".") {
+				this.questions <- Question{&msg, strings.TrimSuffix(q.Name, "."+this.domain+"."), ifIndex, from}
+			}
+		}
 	}
 	if len(msg.Answer) == 0 {
 		return nil

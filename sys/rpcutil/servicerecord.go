@@ -56,8 +56,9 @@ type timestamp struct {
 // GLOBAL VARIABLES
 
 var (
-	reServiceType = regexp.MustCompile("^_[A-Za-z][A-Za-z0-9\\-]*\\._(tcp|udp)$")
-	reSubType     = regexp.MustCompile("^[A-Za-z][A-Za-z0-9\\-]*$")
+	reServiceType           = regexp.MustCompile("^_[A-Za-z][A-Za-z0-9\\-]*\\._(tcp|udp)$")
+	reSubType               = regexp.MustCompile("^[A-Za-z][A-Za-z0-9\\-]*$")
+	qClassCacheFlush uint16 = 1 << 15
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -302,6 +303,79 @@ func (this *record) Expired() bool {
 			return false
 		}
 	}
+}
+
+func (this *record) PTR(zone string, ttl time.Duration) *dns.PTR {
+	return &dns.PTR{
+		Hdr: dns.RR_Header{
+			Name:   this.Service_ + "." + zone + ".",
+			Rrtype: dns.TypePTR,
+			Class:  dns.ClassINET,
+			Ttl:    uint32(ttl.Seconds()),
+		},
+		Ptr: this.Name_ + "." + zone + ".",
+	}
+}
+
+func (this *record) SRV(zone string, ttl time.Duration) *dns.SRV {
+	return &dns.SRV{
+		Hdr: dns.RR_Header{
+			Name:   this.Name_ + "." + zone + ".",
+			Rrtype: dns.TypeSRV,
+			Class:  dns.ClassINET | qClassCacheFlush,
+			Ttl:    uint32(ttl.Seconds()),
+		},
+		Priority: 0,
+		Weight:   0,
+		Port:     uint16(this.Port_),
+		Target:   this.Host_ + "." + zone + ".",
+	}
+}
+
+func (this *record) TXT(zone string, ttl time.Duration) *dns.TXT {
+	return &dns.TXT{
+		Hdr: dns.RR_Header{
+			Name:   this.Name_ + "." + zone + ".",
+			Rrtype: dns.TypeTXT,
+			Class:  dns.ClassINET,
+			Ttl:    uint32(ttl.Seconds()),
+		},
+		Txt: this.Txt_,
+	}
+}
+
+func (this *record) A(zone string, ttl time.Duration) []*dns.A {
+	ips := this.IP4()
+	sections := make([]*dns.A, len(ips))
+	for i, ip := range ips {
+		sections[i] = &dns.A{
+			Hdr: dns.RR_Header{
+				Name:   this.Host_ + "." + zone + ".",
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+				Ttl:    uint32(ttl.Seconds()),
+			},
+			A: ip,
+		}
+	}
+	return sections
+}
+
+func (this *record) AAAA(zone string, ttl time.Duration) []*dns.AAAA {
+	ips := this.IP6()
+	sections := make([]*dns.AAAA, len(ips))
+	for i, ip := range ips {
+		sections[i] = &dns.AAAA{
+			Hdr: dns.RR_Header{
+				Name:   this.Host_ + "." + zone + ".",
+				Rrtype: dns.TypeAAAA,
+				Class:  dns.ClassINET,
+				Ttl:    uint32(ttl.Seconds()),
+			},
+			AAAA: ip,
+		}
+	}
+	return sections
 }
 
 ////////////////////////////////////////////////////////////////////////////////

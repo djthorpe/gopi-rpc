@@ -44,7 +44,7 @@ type discovery struct {
 
 	errors    chan error
 	services  chan rpc.ServiceRecord
-	questions chan string
+	questions chan Question
 	log       gopi.Logger
 	util      rpc.Util
 }
@@ -54,6 +54,7 @@ type discovery struct {
 
 const (
 	DELTA_PROBE = 2 * time.Minute
+	DEFAULT_TTL = 15 * time.Minute
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +66,7 @@ func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
 	this := new(discovery)
 	this.errors = make(chan error)
 	this.services = make(chan rpc.ServiceRecord)
-	this.questions = make(chan string)
+	this.questions = make(chan Question)
 
 	if err := this.Config.Init(config, this, this.errors); err != nil {
 		logger.Debug2("Config.Init returned nil")
@@ -218,7 +219,7 @@ func (this *discovery) EnumerateServices(ctx context.Context) ([]string, error) 
 
 	// The message should be to enumerate services
 	msg := new(dns.Msg)
-	msg.SetQuestion(rpc.DISCOVERY_SERVICE_QUERY+"."+this.domain, dns.TypePTR)
+	msg.SetQuestion(rpc.DISCOVERY_SERVICE_QUERY+"."+this.domain+".", dns.TypePTR)
 	msg.RecursionDesired = false
 
 	// Wait for services
@@ -301,12 +302,18 @@ FOR_LOOP:
 				this.Config.Register(service)
 			}
 		case question := <-this.questions:
-			if question == rpc.DISCOVERY_SERVICE_QUERY {
-				if locals := this.Config.EnumerateServices(rpc.DISCOVERY_TYPE_DB); len(locals) > 0 {
-					this.log.Debug2("rpc.discovery.Broadcast: %v", locals)
+			if question.Query == rpc.DISCOVERY_SERVICE_QUERY {
+				if services := this.Config.EnumerateServices(rpc.DISCOVERY_TYPE_DB); len(services) > 0 {
+					if err := this.Listener.AnswerEnumMulticast(services, question, DEFAULT_TTL); err != nil {
+						this.log.Warn("rpc.discovery: %v", err)
+					}
 				}
-			} else if locals := this.Config.GetServices(question, rpc.DISCOVERY_TYPE_DB); len(locals) > 0 {
-				this.log.Debug2("rpc.discovery.Broadcast: %v", locals)
+			} else {
+				if instances := this.Config.GetServices(question.Query, rpc.DISCOVERY_TYPE_DB); len(instances) > 0 {
+					if err := this.Listener.AnswerInstanceMulticast(instances, question, DEFAULT_TTL); err != nil {
+						this.log.Warn("rpc.discovery: %v", err)
+					}
+				}
 			}
 		case <-stop:
 			break FOR_LOOP

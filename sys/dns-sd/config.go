@@ -270,9 +270,6 @@ FOR_LOOP:
 // and filters to those which have been registered locally (rather
 // than through DNS service discovery) if flag is set
 func (this *Config) EnumerateServices(source rpc.DiscoveryType) []string {
-	this.Lock()
-	defer this.Unlock()
-
 	// Get all the records
 	type_map := make(map[string]bool, 10)
 	for _, record := range this.GetServices("", source) {

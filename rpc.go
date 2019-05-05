@@ -67,6 +67,13 @@ type ServiceRecord interface {
 	// Source returns the source of the record
 	Source() DiscoveryType
 
+	// Get DNS answers
+	PTR(zone string, ttl time.Duration) *dns.PTR
+	SRV(zone string, ttl time.Duration) *dns.SRV
+	TXT(zone string, ttl time.Duration) *dns.TXT
+	A(zone string, ttl time.Duration) []*dns.A
+	AAAA(zone string, ttl time.Duration) []*dns.AAAA
+
 	// Set parameters
 	SetService(service, subtype string) error
 	SetName(name string) error
