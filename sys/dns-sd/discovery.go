@@ -81,8 +81,8 @@ func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
 		this.util = config.Util
 	}
 
-	// Start task to catch errors, receive services, expire records and
-	// send probe requests
+	// Start task to catch errors, receive services,
+	// expire records and send probe requests
 	this.Tasks.Start(this.BackgroundTask, this.ProbeTask)
 
 	return this, nil
@@ -95,12 +95,15 @@ func (this *discovery) Close() error {
 	this.Publisher.Close()
 
 	// Release resources, etc
+	fmt.Println("LISTENER END")
 	if err := this.Listener.Destroy(); err != nil {
 		return err
 	}
+	fmt.Println("CONFIG END")
 	if err := this.Config.Destroy(); err != nil {
 		return err
 	}
+	fmt.Println("TASKS CLOSE END")
 	if err := this.Tasks.Close(); err != nil {
 		return err
 	}

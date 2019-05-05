@@ -185,8 +185,6 @@ func (this *Config) Read(path string) error {
 		if records, err := this.util.Reader(fh); err != nil {
 			return err
 		} else {
-			this.Lock()
-			defer this.Unlock()
 			this.Services = this.UnexpiredServices(records)
 			this.modified = false
 		}
