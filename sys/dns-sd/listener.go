@@ -91,7 +91,6 @@ func (this *Listener) Init(config Discovery, errors chan<- error, services chan<
 		return err
 	} else {
 		this.ifaces = ifaces
-		fmt.Println(ifaces)
 	}
 	if config.Flags&gopi.RPC_FLAG_INET_V4 != 0 {
 		if ip4, err := joinUdp4Multicast(this.ifaces, MDNS_ADDR_IPV4); err != nil {
@@ -395,15 +394,15 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) er
 		}
 	}
 
+	// Ignore where there is no key
+	if record.Key() == "" {
+		return nil
+	}
 	// Ignore inverse address requests
 	if strings.HasSuffix(record.Service(), ".ip6.arpa.") {
 		return nil
 	}
 	if strings.HasSuffix(record.Service(), ".in-addr.arpa.") {
-		return nil
-	}
-	// Ignore where there is no key
-	if record.Key() == "" {
 		return nil
 	}
 
@@ -465,7 +464,7 @@ func joinUdp6Multicast(ifaces []net.Interface, addr *net.UDPAddr) (*ipv6.PacketC
 		errs := &errors.CompoundError{}
 		for _, iface := range ifaces {
 			if err := packet_conn.JoinGroup(&iface, &net.UDPAddr{IP: addr.IP}); err != nil {
-				errs.Add(fmt.Errorf("%v: %v", iface.Name, err))
+				errs.Add(fmt.Errorf("JoinGroup6: %v: %v", iface.Name, err))
 			}
 		}
 		if errs.Success() {
@@ -488,7 +487,7 @@ func joinUdp4Multicast(ifaces []net.Interface, addr *net.UDPAddr) (*ipv4.PacketC
 		errs := &errors.CompoundError{}
 		for _, iface := range ifaces {
 			if err := packet_conn.JoinGroup(&iface, &net.UDPAddr{IP: addr.IP}); err != nil {
-				errs.Add(fmt.Errorf("%v: %v", iface.Name, err))
+				errs.Add(fmt.Errorf("JoinGroup4: %v: %v", iface.Name, err))
 			}
 		}
 		if errs.Success() {
@@ -516,6 +515,9 @@ func listMulticastInterfaces(iface net.Interface) ([]net.Interface, error) {
 				continue
 			}
 			if (ifi.Flags & net.FlagMulticast) == 0 {
+				continue
+			}
+			if addrs, err := ifi.MulticastAddrs(); err != nil || len(addrs) == 0 {
 				continue
 			}
 			interfaces = append(interfaces, ifi)
