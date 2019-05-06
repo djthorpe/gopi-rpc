@@ -16,6 +16,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	event "github.com/djthorpe/gopi/util/event"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +29,8 @@ type Gaffer struct {
 type gaffer struct {
 	log  gopi.Logger
 	addr string
+
+	event.Publisher
 }
 
 ////////////////////////////////////////////////////////////////////////////////

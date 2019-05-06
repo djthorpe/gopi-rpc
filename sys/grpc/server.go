@@ -190,16 +190,21 @@ func (this *server) Service(service, subtype, name string, text ...string) gopi.
 		return nil
 	}
 
-	// Can't return non-TCP
-	if this.addr.Network() != "tcp" {
-		this.log.Warn("grpc.Service: Not TCP")
-		return nil
-	}
-
 	// Can't register if name is blank
 	if strings.TrimSpace(name) == "" {
 		this.log.Warn("grpc.Service: No name")
 		return nil
+	}
+
+	// Check service name
+	if matched, err := regexp.MatchString("^[A-Za-z][A-Za-z0-9\\-]*$", service); err != nil {
+		this.log.Warn("grpc.Service: SetService: %v", err)
+		return nil
+	} else if matched == false {
+		this.log.Warn("grpc.Service: SetService: Invalid service type")
+		return nil
+	} else {
+		service = fmt.Sprintf("_%v._%v", service, this.Addr().Network())
 	}
 
 	// Return service
@@ -210,32 +215,31 @@ func (this *server) Service(service, subtype, name string, text ...string) gopi.
 
 		// Set service, subtype, etc.
 		if err := r.SetService(service, subtype); err != nil {
-			this.log.Warn("grpc.Service: %v", err)
+			this.log.Warn("grpc.Service: SetService: %v", err)
 			return nil
 		} else if err := r.SetName(name); err != nil {
-			this.log.Warn("grpc.Service: %v", err)
+			this.log.Warn("grpc.Service: SetName: %v", err)
 			return nil
 		} else if hostname, err := os.Hostname(); err != nil {
-			this.log.Warn("grpc.Service: %v", err)
+			this.log.Warn("grpc.Service: SetAddr: %v", err)
 			return nil
 		} else if err := r.SetAddr(fmt.Sprintf("%v:%v", hostname, this.Port())); err != nil {
-			this.log.Warn("grpc.Service: %v", err)
+			this.log.Warn("grpc.Service: SetAddr: %v", err)
 			return nil
-		} else if ips, err := net.LookupIP(hostname); err != nil {
-			this.log.Warn("grpc.Service: %v", err)
+		} else if v4, v6, err := addrsForInterfaces(); err != nil {
+			this.log.Warn("grpc.Service: SetAddr: %v", err)
 			return nil
-		} else {
-			for _, ip := range ips {
-				if err := r.AppendIP(ip); err != nil {
-					this.log.Warn("grpc.Service: %v", err)
-					return nil
-				}
-			}
+		} else if err := r.AppendIP(v4...); err != nil {
+			this.log.Warn("grpc.Service: AppendIP: IPv4: %v", err)
+			return nil
+		} else if err := r.AppendIP(v6...); err != nil {
+			this.log.Warn("grpc.Service: AppendIP: IPv6: %v", err)
+			return nil
 		}
 
 		// Set a TXT record for SSL
 		if err := r.AppendTXT(toSslTXT(this.ssl)); err != nil {
-			this.log.Warn("grpc.Service: %v", err)
+			this.log.Warn("grpc.Service: AppendTXT: %v", err)
 			return nil
 		}
 
@@ -272,5 +276,47 @@ func portString(port uint) string {
 		return ""
 	} else {
 		return fmt.Sprint(":", port)
+	}
+}
+
+func addrsForInterfaces() ([]net.IP, []net.IP, error) {
+	if ifaces, err := net.Interfaces(); err != nil {
+		return nil, nil, err
+	} else {
+		var v4, v6 []net.IP
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback != 0 {
+				continue
+			} else if iface.Flags&net.FlagUp == 0 {
+				continue
+			}
+			if v4_, v6_, err := addrsForInterface(iface); err != nil {
+				return nil, nil, err
+			} else {
+				v4 = append(v4, v4_...)
+				v6 = append(v6, v6_...)
+			}
+		}
+		return v4, v6, nil
+	}
+}
+
+func addrsForInterface(iface net.Interface) ([]net.IP, []net.IP, error) {
+	if addrs, err := iface.Addrs(); err != nil {
+		return nil, nil, err
+	} else {
+		var v4, v6 []net.IP
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok == false {
+				continue
+			} else if ipnet.IP.IsLoopback() == true {
+				continue
+			} else if ipnet.IP.To4() != nil {
+				v4 = append(v4, ipnet.IP)
+			} else if ip := ipnet.IP.To16(); ip != nil && ip.IsGlobalUnicast() {
+				v6 = append(v6, ipnet.IP)
+			}
+		}
+		return v4, v6, nil
 	}
 }
