@@ -372,6 +372,7 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) er
 				} else if this.services != nil {
 					this.services <- record
 				}
+				record = this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DNS)
 			} else if err := record.SetPTR(this.domain, rr); err != nil {
 				return err
 			}
@@ -400,15 +401,12 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) er
 	} else if record.Service() == rpc.DISCOVERY_SERVICE_QUERY {
 		return nil
 	} else if strings.HasSuffix(record.Service(), ".ip6.arpa.") {
-		fmt.Println("IP6", record.Service(), record.Name())
 		return nil
 	} else if strings.HasSuffix(record.Service(), ".in-addr.arpa.") {
-		fmt.Println("IP4", record.Service(), record.Name())
 		return nil
+	} else {
+		this.services <- record
 	}
-
-	// Transmit
-	this.services <- record
 
 	// Success
 	return nil

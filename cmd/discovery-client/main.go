@@ -204,25 +204,27 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 		}
 	}
 
-	if client, err := GoogleCastClient(app); err != nil {
-		return err
-	} else if err := client.Ping(); err != nil {
-		return err
-	} else {
-		if devices, err := client.Devices(); err != nil {
+	if service == "_googlecast._tcp" {
+		if client, err := GoogleCastClient(app); err != nil {
+			return err
+		} else if err := client.Ping(); err != nil {
 			return err
 		} else {
-			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"Name", "Service", "State", "Model"})
-			for _, device := range devices {
-				table.Append([]string{
-					device.Name(),
-					device.Service(),
-					fmt.Sprint(device.State()),
-					device.Model(),
-				})
+			if devices, err := client.Devices(); err != nil {
+				return err
+			} else {
+				table := tablewriter.NewWriter(os.Stdout)
+				table.SetHeader([]string{"Name", "Service", "State", "Model"})
+				for _, device := range devices {
+					table.Append([]string{
+						device.Name(),
+						device.Service(),
+						fmt.Sprint(device.State()),
+						device.Model(),
+					})
+				}
+				table.Render()
 			}
-			table.Render()
 		}
 	}
 

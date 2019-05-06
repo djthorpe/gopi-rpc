@@ -309,7 +309,6 @@ func (this *Config) Register_(service rpc.ServiceRecord) error {
 	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
-
 	if service.Service() == rpc.DISCOVERY_SERVICE_QUERY {
 		this.Emit(this.util.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_NAME, service))
 	} else if index := this.IndexForService(service); index == -1 {
