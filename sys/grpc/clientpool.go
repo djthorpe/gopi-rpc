@@ -115,6 +115,26 @@ func (this *clientpool) Connect(service gopi.RPCServiceRecord, flags gopi.RPCFla
 	}
 }
 
+func (this *clientpool) ConnectAddr(addr string, flags gopi.RPCFlag) (gopi.RPCClientConn, error) {
+	this.log.Debug2("<grpc.clientpool.ConnectAddr>{ addr=%v flags=%v }", addr, flags)
+	if host, port, err := net.SplitHostPort(addr); err != nil {
+		return nil, err
+	} else if conn, err := gopi.Open(ClientConn{
+		Addr:       fmt.Sprintf("[%v]:%v", host, port),
+		SSL:        this.ssl,
+		SkipVerify: this.skipverify,
+		Timeout:    this.timeout,
+	}, this.log); err != nil {
+		return nil, err
+	} else if conn_, ok := conn.(*clientconn); ok == false {
+		return nil, gopi.ErrAppError
+	} else if err := conn_.Connect(); err != nil {
+		return nil, err
+	} else {
+		return conn_, nil
+	}
+}
+
 func (this *clientpool) Disconnect(conn gopi.RPCClientConn) error {
 	this.log.Debug2("<grpc.clientpool.Disconnect>{ conn=%v }", conn)
 	if conn_, ok := conn.(*clientconn); ok {
@@ -233,7 +253,6 @@ func (this *clientpool) connectTo(name string, addr net.IP, port uint, ssl, skip
 	this.log.Debug2("<grpc.clientpool.Connect>{ name=%v addr=%v port=%v ssl=%v skipverify=%v timeout=%v }", strconv.Quote(name), addr, port, ssl, skipverify, timeout)
 
 	if conn, err := gopi.Open(ClientConn{
-		Name:       name,
 		Addr:       fmt.Sprintf("[%v]:%v", addr.String(), port),
 		SSL:        ssl,
 		SkipVerify: skipverify,

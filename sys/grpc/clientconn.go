@@ -25,7 +25,6 @@ import (
 
 // Client Configuration
 type ClientConn struct {
-	Name       string
 	Addr       string
 	SSL        bool
 	SkipVerify bool
@@ -34,7 +33,6 @@ type ClientConn struct {
 
 type clientconn struct {
 	log        gopi.Logger
-	name       string
 	addr       string
 	ssl        bool
 	skipverify bool
@@ -52,7 +50,6 @@ func (config ClientConn) Open(log gopi.Logger) (gopi.Driver, error) {
 
 	// Create a client object
 	this := new(clientconn)
-	this.name = config.Name
 	this.addr = config.Addr
 	this.ssl = config.SSL
 	this.skipverify = config.SkipVerify
@@ -65,7 +62,7 @@ func (config ClientConn) Open(log gopi.Logger) (gopi.Driver, error) {
 }
 
 func (this *clientconn) Close() error {
-	this.log.Debug("<rpc.clientconn>Close{ name=%v addr=%v }", this.name, this.addr)
+	this.log.Debug("<rpc.clientconn>Close{ addr=%v }", this.addr)
 
 	// Disconnect first
 	err := this.Disconnect()
@@ -81,7 +78,7 @@ func (this *clientconn) Close() error {
 // CONNECT AND DISCONNECT
 
 func (this *clientconn) Connect() error {
-	this.log.Debug2("<grpc.clientconn>Connect{ name=%v addr=%v }", this.name, this.addr)
+	this.log.Debug2("<grpc.clientconn>Connect{ addr=%v }", this.addr)
 	if this.conn != nil {
 		this.log.Debug("<rpc.clientconn>Connect: Cannot call Connect() when connection already made")
 		return gopi.ErrOutOfOrder
@@ -114,7 +111,7 @@ func (this *clientconn) Connect() error {
 }
 
 func (this *clientconn) Disconnect() error {
-	this.log.Debug2("<grpc.clientconn>Disconnect{ name=%v addr=%v }", this.name, this.addr)
+	this.log.Debug2("<grpc.clientconn>Disconnect{ addr=%v }", this.addr)
 	if this.conn != nil {
 		err := this.conn.Close()
 		this.conn = nil
@@ -142,10 +139,6 @@ func (this *clientconn) Services() ([]string, error) {
 	} else {
 		return services, nil
 	}
-}
-
-func (this *clientconn) Name() string {
-	return this.name
 }
 
 func (this *clientconn) Addr() string {
@@ -179,7 +172,7 @@ func (this *clientconn) Unlock() {
 // STRINGIFY
 
 func (this *clientconn) String() string {
-	return fmt.Sprintf("<grpc.ClientConn>{ name=%v addr=%v ssl=%v connected=%v }", this.name, this.addr, this.ssl, this.conn != nil)
+	return fmt.Sprintf("<grpc.ClientConn>{ addr=%v ssl=%v connected=%v }", this.addr, this.ssl, this.conn != nil)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

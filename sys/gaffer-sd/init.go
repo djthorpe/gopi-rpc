@@ -10,11 +10,11 @@
 package gaffer
 
 import (
-
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 
 	// Modules
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/discovery"
 	_ "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 )
 
@@ -24,8 +24,9 @@ import (
 func init() {
 	// Register InputManager
 	gopi.RegisterModule(gopi.Module{
-		Name: "rpc/discovery:gaffer",
-		Type: gopi.MODULE_TYPE_DISCOVERY,
+		Name:     "rpc/discovery:gaffer",
+		Type:     gopi.MODULE_TYPE_DISCOVERY,
+		Requires: []string{"rpc/discovery:client", "rpc/clientpool"},
 		Config: func(config *gopi.AppConfig) {
 			config.AppFlags.FlagString("sd.addr", "", "Discovery Service Address")
 		},
@@ -33,6 +34,7 @@ func init() {
 			addr, _ := app.AppFlags.GetString("sd.addr")
 			return gopi.Open(Gaffer{
 				Addr: addr,
+				Pool: app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool),
 			}, app.Logger)
 		},
 	})

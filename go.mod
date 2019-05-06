@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	cloud.google.com/go v0.38.0 // indirect
-	github.com/djthorpe/gopi v1.0.77
+	github.com/djthorpe/gopi v1.0.78
 	github.com/golang/mock v1.3.0 // indirect
 	github.com/golang/protobuf v1.3.1
 	github.com/google/btree v1.0.0 // indirect
@@ -21,7 +21,7 @@ require (
 	golang.org/x/mobile v0.0.0-20190415191353-3e0bab5405d6 // indirect
 	golang.org/x/net v0.0.0-20190503192946-f4e77d36d62c
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a // indirect
-	golang.org/x/sys v0.0.0-20190502175342-a43fa875dd82 // indirect
+	golang.org/x/sys v0.0.0-20190506115046-ca7f33d4116e // indirect
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	golang.org/x/tools v0.0.0-20190503185657-3b6f9c0030f7 // indirect
