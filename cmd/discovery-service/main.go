@@ -14,6 +14,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
@@ -29,8 +30,8 @@ import (
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/discovery:service", "rpc/version:service")
+	config := gopi.NewAppConfig("rpc/discovery:service", "rpc/version:service", "rpc/discovery:dns-sd")
 
 	// Run the server and register all the services
-	os.Exit(gopi.RPCServerTool(config))
+	os.Exit(rpc.Server(config))
 }
