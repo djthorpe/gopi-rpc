@@ -29,7 +29,7 @@ import (
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/helloworld:service", "rpc/version:service", "rpc/discovery")
+	config := gopi.NewAppConfig("rpc/helloworld:service", "rpc/version:service", "discovery")
 
 	// Run the server and register all the services
 	os.Exit(gopi.RPCServerTool(config))

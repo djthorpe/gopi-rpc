@@ -17,9 +17,6 @@ import (
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
-
-	// Modules
-	_ "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +25,7 @@ import (
 func init() {
 	// Register InputManager
 	gopi.RegisterModule(gopi.Module{
-		Name:     "rpc/discovery",
+		Name:     "rpc/discovery:dns-sd",
 		Requires: []string{"rpc/util"},
 		Type:     gopi.MODULE_TYPE_DISCOVERY,
 		Config: func(config *gopi.AppConfig) {

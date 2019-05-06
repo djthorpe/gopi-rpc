@@ -79,7 +79,7 @@ type ServiceRecord interface {
 	SetName(name string) error
 	SetAddr(addr string) error
 	SetPTR(zone string, rr *dns.PTR) error
-	SetSRV(rr *dns.SRV) error
+	SetSRV(zone string, rr *dns.SRV) error
 	SetTTL(time.Duration) error
 	AppendIP(...net.IP) error
 	AppendTXT(...string) error

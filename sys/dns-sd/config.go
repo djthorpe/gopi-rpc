@@ -71,7 +71,7 @@ func (this *Config) Init(config Discovery, source gopi.Driver, errors chan<- err
 	// Read or create file
 	if config.Path != "" {
 		if err := this.CreatePath(config.Path); err != nil {
-			return err
+			return fmt.Errorf("Error: %v: %v", config.Path, err)
 		}
 	}
 
@@ -194,10 +194,10 @@ func (this *Config) Read(path string) error {
 	return nil
 }
 
-// ExpireServices returns an array of unexpired services
+// UnexpiredServices returns an array of unexpired services
 func (this *Config) UnexpiredServices(records []rpc.ServiceRecord) []rpc.ServiceRecord {
 	services := make([]rpc.ServiceRecord, 0, len(this.Services))
-	for _, service := range this.Services {
+	for _, service := range records {
 		if service.Expired() == false {
 			services = append(services, service)
 		}
@@ -305,10 +305,11 @@ func (this *Config) GetServices(service string, source rpc.DiscoveryType) []rpc.
 ////////////////////////////////////////////////////////////////////////////////
 // REGISTER & REMOVE SERVICES
 
-func (this *Config) Register(service rpc.ServiceRecord) error {
+func (this *Config) Register_(service rpc.ServiceRecord) error {
 	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
+
 	if service.Service() == rpc.DISCOVERY_SERVICE_QUERY {
 		this.Emit(this.util.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_NAME, service))
 	} else if index := this.IndexForService(service); index == -1 {
@@ -329,7 +330,7 @@ func (this *Config) Register(service rpc.ServiceRecord) error {
 	return nil
 }
 
-func (this *Config) Remove(service rpc.ServiceRecord) error {
+func (this *Config) Remove_(service rpc.ServiceRecord) error {
 	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}

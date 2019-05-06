@@ -61,7 +61,7 @@ type Question struct {
 const (
 	MDNS_DEFAULT_DOMAIN = "local."
 	DELTA_QUERY_MS      = 500
-	REPEAT_QUERY        = 4
+	REPEAT_QUERY        = 2
 )
 
 var (
@@ -376,7 +376,7 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) er
 				return err
 			}
 		case *dns.SRV:
-			if err := record.SetSRV(rr); err != nil {
+			if err := record.SetSRV(this.domain, rr); err != nil {
 				return err
 			}
 		case *dns.TXT:
@@ -394,15 +394,16 @@ func (this *Listener) parse_packet(packet []byte, ifIndex int, from net.Addr) er
 		}
 	}
 
-	// Ignore where there is no key
+	// Filter out certain records
 	if record.Key() == "" {
 		return nil
-	}
-	// Ignore inverse address requests
-	if strings.HasSuffix(record.Service(), ".ip6.arpa.") {
+	} else if record.Service() == rpc.DISCOVERY_SERVICE_QUERY {
 		return nil
-	}
-	if strings.HasSuffix(record.Service(), ".in-addr.arpa.") {
+	} else if strings.HasSuffix(record.Service(), ".ip6.arpa.") {
+		fmt.Println("IP6", record.Service(), record.Name())
+		return nil
+	} else if strings.HasSuffix(record.Service(), ".in-addr.arpa.") {
+		fmt.Println("IP4", record.Service(), record.Name())
 		return nil
 	}
 

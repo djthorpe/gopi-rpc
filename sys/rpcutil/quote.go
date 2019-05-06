@@ -11,6 +11,7 @@ package rpcutil
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
@@ -69,8 +70,8 @@ func (this *tokenizer) Conv(tok rune) rune {
 		return '\t'
 	case tok == 'r':
 		return '\r'
-	case tok == 'x':
-		return rune(0)
+	case tok == 'f':
+		return '\f'
 	case unicode.IsDigit(tok):
 		return rune(0)
 	default:
@@ -126,7 +127,55 @@ func (this *tokenizer) String() string {
 	}
 }
 
-func unquote(src string) (string, error) {
+////////////////////////////////////////////////////////////////////////////////
+// QUOTE
+
+func Quote(src string) string {
+	// Tokenizer
+	t := NewTokenizer(src)
+	for tok := t.Next(); tok != EOF; tok = t.Next() {
+		switch {
+		case tok == ' ', tok == '@', tok == '.', tok == '\\':
+			t.Append('\\', t.State)
+			t.Append(tok, t.State)
+		case tok == '\n':
+			t.Append('\\', t.State)
+			t.Append('n', t.State)
+		case tok == '\r':
+			t.Append('\\', t.State)
+			t.Append('r', t.State)
+		case tok == '\t':
+			t.Append('\\', t.State)
+			t.Append('t', t.State)
+		case tok == '\f':
+			t.Append('\\', t.State)
+			t.Append('f', t.State)
+		case unicode.IsDigit(tok), unicode.IsLetter(tok):
+			fallthrough
+		case tok == '_', tok == '-', tok == ':':
+			t.Append(tok, t.State)
+		default:
+			for _, b := range []byte(string(tok)) {
+				t.Append('\\', t.State)
+				for _, d := range []rune(fmt.Sprintf("%03d", b)) {
+					t.Append(d, t.State)
+				}
+			}
+		}
+	}
+	return t.String()
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// UNQUOTE
+
+// Unquote returns a bare string without quoted characters. The following
+// Coversions happen:
+// \\ \n \f \t \r Happen as normal
+// \xFF returns a byte from hex
+// \123 returns a byte from decimal
+// \0123 returns a bype from octal
+func Unquote(src string) (string, error) {
 	// The simple case without any backslashes
 	if strings.ContainsAny(src, "\\") == false {
 		return src, nil
@@ -167,6 +216,11 @@ func unquote(src string) (string, error) {
 				return src, err
 			}
 		}
+	}
+
+	// We should always end up in st_start state
+	if t.State != st_start {
+		return src, ErrParseError
 	}
 
 	// Eject last value

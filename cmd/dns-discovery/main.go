@@ -21,6 +21,7 @@ import (
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
+	_ "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 	_ "github.com/djthorpe/gopi/sys/logger"
 )
 

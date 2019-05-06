@@ -13,14 +13,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/protobuf/ptypes"
-
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	grpc "github.com/djthorpe/gopi-rpc/sys/grpc"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/version"
+	ptypes "github.com/golang/protobuf/ptypes"
 	empty "github.com/golang/protobuf/ptypes/empty"
 )
 

@@ -107,8 +107,7 @@ func (this *record) SetService(service, subtype string) error {
 
 // SetName sets the name of the service instance
 func (this *record) SetName(name string) error {
-	// TODO: quote
-	this.Name_ = name
+	this.Name_ = Quote(name)
 	this.Key_ = this.Name_
 	if this.Service() != "" {
 		this.Key_ += "." + this.Service()
@@ -142,14 +141,16 @@ func (this *record) SetPTR(zone string, rr *dns.PTR) error {
 	return nil
 }
 
-func (this *record) SetSRV(rr *dns.SRV) error {
+func (this *record) SetSRV(zone string, rr *dns.SRV) error {
 	if rr == nil {
 		return gopi.ErrBadParameter
-	} else {
+	} else if strings.HasSuffix(rr.Target, "."+zone+".") {
 		this.Host_ = rr.Target
-		this.Port_ = uint(rr.Port)
-		return nil
+	} else {
+		this.Host_ = strings.TrimPrefix(rr.Target, ".") + "." + zone + "."
 	}
+	this.Port_ = uint(rr.Port)
+	return nil
 }
 
 func (this *record) SetTXT(txt []string) error {
@@ -223,7 +224,7 @@ func (this *record) Key() string {
 }
 
 func (this *record) Name() string {
-	if name, err := unquote(this.Name_); err != nil {
+	if name, err := Unquote(this.Name_); err != nil {
 		return this.Name_
 	} else {
 		return name
@@ -328,7 +329,7 @@ func (this *record) SRV(zone string, ttl time.Duration) *dns.SRV {
 		Priority: 0,
 		Weight:   0,
 		Port:     uint16(this.Port_),
-		Target:   this.Host_ + "." + zone + ".",
+		Target:   this.Host_,
 	}
 }
 
