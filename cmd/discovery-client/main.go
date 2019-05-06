@@ -21,13 +21,12 @@ import (
 	tablewriter "github.com/olekukonko/tablewriter"
 
 	// Modules
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/discovery"
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/googlecast"
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
 	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
 	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi/sys/logger"
-
-	// Services
-	discovery "github.com/djthorpe/gopi-rpc/rpc/grpc/discovery"
-	version "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -81,28 +80,42 @@ func Conn(app *gopi.AppInstance) (gopi.RPCClientConn, error) {
 	}
 }
 
-func DiscoveryClient(app *gopi.AppInstance) (*discovery.Client, error) {
+func DiscoveryClient(app *gopi.AppInstance) (rpc.DiscoveryClient, error) {
 	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
 
 	if conn, err := Conn(app); err != nil {
 		return nil, err
 	} else if client := pool.NewClient("gopi.Discovery", conn); client == nil {
 		return nil, gopi.ErrNotFound
-	} else if client_, ok := client.(*discovery.Client); client_ == nil || ok == false {
+	} else if client_, ok := client.(rpc.DiscoveryClient); client_ == nil || ok == false {
 		return nil, gopi.ErrAppError
 	} else {
 		return client_, nil
 	}
 }
 
-func VersionClient(app *gopi.AppInstance) (*version.Client, error) {
+func VersionClient(app *gopi.AppInstance) (rpc.VersionClient, error) {
 	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
 
 	if conn, err := Conn(app); err != nil {
 		return nil, err
 	} else if client := pool.NewClient("gopi.Version", conn); client == nil {
 		return nil, gopi.ErrNotFound
-	} else if client_, ok := client.(*version.Client); client_ == nil || ok == false {
+	} else if client_, ok := client.(rpc.VersionClient); client_ == nil || ok == false {
+		return nil, gopi.ErrAppError
+	} else {
+		return client_, nil
+	}
+}
+
+func GoogleCastClient(app *gopi.AppInstance) (rpc.GoogleCastClient, error) {
+	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+
+	if conn, err := Conn(app); err != nil {
+		return nil, err
+	} else if client := pool.NewClient("gopi.GoogleCast", conn); client == nil {
+		return nil, gopi.ErrNotFound
+	} else if client_, ok := client.(rpc.GoogleCastClient); client_ == nil || ok == false {
 		return nil, gopi.ErrAppError
 	} else {
 		return client_, nil
@@ -191,6 +204,28 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 		}
 	}
 
+	if client, err := GoogleCastClient(app); err != nil {
+		return err
+	} else if err := client.Ping(); err != nil {
+		return err
+	} else {
+		if devices, err := client.Devices(); err != nil {
+			return err
+		} else {
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetHeader([]string{"Name", "Service", "State", "Model"})
+			for _, device := range devices {
+				table.Append([]string{
+					device.Name(),
+					device.Service(),
+					fmt.Sprint(device.State()),
+					device.Model(),
+				})
+			}
+			table.Render()
+		}
+	}
+
 	// Success
 	return nil
 }
@@ -199,7 +234,7 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/discovery:client", "rpc/version:client", "discovery")
+	config := gopi.NewAppConfig("rpc/discovery:client", "rpc/version:client", "googlecast:client", "discovery")
 
 	// Set flags
 	config.AppFlags.FlagString("addr", "localhost:8080", "Gateway address")

@@ -126,3 +126,40 @@ type DiscoveryClient interface {
 	// Stream discovery events. filtering by service name
 	StreamEvents(string, chan<- gopi.RPCEvent) error
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// GOOGLECAST
+
+type GoogleCast interface {
+	gopi.Driver
+	gopi.Publisher
+
+	Devices() []GoogleCastDevice
+}
+
+type GoogleCastDevice interface {
+	Id() string
+	Name() string
+	Model() string
+	Service() string
+	State() uint
+}
+
+type GoogleCastEvent interface {
+	gopi.Event
+
+	Type() gopi.RPCEventType
+	Device() GoogleCastDevice
+	Timestamp() time.Time
+}
+
+type GoogleCastClient interface {
+	// Ping remote service
+	Ping() error
+
+	// Return devices from the remote service
+	Devices() ([]GoogleCastDevice, error)
+
+	// Stream discovery events
+	StreamEvents(string, chan<- GoogleCastEvent) error
+}
