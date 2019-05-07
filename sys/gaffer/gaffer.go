@@ -17,6 +17,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -143,4 +144,9 @@ func (this *gaffer) Executables(recursive bool) []string {
 	}
 
 	return executables
+}
+
+// Return a new service
+func (this *gaffer) AddService(executable string) (rpc.GafferService, error) {
+	return nil, gopi.ErrNotImplemented
 }

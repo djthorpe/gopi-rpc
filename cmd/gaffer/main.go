@@ -13,6 +13,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/gaffer"
@@ -20,6 +21,16 @@ import (
 )
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
+	gaffer := app.ModuleInstance("gaffer").(rpc.Gaffer)
+
+	for _, exec := range gaffer.Executables(true) {
+		if service, err := gaffer.AddService(exec); err != nil {
+			app.Logger.Warn("%v: %v", exec, err)
+		} else {
+			app.Logger.Info("%v: %v", exec, service)
+		}
+	}
+
 	app.Logger.Info("Waiting for CTRL+C")
 	app.WaitForSignal()
 	done <- gopi.DONE
