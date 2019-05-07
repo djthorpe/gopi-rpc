@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -29,9 +30,10 @@ import (
 
 type Discovery struct {
 	Path      string
-	Interface *net.Interface
+	Interface net.Interface
 	Domain    string
 	Flags     gopi.RPCFlag
+	Util      rpc.Util
 }
 
 type discovery struct {
@@ -41,38 +43,59 @@ type discovery struct {
 	Listener
 
 	errors    chan error
-	services  chan *rpc.ServiceRecord
-	questions chan string
+	services  chan rpc.ServiceRecord
+	questions chan Question
 	log       gopi.Logger
+	util      rpc.Util
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// CONFIGURATION
+
+const (
+	DELTA_PROBE = 120 * time.Second
+	DEFAULT_TTL = 15 * time.Minute
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // OPEN AND CLOSE
 
 func (config Discovery) Open(logger gopi.Logger) (gopi.Driver, error) {
-	logger.Debug("<rpc.discovery.Open>{ interface=%v domain='%v' flags=%v }", config.Interface, config.Domain, config.Flags)
+	logger.Debug("<rpc.discovery.dns-sd.Open>{ interface=%v domain='%v' flags=%v }", config.Interface, config.Domain, config.Flags)
 
 	this := new(discovery)
 	this.errors = make(chan error)
-	this.services = make(chan *rpc.ServiceRecord)
-	this.questions = make(chan string)
+	this.services = make(chan rpc.ServiceRecord)
+	this.questions = make(chan Question)
 
-	if err := this.Config.Init(config.Path, this, this.errors); err != nil {
+	if err := this.Config.Init(config, this, this.errors); err != nil {
+		logger.Debug2("Config.Init returned nil")
 		return nil, err
 	} else if err := this.Listener.Init(config, this.errors, this.services, this.questions); err != nil {
+		logger.Debug2("Listener.Init returned nil")
 		return nil, err
+	} else if config.Util == nil {
+		logger.Debug2("config.Util == nil")
+		return nil, gopi.ErrBadParameter
 	} else {
 		this.log = logger
+		this.util = config.Util
 	}
 
-	// Start task to catch errors, receive services and expire records
-	this.Tasks.Start(this.BackgroundTask)
+	// Start task to catch errors, receive services,
+	// expire records and send probe requests
+	this.Tasks.Start(this.BackgroundTask, this.ProbeTask)
 
 	return this, nil
 }
 
 func (this *discovery) Close() error {
-	this.log.Debug("<rpc.discovery.Close>{ config=%v listener=%v }", this.Config, this.Listener)
+	this.log.Debug("<rpc.discovery.dns-sd.Close>{ config=%v listener=%v }", this.Config, this.Listener)
+
+	// Remove registered services
+	for _, service := range this.Config.GetServices("", rpc.DISCOVERY_TYPE_DB) {
+		fmt.Println("TODO, de-register", service)
+	}
 
 	// Unsubscribe
 	this.Publisher.Close()
@@ -102,39 +125,72 @@ func (this *discovery) Close() error {
 
 // Register a service record
 func (this *discovery) Register(service gopi.RPCServiceRecord) error {
-	this.log.Debug2("<rpc.discovery.Register>{ service=%v }", service)
+	this.log.Debug2("<rpc.discovery.dns-sd.Register>{ service=%v }", service)
 	if service == nil || service.Name() == "" || service.Service() == "" {
 		return gopi.ErrBadParameter
-	} else {
-		// Make a service record which can be stored
-		key := fmt.Sprintf("%v.%v.%v.", strings.Trim(service.Name(), "."), strings.Trim(service.Service(), "."), strings.Trim(this.domain, "."))
-		if err := this.Config.Register(&rpc.ServiceRecord{
-			Key_:     key,
-			Name_:    service.Name(),
-			Host_:    service.Host(),
-			Service_: service.Service(),
-			Port_:    service.Port(),
-			Txt_:     service.Text(),
-			Ipv4_:    service.IP4(),
-			Ipv6_:    service.IP6(),
-			Ttl_:     &rpc.Duration{service.TTL()},
-			Local_:   true,
-		}); err != nil {
-			return err
-		}
+	}
+
+	// Generate service name including subtype
+	record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB)
+	if err := record.SetName(service.Name()); err != nil {
+		return err
+	}
+	if err := record.SetService(service.Service(), service.Subtype()); err != nil {
+		return err
+	}
+	if err := record.SetAddr(fmt.Sprintf("%v:%v", service.Host(), service.Port())); err != nil {
+		return err
+	}
+	if err := record.AppendTXT(service.Text()...); err != nil {
+		return err
+	}
+	if err := record.AppendIP(service.IP4()...); err != nil {
+		return err
+	}
+	if err := record.AppendIP(service.IP6()...); err != nil {
+		return err
+	}
+
+	// Configure in the registry
+	if err := this.Config.Register_(record); err != nil {
+		return err
 	}
 
 	// Success
 	return nil
 }
 
+// Remove a service record
+func (this *discovery) Remove(service gopi.RPCServiceRecord) error {
+	this.log.Debug2("<rpc.discovery.dns-sd.Unregister>{ service=%v }", service)
+	if service == nil || service.Name() == "" || service.Service() == "" {
+		return gopi.ErrBadParameter
+	}
+
+	// Generate service name including subtype
+	record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB)
+	if err := record.SetName(service.Name()); err != nil {
+		return err
+	}
+	if err := record.SetService(service.Service(), service.Subtype()); err != nil {
+		return err
+	}
+
+	// Remove from the registry
+	if err := this.Config.Remove_(record); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
 // Lookup service instances from service name
 func (this *discovery) Lookup(ctx context.Context, service string) ([]gopi.RPCServiceRecord, error) {
-	this.log.Debug2("<rpc.discovery.Lookup>{ service=%v }", strconv.Quote(service))
+	this.log.Debug2("<rpc.discovery.dns-sd.Lookup>{ service=%v }", strconv.Quote(service))
 
 	// The message should be to lookup service by name
 	msg := new(dns.Msg)
-	msg.SetQuestion(service+"."+this.domain, dns.TypePTR)
+	msg.SetQuestion(service+"."+this.domain+".", dns.TypePTR)
 	msg.RecursionDesired = false
 
 	// Wait for services
@@ -167,7 +223,7 @@ func (this *discovery) Lookup(ctx context.Context, service string) ([]gopi.RPCSe
 	}()
 
 	// Perform the query and wait for cancellation
-	err := this.Query(msg, ctx)
+	err := this.QueryAll(msg, ctx)
 
 	// Retrieve the service records
 	records := make([]gopi.RPCServiceRecord, 0, len(services))
@@ -185,11 +241,11 @@ func (this *discovery) Lookup(ctx context.Context, service string) ([]gopi.RPCSe
 
 // Enumerate Services
 func (this *discovery) EnumerateServices(ctx context.Context) ([]string, error) {
-	this.log.Debug2("<rpc.discovery.EnumerateServices>{ }")
+	this.log.Debug2("<rpc.discovery.dns-sd.EnumerateServices>{ }")
 
 	// The message should be to enumerate services
 	msg := new(dns.Msg)
-	msg.SetQuestion(MDNS_SERVICE_QUERY+"."+this.domain, dns.TypePTR)
+	msg.SetQuestion(rpc.DISCOVERY_SERVICE_QUERY+"."+this.domain+".", dns.TypePTR)
 	msg.RecursionDesired = false
 
 	// Wait for services
@@ -214,7 +270,7 @@ func (this *discovery) EnumerateServices(ctx context.Context) ([]string, error) 
 	}()
 
 	// Perform the query and wait for cancellation
-	err := this.Query(msg, ctx)
+	err := this.QueryAll(msg, ctx)
 
 	// Stop collecting names
 	stop <- gopi.DONE
@@ -236,7 +292,7 @@ func (this *discovery) EnumerateServices(ctx context.Context) ([]string, error) 
 
 // ServiceInstances returns all cached servicerecords for a particular service name
 func (this *discovery) ServiceInstances(service string) []gopi.RPCServiceRecord {
-	this.log.Debug2("<rpc.discovery.ServiceRecords>{ service=%v }", strconv.Quote(service))
+	this.log.Debug2("<rpc.discovery.dns-sd.ServiceRecords>{ service=%v }", strconv.Quote(service))
 	records := make([]gopi.RPCServiceRecord, 0, len(this.Config.Services))
 	for _, record := range this.Config.Services {
 		if service == "" || (record.Service() == service && strings.TrimSpace(record.Service()) != "") {
@@ -257,28 +313,33 @@ func (this *discovery) String() string {
 // BACKGROUND TASKS
 
 func (this *discovery) BackgroundTask(start chan<- event.Signal, stop <-chan event.Signal) error {
-	this.log.Debug2("<rpc.discovery.BackgroundTask> started")
+	this.log.Debug2("<rpc.discovery.dns-sd.BackgroundTask> started")
 	start <- gopi.DONE
 
-	// TODO
 FOR_LOOP:
 	for {
 		select {
 		case err := <-this.errors:
-			this.log.Warn("Discover error: %v", err)
+			this.log.Warn("rpc.discovery: %v", err)
 		case service := <-this.services:
 			if service.TTL() == 0 {
-				this.Config.Remove(service)
+				this.Config.Remove_(service)
 			} else {
-				this.Config.Register(service)
+				this.Config.Register_(service)
 			}
 		case question := <-this.questions:
-			if question == MDNS_SERVICE_QUERY {
-				if locals := this.Config.EnumerateServices(true); len(locals) > 0 {
-					this.log.Debug2("rpc.discovery.Broadcast: %v", locals)
+			if question.Query == rpc.DISCOVERY_SERVICE_QUERY {
+				if services := this.Config.EnumerateServices(rpc.DISCOVERY_TYPE_DB); len(services) > 0 {
+					if err := this.Listener.AnswerEnumMulticast(services, question, DEFAULT_TTL); err != nil {
+						this.log.Warn("rpc.discovery: %v", err)
+					}
 				}
-			} else if locals := this.Config.GetServices(question, true); len(locals) > 0 {
-				this.log.Debug2("rpc.discovery.Broadcast: %v", locals)
+			} else {
+				if instances := this.Config.GetServices(question.Query, rpc.DISCOVERY_TYPE_DB); len(instances) > 0 {
+					if err := this.Listener.AnswerInstanceMulticast(instances, question, DEFAULT_TTL); err != nil {
+						this.log.Warn("rpc.discovery: %v", err)
+					}
+				}
 			}
 		case <-stop:
 			break FOR_LOOP
@@ -286,6 +347,43 @@ FOR_LOOP:
 	}
 
 	// Success
-	this.log.Debug2("<rpc.discovery.BackgroundTask> completed")
+	this.log.Debug2("<rpc.discovery.dns-sd.BackgroundTask> completed")
+	return nil
+}
+
+func (this *discovery) ProbeTask(start chan<- event.Signal, stop <-chan event.Signal) error {
+	this.log.Debug2("<rpc.discovery.dns-sd.ProbeTask> started")
+	start <- gopi.DONE
+
+	timer := time.NewTimer(10 * time.Second)
+	services := []string{}
+FOR_LOOP:
+	for {
+		select {
+		case <-timer.C:
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			if len(services) == 0 {
+				if services_, err := this.EnumerateServices(ctx); err != nil {
+					this.errors <- err
+				} else {
+					services = services_
+				}
+			} else {
+				this.log.Debug2("<rpc.discovery.dns-sd.ProbeTask> Probing for %v", services[0])
+				if _, err := this.Lookup(ctx, services[0]); err != nil {
+					this.errors <- err
+				}
+				services = services[1:len(services)]
+			}
+			cancel()
+			timer.Reset(DELTA_PROBE)
+		case <-stop:
+			break FOR_LOOP
+		}
+	}
+
+	// Success
+	timer.Stop()
+	this.log.Debug2("<rpc.discovery.dns-sd.ProbeTask> completed")
 	return nil
 }

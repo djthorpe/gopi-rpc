@@ -43,12 +43,13 @@ enum EventType {
 message ServiceRecord {
     string name = 1;
     string service = 2;
-    uint32 port = 3;
-    string host = 4;
-    repeated string txt = 5;
-    repeated string ip4 = 6;
-    repeated string ip6 = 7;
-    google.protobuf.Duration ttl = 8;
+    string subtype = 3;
+    uint32 port = 4;
+    string host = 5;
+    repeated string txt = 6;
+    repeated string ip4 = 7;
+    repeated string ip6 = 8;
+    google.protobuf.Duration ttl = 9;
 }
 
 // Filter for lookup request

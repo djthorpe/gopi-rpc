@@ -6,11 +6,12 @@
 	For Licensing and Usage information, please see LICENSE.md
 */
 
-package discovery
+package googlecast
 
 import (
 	// Frameworks
-	"github.com/djthorpe/gopi"
+	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -19,27 +20,27 @@ import (
 func init() {
 	// Service
 	gopi.RegisterModule(gopi.Module{
-		Name:     "rpc/discovery:service",
+		Name:     "googlecast:service",
 		Type:     gopi.MODULE_TYPE_SERVICE,
-		Requires: []string{"rpc/server", "discovery"},
+		Requires: []string{"rpc/server", "googlecast"},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
 			return gopi.Open(Service{
-				Server:    app.ModuleInstance("rpc/server").(gopi.RPCServer),
-				Discovery: app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery),
+				Server:     app.ModuleInstance("rpc/server").(gopi.RPCServer),
+				GoogleCast: app.ModuleInstance("googlecast").(rpc.GoogleCast),
 			}, app.Logger)
 		},
 	})
 
 	// Client
 	gopi.RegisterModule(gopi.Module{
-		Name:     "rpc/discovery:client",
+		Name:     "googlecast:client",
 		Type:     gopi.MODULE_TYPE_CLIENT,
 		Requires: []string{"rpc/clientpool"},
 		Run: func(app *gopi.AppInstance, _ gopi.Driver) error {
 			if clientpool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool); clientpool == nil {
 				return gopi.ErrAppError
 			} else {
-				clientpool.RegisterClient("gopi.Discovery", NewDiscoveryClient)
+				clientpool.RegisterClient("gopi.GoogleCast", NewGoogleCastClient)
 				return nil
 			}
 		},

@@ -10,13 +10,10 @@
 package discovery
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,13 +32,14 @@ type Config struct {
 	event.Publisher
 
 	// Public members
-	Services []*rpc.ServiceRecord `json:"services"`
+	Services []rpc.ServiceRecord `json:"services"`
 
 	// Private members
 	errors   chan<- error
 	modified bool
 	path     string
 	source   gopi.Driver
+	util     rpc.Util
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -56,18 +54,24 @@ const (
 ////////////////////////////////////////////////////////////////////////////////
 // INIT / DEINIT
 
-func (this *Config) Init(path string, source gopi.Driver, errors chan<- error) error {
-	this.Services = make([]*rpc.ServiceRecord, 0)
+func (this *Config) Init(config Discovery, source gopi.Driver, errors chan<- error) error {
+	this.Services = make([]rpc.ServiceRecord, 0)
 	this.modified = false
+
+	if config.Util == nil {
+		return gopi.ErrBadParameter
+	} else {
+		this.util = config.Util
+	}
 
 	// Allow nil for source and errors
 	this.source = source
 	this.errors = errors
 
 	// Read or create file
-	if path != "" {
-		if err := this.CreatePath(path); err != nil {
-			return err
+	if config.Path != "" {
+		if err := this.CreatePath(config.Path); err != nil {
+			return fmt.Errorf("Error: %v: %v", config.Path, err)
 		}
 	}
 
@@ -98,7 +102,7 @@ func (this Config) String() string {
 	if this.path != "" {
 		params += fmt.Sprintf("path=%v ", strconv.Quote(this.path))
 	}
-	return fmt.Sprintf("<Config>{ %v num_services=%v }", strings.TrimSpace(params), len(this.Services))
+	return fmt.Sprintf("<Config>{ %vnum_services=%v }", params, len(this.Services))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -118,6 +122,12 @@ func (this *Config) CreatePath(path string) error {
 	// Set path
 	this.path = path
 
+	// Append filename
+	if stat, err := os.Stat(this.path); err == nil && stat.IsDir() {
+		// append default filename
+		this.path = filepath.Join(this.path, FILENAME_DEFAULT)
+	}
+
 	// Read file
 	if stat, err := os.Stat(this.path); err == nil && stat.Mode().IsRegular() {
 		if err := this.Read(this.path); err != nil {
@@ -125,19 +135,17 @@ func (this *Config) CreatePath(path string) error {
 		} else {
 			return nil
 		}
-	} else if err == nil && stat.IsDir() {
-		// append default filename
-		this.path = filepath.Join(this.path, FILENAME_DEFAULT)
+	} else if os.IsNotExist(err) {
+		// Create file
+		if fh, err := os.Create(this.path); err != nil {
+			return err
+		} else if err := fh.Close(); err != nil {
+			return err
+		}
 	}
 
-	// Create file
-	if fh, err := os.Create(this.path); err != nil {
-		return err
-	} else if err := fh.Close(); err != nil {
-		return err
-	} else {
-		return nil
-	}
+	// Success
+	return nil
 }
 
 // Set the modified flag to true
@@ -149,47 +157,15 @@ func (this *Config) SetModified() {
 
 // Write the configuration file to disk
 func (this *Config) Write(path string, indent bool) error {
+	this.Lock()
+	defer this.Unlock()
 	if fh, err := os.Create(path); err != nil {
 		return err
 	} else {
 		defer fh.Close()
-		return this.Writer(fh, indent)
-	}
-}
-
-// Writer writes the configuration to a io.Writer object
-func (this *Config) Writer(fh io.Writer, indent bool) error {
-	this.Lock()
-	defer this.Unlock()
-
-	enc := json.NewEncoder(fh)
-	if indent {
-		enc.SetIndent("", "  ")
-	}
-	if err := enc.Encode(this); err != nil {
-		return err
-	}
-
-	// Clear modified flag
-	this.modified = false
-
-	// Success
-	return nil
-}
-
-// Read the configuration from a file
-func (this *Config) Read(path string) error {
-	// Read configuration
-	if fh, err := os.Open(path); err != nil {
-		return err
-	} else {
-		defer fh.Close()
-		if config, err := this.Reader(fh); err != nil {
+		if err := this.util.Writer(fh, this.Services, indent); err != nil {
 			return err
 		} else {
-			this.Lock()
-			defer this.Unlock()
-			this.Services = config.ExpireServices()
 			this.modified = false
 		}
 	}
@@ -198,25 +174,30 @@ func (this *Config) Read(path string) error {
 	return nil
 }
 
-// Reader reads the configuration from an io.Reader object
-func (this *Config) Reader(fh io.Reader) (*Config, error) {
+// Read the configuration from a file
+func (this *Config) Read(path string) error {
 	this.Lock()
 	defer this.Unlock()
-
-	dec := json.NewDecoder(fh)
-	config := new(Config)
-	if err := dec.Decode(&config); err != nil {
-		return nil, err
+	if fh, err := os.Open(path); err != nil {
+		return err
+	} else {
+		defer fh.Close()
+		if records, err := this.util.Reader(fh); err != nil {
+			return err
+		} else {
+			this.Services = this.UnexpiredServices(records)
+			this.modified = false
+		}
 	}
 
 	// Success
-	return config, nil
+	return nil
 }
 
-// ExpireServices returns an array of unexpired services
-func (this *Config) ExpireServices() []*rpc.ServiceRecord {
-	services := make([]*rpc.ServiceRecord, 0, len(this.Services))
-	for _, service := range this.Services {
+// UnexpiredServices returns an array of unexpired services
+func (this *Config) UnexpiredServices(records []rpc.ServiceRecord) []rpc.ServiceRecord {
+	services := make([]rpc.ServiceRecord, 0, len(this.Services))
+	for _, service := range records {
 		if service.Expired() == false {
 			services = append(services, service)
 		}
@@ -262,10 +243,10 @@ FOR_LOOP:
 		case <-ticker.C:
 			for _, service := range this.Services {
 				if service.Expired() {
-					this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_EXPIRED, service))
+					this.Emit(this.util.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_EXPIRED, service))
 				}
 			}
-			if services := this.ExpireServices(); len(services) != len(this.Services) {
+			if services := this.UnexpiredServices(this.Services); len(services) != len(this.Services) {
 				this.Services = services
 				this.SetModified()
 			}
@@ -285,34 +266,32 @@ FOR_LOOP:
 ////////////////////////////////////////////////////////////////////////////////
 // RETURN SERVICES
 
-func (this *Config) EnumerateServices(local bool) []string {
-	this.Lock()
-	defer this.Unlock()
-
-	records := make(map[string]bool, 1)
-	for _, record := range this.Services {
-		if local == true && record.Local_ == false {
-			continue
-		}
-		records[record.Service_] = true
+// EnumerateServices returns the names of discovered service types
+// and filters to those which have been registered locally (rather
+// than through DNS service discovery) if flag is set
+func (this *Config) EnumerateServices(source rpc.DiscoveryType) []string {
+	// Get all the records
+	type_map := make(map[string]bool, 10)
+	for _, record := range this.GetServices("", source) {
+		type_map[record.Service()] = true
 	}
-	records_ := make([]string, 0, len(records))
-	for key := range records {
-		records_ = append(records_, key)
+	records := make([]string, 0, len(type_map))
+	for key := range type_map {
+		records = append(records, key)
 	}
-	return records_
+	return records
 }
 
-func (this *Config) GetServices(service string, local bool) []*rpc.ServiceRecord {
+func (this *Config) GetServices(service string, source rpc.DiscoveryType) []rpc.ServiceRecord {
 	this.Lock()
 	defer this.Unlock()
 
-	records := make([]*rpc.ServiceRecord, 0)
+	records := make([]rpc.ServiceRecord, 0)
 	for _, record := range this.Services {
-		if local == true && record.Local_ == false {
+		if source != rpc.DISCOVERY_TYPE_NONE && source != record.Source() {
 			continue
 		}
-		if service != "" && service != record.Service_ {
+		if service != "" && service != record.Service() {
 			continue
 		}
 		if record.Expired() {
@@ -326,32 +305,31 @@ func (this *Config) GetServices(service string, local bool) []*rpc.ServiceRecord
 ////////////////////////////////////////////////////////////////////////////////
 // REGISTER & REMOVE SERVICES
 
-func (this *Config) Register(service *rpc.ServiceRecord) error {
+func (this *Config) Register_(service rpc.ServiceRecord) error {
 	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
-
-	if service.Service() == MDNS_SERVICE_QUERY {
-		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_NAME, service))
+	if service.Service() == rpc.DISCOVERY_SERVICE_QUERY {
+		this.Emit(this.util.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_NAME, service))
 	} else if index := this.IndexForService(service); index == -1 {
 		this.Lock()
 		this.Services = append(this.Services, service)
 		this.Unlock()
 		this.SetModified()
-		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_ADDED, service))
+		this.Emit(this.util.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_ADDED, service))
 	} else {
 		this.Lock()
 		this.Services[index] = service
 		this.Unlock()
 		this.SetModified()
-		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_UPDATED, service))
+		this.Emit(this.util.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_UPDATED, service))
 	}
 
 	// Success
 	return nil
 }
 
-func (this *Config) Remove(service *rpc.ServiceRecord) error {
+func (this *Config) Remove_(service rpc.ServiceRecord) error {
 	if service == nil || service.Key() == "" {
 		return gopi.ErrBadParameter
 	}
@@ -360,7 +338,7 @@ func (this *Config) Remove(service *rpc.ServiceRecord) error {
 	} else if err := this.RemoveAtIndex(index); err != nil {
 		return err
 	} else {
-		this.Emit(rpc.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_REMOVED, service))
+		this.Emit(this.util.NewEvent(this.source, gopi.RPC_EVENT_SERVICE_REMOVED, service))
 	}
 
 	// Success
@@ -378,7 +356,7 @@ func (this *Config) RemoveAtIndex(index int) error {
 	return nil
 }
 
-func (this *Config) IndexForService(service *rpc.ServiceRecord) int {
+func (this *Config) IndexForService(service rpc.ServiceRecord) int {
 	if service == nil {
 		return -1
 	}

@@ -21,6 +21,7 @@ import (
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
+	_ "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 	_ "github.com/djthorpe/gopi/sys/logger"
 )
 
@@ -115,13 +116,14 @@ func Lookup(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) 
 			return err
 		} else {
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"Service", "Name", "Host", "IP"})
+			table.SetHeader([]string{"Service", "Name", "Host", "IP", "TXT"})
 			for _, service := range services {
 				table.Append([]string{
 					service.Service(),
 					service.Name(),
 					RenderHost(service),
 					RenderIP(service),
+					strings.Join(service.Text(), " "),
 				})
 			}
 			table.Render()

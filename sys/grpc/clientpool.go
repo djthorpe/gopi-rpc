@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/djthorpe/gopi/util/errors"
@@ -32,6 +31,7 @@ type ClientPool struct {
 	SSL        bool
 	SkipVerify bool
 	Timeout    time.Duration
+	Util       rpc.Util
 }
 
 type clientpool struct {
@@ -44,6 +44,7 @@ type clientpool struct {
 	ssl        bool
 	skipverify bool
 	timeout    time.Duration
+	util       rpc.Util
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +55,7 @@ func (config ClientPool) Open(log gopi.Logger) (gopi.Driver, error) {
 
 	this := new(clientpool)
 	this.log = log
+	this.util = config.Util
 	this.ssl = config.SSL
 	this.skipverify = config.SkipVerify
 	this.timeout = config.Timeout
@@ -113,6 +115,26 @@ func (this *clientpool) Connect(service gopi.RPCServiceRecord, flags gopi.RPCFla
 	}
 }
 
+func (this *clientpool) ConnectAddr(addr string, flags gopi.RPCFlag) (gopi.RPCClientConn, error) {
+	this.log.Debug2("<grpc.clientpool.ConnectAddr>{ addr=%v flags=%v }", addr, flags)
+	if host, port, err := net.SplitHostPort(addr); err != nil {
+		return nil, err
+	} else if conn, err := gopi.Open(ClientConn{
+		Addr:       fmt.Sprintf("[%v]:%v", host, port),
+		SSL:        this.ssl,
+		SkipVerify: this.skipverify,
+		Timeout:    this.timeout,
+	}, this.log); err != nil {
+		return nil, err
+	} else if conn_, ok := conn.(*clientconn); ok == false {
+		return nil, gopi.ErrAppError
+	} else if err := conn_.Connect(); err != nil {
+		return nil, err
+	} else {
+		return conn_, nil
+	}
+}
+
 func (this *clientpool) Disconnect(conn gopi.RPCClientConn) error {
 	this.log.Debug2("<grpc.clientpool.Disconnect>{ conn=%v }", conn)
 	if conn_, ok := conn.(*clientconn); ok {
@@ -155,8 +177,10 @@ func (this *clientpool) Lookup(ctx context.Context, service, addr string, max in
 	if this.discovery == nil || service == "" {
 		// If there is no discovery service or the service string is empty,
 		// then return the service record with the address only
-		if record := serviceRecordWithAddr(service, addr); record == nil {
+		if record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB); record == nil {
 			return nil, gopi.ErrBadParameter
+		} else if err := record.SetAddr(addr); err != nil {
+			return nil, err
 		} else {
 			return []gopi.RPCServiceRecord{record}, nil
 		}
@@ -183,21 +207,6 @@ func (this *clientpool) String() string {
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
-
-func serviceRecordWithAddr(service, addr string) gopi.RPCServiceRecord {
-	if host, port_, err := net.SplitHostPort(addr); err != nil {
-		return nil
-	} else if port, err := strconv.ParseUint(strings.TrimPrefix(port_, ":"), 10, 32); err != nil {
-		return nil
-	} else if record := rpc.NewServiceRecord(); record == nil {
-		return nil
-	} else {
-		record.Name_ = service
-		record.Host_ = host
-		record.Port_ = uint(port)
-		return record
-	}
-}
 
 func (this *clientpool) addressesFor(service gopi.RPCServiceRecord, flags gopi.RPCFlag) ([]net.IP, error) {
 
@@ -244,7 +253,6 @@ func (this *clientpool) connectTo(name string, addr net.IP, port uint, ssl, skip
 	this.log.Debug2("<grpc.clientpool.Connect>{ name=%v addr=%v port=%v ssl=%v skipverify=%v timeout=%v }", strconv.Quote(name), addr, port, ssl, skipverify, timeout)
 
 	if conn, err := gopi.Open(ClientConn{
-		Name:       name,
 		Addr:       fmt.Sprintf("[%v]:%v", addr.String(), port),
 		SSL:        ssl,
 		SkipVerify: skipverify,

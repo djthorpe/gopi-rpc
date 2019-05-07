@@ -14,14 +14,17 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
+	_ "github.com/djthorpe/gopi-rpc/sys/googlecast"
 	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi/sys/logger"
 
 	// Services
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/discovery"
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/googlecast"
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
 )
 
@@ -29,8 +32,8 @@ import (
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/discovery:service", "rpc/version:service")
+	config := gopi.NewAppConfig("rpc/discovery:service", "rpc/version:service", "googlecast:service", "rpc/discovery:dns-sd")
 
 	// Run the server and register all the services
-	os.Exit(gopi.RPCServerTool(config))
+	os.Exit(rpc.Server(config))
 }

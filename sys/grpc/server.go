@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -32,6 +33,7 @@ type Server struct {
 	SSLCertificate string
 	Port           uint
 	ServerOption   []grpc.ServerOption
+	Util           rpc.Util
 }
 
 type server struct {
@@ -40,8 +42,17 @@ type server struct {
 	server *grpc.Server
 	addr   net.Addr
 	ssl    bool
+	util   rpc.Util
+
 	event.Publisher
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// GLOBAL VARIABLES
+
+var (
+	reService = regexp.MustCompile("[A-za-z][A-Za-z0-9\\-]*")
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // SERVER OPEN AND CLOSE
@@ -54,6 +65,11 @@ func (config Server) Open(log gopi.Logger) (gopi.Driver, error) {
 	this.log = log
 	this.port = config.Port
 	this.ssl = false
+	this.util = config.Util
+
+	if this.util == nil {
+		return nil, gopi.ErrBadParameter
+	}
 
 	if config.SSLKey != "" && config.SSLCertificate != "" {
 		if creds, err := credentials.NewServerTLSFromFile(config.SSLCertificate, config.SSLKey); err != nil {
@@ -110,10 +126,10 @@ func (this *server) Start() error {
 	} else {
 		// Start server
 		this.addr = lis.Addr()
-		this.Emit(rpc.NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED, nil))
-		this.log.Debug("<grpc.Server>{ addr=%v }", this.addr)
+		this.Emit(this.util.NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED, nil))
+		this.log.Info("Listening on addresss: %v", this.addr)
 		err := this.server.Serve(lis) // blocking call
-		this.Emit(rpc.NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED, nil))
+		this.Emit(this.util.NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED, nil))
 		this.addr = nil
 		return err
 	}
@@ -165,57 +181,68 @@ func (this *server) GRPCServer() *grpc.Server {
 ///////////////////////////////////////////////////////////////////////////////
 // SERVICE
 
-func (this *server) Service(service string, text ...string) gopi.RPCServiceRecord {
-	if hostname, err := os.Hostname(); err != nil {
-		this.log.Error("<grpc.Server>Service: %v", err)
-		return nil
-	} else {
-		return this.ServiceWithName(service, hostname, text...)
-	}
-}
-
-func (this *server) ServiceWithName(service, name string, text ...string) gopi.RPCServiceRecord {
-	this.log.Debug2("<grpc.ServiceWithName>{ service=%v name=%v text=%v }", strconv.Quote(service), strconv.Quote(name), text)
+func (this *server) Service(service, subtype, name string, text ...string) gopi.RPCServiceRecord {
+	this.log.Debug2("<grpc.Service>{ service=%v subtype=%v name=%v text=%v }", strconv.Quote(service), strconv.Quote(subtype), strconv.Quote(name), text)
 
 	// Can't return a service unless the server is started
 	if this.addr == nil {
-		this.log.Warn("grpc.ServiceWithName: No address")
-		return nil
-	}
-
-	// Can't return non-TCP
-	if this.addr.Network() != "tcp" {
-		this.log.Warn("grpc.ServiceWithName: Not TCP")
+		this.log.Warn("grpc.Service: No address")
 		return nil
 	}
 
 	// Can't register if name is blank
 	if strings.TrimSpace(name) == "" {
-		this.log.Warn("grpc.ServiceWithName: No name")
+		this.log.Warn("grpc.Service: No name")
 		return nil
+	}
+
+	// Check service name
+	if matched, err := regexp.MatchString("^[A-Za-z][A-Za-z0-9\\-]*$", service); err != nil {
+		this.log.Warn("grpc.Service: SetService: %v", err)
+		return nil
+	} else if matched == false {
+		this.log.Warn("grpc.Service: SetService: Invalid service type")
+		return nil
+	} else {
+		service = fmt.Sprintf("_%v._%v", service, this.Addr().Network())
 	}
 
 	// Return service
 	if _, ok := this.addr.(*net.TCPAddr); ok == false {
 		return nil
 	} else {
-		r := rpc.NewServiceRecord()
-		if service_, err := gopi.RPCServiceType(service, 0); err != nil {
-			this.log.Warn("grpc.ServiceWithName: %v", err)
+		r := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB)
+
+		// Set service, subtype, etc.
+		if err := r.SetService(service, subtype); err != nil {
+			this.log.Warn("grpc.Service: SetService: %v", err)
 			return nil
-		} else {
-			r.Service_ = service_
+		} else if err := r.SetName(name); err != nil {
+			this.log.Warn("grpc.Service: SetName: %v", err)
+			return nil
+		} else if hostname, err := os.Hostname(); err != nil {
+			this.log.Warn("grpc.Service: SetAddr: %v", err)
+			return nil
+		} else if err := r.SetAddr(fmt.Sprintf("%v:%v", hostname, this.Port())); err != nil {
+			this.log.Warn("grpc.Service: SetAddr: %v", err)
+			return nil
+		} else if v4, v6, err := addrsForInterfaces(); err != nil {
+			this.log.Warn("grpc.Service: SetAddr: %v", err)
+			return nil
+		} else if err := r.AppendIP(v4...); err != nil {
+			this.log.Warn("grpc.Service: AppendIP: IPv4: %v", err)
+			return nil
+		} else if err := r.AppendIP(v6...); err != nil {
+			this.log.Warn("grpc.Service: AppendIP: IPv6: %v", err)
+			return nil
 		}
-		// Set name, port and TXT records
-		r.Name_ = name
-		r.Port_ = this.Port()
-		r.Txt_ = text
-		// TODO: Add IP4 and IP6 here
-		if this.ssl {
-			r.Txt_ = append(r.Txt_, "ssl=1")
-		} else {
-			r.Txt_ = append(r.Txt_, "ssl=0")
+
+		// Set a TXT record for SSL
+		if err := r.AppendTXT(toSslTXT(this.ssl)); err != nil {
+			this.log.Warn("grpc.Service: AppendTXT: %v", err)
+			return nil
 		}
+
 		return r
 	}
 }
@@ -236,10 +263,60 @@ func (this *server) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
+func toSslTXT(ssl bool) string {
+	if ssl {
+		return "ssl=1"
+	} else {
+		return "ssl=0"
+	}
+}
+
 func portString(port uint) string {
 	if port == 0 {
 		return ""
 	} else {
 		return fmt.Sprint(":", port)
+	}
+}
+
+func addrsForInterfaces() ([]net.IP, []net.IP, error) {
+	if ifaces, err := net.Interfaces(); err != nil {
+		return nil, nil, err
+	} else {
+		var v4, v6 []net.IP
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback != 0 {
+				continue
+			} else if iface.Flags&net.FlagUp == 0 {
+				continue
+			}
+			if v4_, v6_, err := addrsForInterface(iface); err != nil {
+				return nil, nil, err
+			} else {
+				v4 = append(v4, v4_...)
+				v6 = append(v6, v6_...)
+			}
+		}
+		return v4, v6, nil
+	}
+}
+
+func addrsForInterface(iface net.Interface) ([]net.IP, []net.IP, error) {
+	if addrs, err := iface.Addrs(); err != nil {
+		return nil, nil, err
+	} else {
+		var v4, v6 []net.IP
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok == false {
+				continue
+			} else if ipnet.IP.IsLoopback() == true {
+				continue
+			} else if ipnet.IP.To4() != nil {
+				v4 = append(v4, ipnet.IP)
+			} else if ip := ipnet.IP.To16(); ip != nil && ip.IsGlobalUnicast() {
+				v6 = append(v6, ipnet.IP)
+			}
+		}
+		return v4, v6, nil
 	}
 }
