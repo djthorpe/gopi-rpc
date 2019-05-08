@@ -28,8 +28,9 @@ import (
 
 type config_ struct {
 	// Public Members
-	BinRoot  string     `json:"root"`
-	Services []*Service `json:"services"`
+	BinRoot       string          `json:"root"`
+	Services      []*Service      `json:"services"`
+	ServiceGroups []*ServiceGroup `json:"groups"`
 }
 
 type config struct {
@@ -74,6 +75,7 @@ func (this *config) Init(config Gaffer, logger gopi.Logger) error {
 
 	this.log = logger
 	this.Services = make([]*Service, 0)
+	this.ServiceGroups = make([]*ServiceGroup, 0)
 
 	// Read or create file
 	if config.Path != "" {
@@ -281,6 +283,24 @@ func (this *config) GetServiceByName(service string) *Service {
 	defer this.Unlock()
 
 	if service == "" {
+		return nil
+	}
+	for _, service_ := range this.Services {
+		if service == service_.Name() {
+			return service_
+		}
+	}
+	return nil
+}
+
+// GetGroupsByName returns an array of group structures, or nil if any
+// of the groups could not be found
+func (this *config) GetGroupsByName(groups []string) []*ServiceGroup {
+	this.log.Debug2("<gaffer.config>GetGroupsByName{ groups=%v }", groups)
+	this.Lock()
+	defer this.Unlock()
+
+	if len(groups) == 0 {
 		return nil
 	}
 	for _, service_ := range this.Services {
