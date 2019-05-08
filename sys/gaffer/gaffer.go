@@ -33,6 +33,7 @@ type gaffer struct {
 	log gopi.Logger
 
 	config
+	instances
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,6 +52,10 @@ func (config Gaffer) Open(logger gopi.Logger) (gopi.Driver, error) {
 		logger.Debug2("Config.Init returned nil")
 		return nil, err
 	}
+	if err := this.instances.Init(config, logger); err != nil {
+		logger.Debug2("Instances.Init returned nil")
+		return nil, err
+	}
 
 	// Success
 	return this, nil
@@ -60,6 +65,9 @@ func (this *gaffer) Close() error {
 	this.log.Debug("<gaffer.Close>{ }")
 
 	// Release resources, etc
+	if err := this.instances.Destroy(); err != nil {
+		return err
+	}
 	if err := this.config.Destroy(); err != nil {
 		return err
 	}
@@ -72,7 +80,7 @@ func (this *gaffer) Close() error {
 // STRINGIFY
 
 func (this *gaffer) String() string {
-	return fmt.Sprintf("<gaffer>{ %v }", this.config.String())
+	return fmt.Sprintf("<gaffer>{ %v %v }", this.config.String(), this.instances.String())
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,8 +116,8 @@ func (this *gaffer) Executables(recursive bool) []string {
 }
 
 // Return a new service
-func (this *gaffer) AddService(executable string) (rpc.GafferService, error) {
-	this.log.Debug2("<gaffer>AddService{ executable=%v }", strconv.Quote(executable))
+func (this *gaffer) AddServiceForPath(executable string) (rpc.GafferService, error) {
+	this.log.Debug2("<gaffer>AddServiceForPath{ executable=%v }", strconv.Quote(executable))
 
 	// Check incoming parameters
 	if executable == "" {
@@ -142,4 +150,68 @@ func (this *gaffer) AddService(executable string) (rpc.GafferService, error) {
 			return service, nil
 		}
 	}
+}
+
+// Return a new group
+func (this *gaffer) AddGroupForName(name string) (rpc.GafferServiceGroup, error) {
+	this.log.Debug2("<gaffer>AddGroupForName{ name=%v }", strconv.Quote(name))
+
+	// Check incoming parameters
+	if name == "" {
+		return nil, gopi.ErrBadParameter
+	}
+	// Create a new group
+	if group := NewGroup(name); group == nil {
+		return nil, gopi.ErrBadParameter
+	} else if err := this.config.AddGroup(group); err != nil {
+		return nil, err
+	} else {
+		return group, nil
+	}
+}
+
+// Return an existing service
+func (this *gaffer) GetServiceForName(service string) rpc.GafferService {
+	return this.config.GetServiceByName(service)
+}
+
+// Return an array of service groups or nil if any name could not be found
+func (this *gaffer) GetGroupsForNames(groups []string) []rpc.GafferServiceGroup {
+	if groups_ := this.config.GetGroupsByName(groups); groups_ == nil {
+		return nil
+	} else {
+		groups__ := make([]rpc.GafferServiceGroup, len(groups_))
+		for i, group := range groups_ {
+			groups__[i] = group
+		}
+		return groups__
+	}
+}
+
+// Remove a group
+func (this *gaffer) RemoveGroupForName(string) error {
+	return gopi.ErrNotImplemented
+
+}
+
+// Remove a service
+func (this *gaffer) RemoveServiceForName(string) error {
+	return gopi.ErrNotImplemented
+}
+
+// Return all services and groups
+func (this *gaffer) Services() []rpc.GafferService {
+	services := make([]rpc.GafferService, len(this.config.Services))
+	for i, service := range this.config.Services {
+		services[i] = service
+	}
+	return services
+}
+
+func (this *gaffer) Groups() []rpc.GafferServiceGroup {
+	groups := make([]rpc.GafferServiceGroup, len(this.config.ServiceGroups))
+	for i, group := range this.config.ServiceGroups {
+		groups[i] = group
+	}
+	return groups
 }

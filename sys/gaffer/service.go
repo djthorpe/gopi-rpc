@@ -27,6 +27,11 @@ type ServiceGroup struct {
 	Name_ string `json:"name"`
 }
 
+type ServiceInstance struct {
+	// Id is unique identifier for the service
+	Id_ uint `json:"name"`
+}
+
 /*
 	// MaxInstances determines maximum number of
 	// instances which can be started at once,
@@ -65,6 +70,7 @@ func NewService(name, executable string) *Service {
 	this := new(Service)
 	this.Name_ = name
 	this.Path_ = executable
+	this.Groups_ = make([]string, 0)
 	return this
 }
 
@@ -74,4 +80,17 @@ func (this *Service) Name() string {
 
 func (this *Service) Path() string {
 	return this.Path_
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// GROUP IMPLEMENTATION
+
+func NewGroup(name string) *ServiceGroup {
+	this := new(ServiceGroup)
+	this.Name_ = name
+	return this
+}
+
+func (this *ServiceGroup) Name() string {
+	return this.Name_
 }

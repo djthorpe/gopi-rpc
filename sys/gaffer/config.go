@@ -276,6 +276,24 @@ func (this *config) AddService(service *Service) error {
 	return nil
 }
 
+func (this *config) AddGroup(group *ServiceGroup) error {
+	this.log.Debug2("<gaffer.config>AddGroup{ group=%v }", group)
+
+	if group == nil {
+		return gopi.ErrBadParameter
+	} else if groups_ := this.GetGroupsByName([]string{group.Name()}); len(groups_) != 0 {
+		return fmt.Errorf("Duplicate group name: %v", strconv.Quote(group.Name()))
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		this.ServiceGroups = append(this.ServiceGroups, group)
+		this.modified = true
+	}
+
+	// Success
+	return nil
+}
+
 // GetServiceByName returns a service structure from name
 func (this *config) GetServiceByName(service string) *Service {
 	this.log.Debug2("<gaffer.config>GetServiceByName{ service=%v }", strconv.Quote(service))
@@ -303,12 +321,21 @@ func (this *config) GetGroupsByName(groups []string) []*ServiceGroup {
 	if len(groups) == 0 {
 		return nil
 	}
-	for _, service_ := range this.Services {
-		if service == service_.Name() {
-			return service_
+	// Make a hash of the groups for quicker lookup
+	groups_map := make(map[string]*ServiceGroup)
+	for _, group := range this.ServiceGroups {
+		groups_map[group.Name()] = group
+	}
+	// Now return the groups
+	groups_ := make([]*ServiceGroup, len(groups))
+	for i, group := range groups {
+		if group_, exists := groups_map[group]; exists == false {
+			return nil
+		} else {
+			groups_[i] = group_
 		}
 	}
-	return nil
+	return groups_
 }
 
 func (this *config) GenerateNameFromExecutable(executable string) (string, error) {

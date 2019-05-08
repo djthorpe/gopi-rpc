@@ -20,10 +20,33 @@ type Gaffer interface {
 	// Return list of executables
 	Executables(recursive bool) []string
 
+	// Return an existing service
+	GetServiceForName(string) GafferService
+
+	// Return an array of service groups or nil if any name could not be found
+	GetGroupsForNames([]string) []GafferServiceGroup
+
 	// Return a new service
-	AddService(executable string) (GafferService, error)
+	AddServiceForPath(string) (GafferService, error)
+
+	// Return a new group
+	AddGroupForName(string) (GafferServiceGroup, error)
+
+	// Remove a service
+	RemoveServiceForName(string) error
+
+	// Remove a group
+	RemoveGroupForName(string) error
+
+	// Return all services and groups
+	Services() []GafferService
+	Groups() []GafferServiceGroup
 }
 
 type GafferService interface {
+	Name() string
+}
+
+type GafferServiceGroup interface {
 	Name() string
 }

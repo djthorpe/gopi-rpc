@@ -23,11 +23,26 @@ import (
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 	gaffer := app.ModuleInstance("gaffer").(rpc.Gaffer)
 
+	groups := []string{"prod", "dev", "staging"}
+	for _, name := range groups {
+		if group, err := gaffer.AddGroupForName(name); err != nil {
+			app.Logger.Warn("%v: %v", name, err)
+		} else {
+			app.Logger.Info("%v: %v", name, group)
+		}
+	}
+
 	for _, exec := range gaffer.Executables(true) {
-		if service, err := gaffer.AddService(exec); err != nil {
+		if service, err := gaffer.AddServiceForPath(exec); err != nil {
 			app.Logger.Warn("%v: %v", exec, err)
 		} else {
 			app.Logger.Info("%v: %v", exec, service)
+		}
+	}
+
+	for _, name := range groups {
+		if err := gaffer.RemoveGroupForName(name); err != nil {
+			app.Logger.Warn("%v: %v", name, err)
 		}
 	}
 
