@@ -254,13 +254,59 @@ func (this *config) Writer(fh io.Writer, records []*Service, indent bool) error 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ADD SERVICE
+// SERVICES
 
 func (this *config) AddService(service *Service) error {
 	this.log.Debug2("<gaffer.config>AddService{ service=%v }", service)
-	// Service needs to have a unique name
-	// TODO
-	return gopi.ErrNotImplemented
+
+	if service == nil {
+		return gopi.ErrBadParameter
+	} else if service_ := this.GetServiceByName(service.Name()); service_ != nil {
+		return fmt.Errorf("Duplicate service name: %v", strconv.Quote(service.Name()))
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		this.Services = append(this.Services, service)
+		this.modified = true
+	}
+
+	// Success
+	return nil
+}
+
+// GetServiceByName returns a service structure from name
+func (this *config) GetServiceByName(service string) *Service {
+	this.log.Debug2("<gaffer.config>GetServiceByName{ service=%v }", strconv.Quote(service))
+	this.Lock()
+	defer this.Unlock()
+
+	if service == "" {
+		return nil
+	}
+	for _, service_ := range this.Services {
+		if service == service_.Name() {
+			return service_
+		}
+	}
+	return nil
+}
+
+func (this *config) GenerateNameFromExecutable(executable string) (string, error) {
+	this.log.Debug2("<gaffer.config>GenerateNameFromExecutable{ executable=%v }", strconv.Quote(executable))
+
+	// Get the base name and check against
+	base := filepath.Base(executable)
+	service := base
+	for i := 1; i <= 10; i++ {
+		if this.GetServiceByName(service) == nil {
+			return service, nil
+		} else {
+			service = fmt.Sprintf("%s-%v", base, i)
+		}
+	}
+
+	// Return a not found error after 10 attempts
+	return "", gopi.ErrNotFound
 }
 
 ////////////////////////////////////////////////////////////////////////////////

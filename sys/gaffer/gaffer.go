@@ -35,45 +35,6 @@ type gaffer struct {
 	config
 }
 
-type Service struct {
-	// Name is unique name for the service
-	Name string `json:"name"`
-
-	// Path is the path to the executable
-	Path string `json:"path"`
-}
-
-/*
-	// MaxInstances determines maximum number of
-	// instances which can be started at once,
-	// when 0 means service is off
-	MaxInstances uint `json:"max_instances"`
-
-	// Timeout is the length of time a service should run for
-	// before cancelling
-	Timeout time.Duration `json:"timeout"`
-
-	// Mode is manual or auto, which indicates if instances
-	// are automatically created or manually
-	Mode ServiceMode `json:"mode"`
-
-	// Flags on the command line
-	Flags []*Tuple `json:"flags"`
-
-	// Args on the command line
-	Args []string `json:"args"`
-}
-
-// Tuple defines a key-value pair for flags or environment vars
-type Tuple struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-// ServiceMode is auto or manual
-type ServiceMode uint
-*/
-
 ////////////////////////////////////////////////////////////////////////////////
 // COMSTANTS
 
@@ -148,5 +109,37 @@ func (this *gaffer) Executables(recursive bool) []string {
 
 // Return a new service
 func (this *gaffer) AddService(executable string) (rpc.GafferService, error) {
-	return nil, gopi.ErrNotImplemented
+	this.log.Debug2("<gaffer>AddService{ executable=%v }", strconv.Quote(executable))
+
+	// Check incoming parameters
+	if executable == "" {
+		return nil, gopi.ErrBadParameter
+	}
+	if root, err := this.config.Root(); err != nil {
+		return nil, gopi.ErrBadParameter
+	} else if filepath.IsAbs(executable) {
+		return nil, gopi.ErrBadParameter
+	} else {
+		// Locate executable
+		executable = filepath.Clean(executable)
+		executable_ := filepath.Join(root, executable)
+		if stat, err := os.Stat(executable_); os.IsNotExist(err) {
+			return nil, gopi.ErrNotFound
+		} else if stat.Mode().IsRegular() == false {
+			return nil, gopi.ErrBadParameter
+		} else if err := isExecutableFileAtPath(executable_); err != nil {
+			return nil, fmt.Errorf("No executable permissions: %v", executable_)
+		}
+
+		// Find a name which doesn't clash
+		if name, err := this.config.GenerateNameFromExecutable(executable); err != nil {
+			return nil, err
+		} else if service := NewService(name, executable); service == nil {
+			return nil, gopi.ErrBadParameter
+		} else if err := this.config.AddService(service); err != nil {
+			return nil, err
+		} else {
+			return service, nil
+		}
+	}
 }
