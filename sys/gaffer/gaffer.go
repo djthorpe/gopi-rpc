@@ -172,11 +172,13 @@ func (this *gaffer) AddGroupForName(name string) (rpc.GafferServiceGroup, error)
 
 // Return an existing service
 func (this *gaffer) GetServiceForName(service string) rpc.GafferService {
+	this.log.Debug2("<gaffer>GetServiceForName{ service=%v }", strconv.Quote(service))
 	return this.config.GetServiceByName(service)
 }
 
 // Return an array of service groups or nil if any name could not be found
 func (this *gaffer) GetGroupsForNames(groups []string) []rpc.GafferServiceGroup {
+	this.log.Debug2("<gaffer>GetGroupsForNames{ groups=%v }", groups)
 	if groups_ := this.config.GetGroupsByName(groups); groups_ == nil {
 		return nil
 	} else {
@@ -189,14 +191,24 @@ func (this *gaffer) GetGroupsForNames(groups []string) []rpc.GafferServiceGroup 
 }
 
 // Remove a group
-func (this *gaffer) RemoveGroupForName(string) error {
+func (this *gaffer) RemoveGroupForName(group string) error {
+	this.log.Debug2("<gaffer>RemoveGroupForName{ group=%v }", strconv.Quote(group))
 	return gopi.ErrNotImplemented
 
 }
 
 // Remove a service
-func (this *gaffer) RemoveServiceForName(string) error {
-	return gopi.ErrNotImplemented
+func (this *gaffer) RemoveServiceForName(service string) error {
+	this.log.Debug2("<gaffer>RemoveServiceForName{ service=%v }", strconv.Quote(service))
+	if service == "" {
+		return gopi.ErrBadParameter
+	} else if service_ := this.config.GetServiceByName(service); service_ == nil {
+		return gopi.ErrNotFound
+	} else if err := this.config.RemoveService(service_); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 // Return all services and groups

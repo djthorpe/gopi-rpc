@@ -356,6 +356,11 @@ func (this *config) GenerateNameFromExecutable(executable string) (string, error
 	return "", gopi.ErrNotFound
 }
 
+func (this *config) RemoveService(service *Service) error {
+	this.log.Debug2("<gaffer.config>RemoveService{ service=%v }", service)
+	return gopi.ErrNotImplemented
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // BACKGROUND TASKS
 
