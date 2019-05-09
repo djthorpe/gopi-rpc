@@ -14,6 +14,9 @@ import (
 	"github.com/djthorpe/gopi"
 )
 
+////////////////////////////////////////////////////////////////////////////////
+// INTERFACES
+
 type Gaffer interface {
 	gopi.Driver
 
@@ -38,18 +41,55 @@ type Gaffer interface {
 	// Remove a group
 	RemoveGroupForName(string) error
 
-	// Return all services and groups
+	// Set service mode to manual or auto
+	SetServiceModeByName(string, GafferServiceMode) error
+
+	// Return all services, groups and instances
 	Services() []GafferService
 	Groups() []GafferServiceGroup
+	Instances() []GafferServiceInstance
 }
 
 type GafferService interface {
 	Name() string
 	Path() string
 	Groups() []string
+	Mode() GafferServiceMode
+	Instances() uint
+
 	IsMemberOfGroup(string) bool
 }
 
 type GafferServiceGroup interface {
 	Name() string
+}
+
+type GafferServiceInstance interface {
+	Id() uint
+	Service() string
+}
+
+type GafferServiceMode uint
+
+////////////////////////////////////////////////////////////////////////////////
+// CONSTANTS
+
+const (
+	GAFFER_MODE_NONE GafferServiceMode = iota
+	GAFFER_MODE_MANUAL
+	GAFFER_MODE_AUTO
+)
+
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (m GafferServiceMode) String() string {
+	switch m {
+	case GAFFER_MODE_MANUAL:
+		return "GAFFER_MODE_MANUAL"
+	case GAFFER_MODE_AUTO:
+		return "GAFFER_MODE_AUTO"
+	default:
+		return "[?? Invalid GafferServiceMode value]"
+	}
 }

@@ -240,3 +240,45 @@ func (this *gaffer) Groups() []rpc.GafferServiceGroup {
 	}
 	return groups
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// EDIT METHODS
+
+func (this *gaffer) SetServiceNameByName(service string, new string) error {
+	return gopi.ErrNotImplemented
+}
+
+func (this *gaffer) SetGroupNameByName(group string, new string) error {
+	return gopi.ErrNotImplemented
+}
+
+func (this *gaffer) SetServiceModeByName(service string, mode rpc.GafferServiceMode) error {
+	return gopi.ErrNotImplemented
+}
+
+func (this *gaffer) SetServiceInstanceCountByName(service string, count uint) error {
+	return gopi.ErrNotImplemented
+}
+
+func (this *gaffer) AddServiceGroupByName(service string, group string) error {
+	return gopi.ErrNotImplemented
+}
+
+func (this *gaffer) RemoveServiceGroupByName(service string, group string) error {
+	return gopi.ErrNotImplemented
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// INSTANCES
+
+func (this *gaffer) GenerateInstanceId() uint {
+
+}
+
+func (this *gaffer) StartInstanceByServiceName(service string, id uint) error {
+
+}
+
+func (this *gaffer) StopInstanceById(id uint) error {
+
+}
