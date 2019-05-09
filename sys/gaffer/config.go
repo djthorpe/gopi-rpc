@@ -256,7 +256,7 @@ func (this *config) Writer(fh io.Writer, records []*Service, indent bool) error 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// SERVICES
+// SERVICES AND GROUPS
 
 func (this *config) AddService(service *Service) error {
 	this.log.Debug2("<gaffer.config>AddService{ service=%v }", service)
@@ -356,9 +356,61 @@ func (this *config) GenerateNameFromExecutable(executable string) (string, error
 	return "", gopi.ErrNotFound
 }
 
+// ServicesForGroupByName returns an array of services which contain a
+// particular group, by name
+func (this *config) ServicesForGroupByName(group string) []*Service {
+	this.log.Debug2("<gaffer.config>ServicesForGroup{ group=%v }", group)
+	services := make([]*Service, 0)
+	for _, service := range this.Services {
+		if service.IsMemberOfGroup(group) {
+			services = append(services, service)
+		}
+	}
+	return services
+}
+
 func (this *config) RemoveService(service *Service) error {
 	this.log.Debug2("<gaffer.config>RemoveService{ service=%v }", service)
-	return gopi.ErrNotImplemented
+	if service == nil {
+		return gopi.ErrBadParameter
+	}
+	services_ := make([]*Service, 0, len(this.Services))
+	for _, service_ := range this.Services {
+		if service_ != service {
+			services_ = append(services_, service_)
+		}
+	}
+	if len(services_) != len(this.Services) {
+		this.Lock()
+		defer this.Unlock()
+		this.Services = services_
+		this.modified = true
+		return nil
+	} else {
+		return gopi.ErrNotModified
+	}
+}
+
+func (this *config) RemoveGroup(group *ServiceGroup) error {
+	this.log.Debug2("<gaffer.config>RemoveGroup{ group=%v }", group)
+	if group == nil {
+		return gopi.ErrBadParameter
+	}
+	groups_ := make([]*ServiceGroup, 0, len(this.ServiceGroups))
+	for _, group_ := range this.ServiceGroups {
+		if group_ != group {
+			groups_ = append(groups_, group_)
+		}
+	}
+	if len(groups_) != len(this.ServiceGroups) {
+		this.Lock()
+		defer this.Unlock()
+		this.ServiceGroups = groups_
+		this.modified = true
+		return nil
+	} else {
+		return gopi.ErrNotModified
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

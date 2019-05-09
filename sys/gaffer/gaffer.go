@@ -193,8 +193,21 @@ func (this *gaffer) GetGroupsForNames(groups []string) []rpc.GafferServiceGroup 
 // Remove a group
 func (this *gaffer) RemoveGroupForName(group string) error {
 	this.log.Debug2("<gaffer>RemoveGroupForName{ group=%v }", strconv.Quote(group))
-	return gopi.ErrNotImplemented
-
+	if group == "" {
+		return gopi.ErrBadParameter
+	} else if groups := this.config.GetGroupsByName([]string{group}); len(groups) != 1 {
+		return gopi.ErrNotFound
+	} else if services := this.config.ServicesForGroupByName(group); len(services) != 0 {
+		services_ := make([]string, len(services))
+		for i, service := range services {
+			services_[i] = strconv.Quote(service.Name())
+		}
+		return fmt.Errorf("Group %v is in use by services %v", strconv.Quote(group), strings.Join(services_, ","))
+	} else if err := this.config.RemoveGroup(groups[0]); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 // Remove a service

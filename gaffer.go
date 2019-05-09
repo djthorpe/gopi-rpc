@@ -45,6 +45,9 @@ type Gaffer interface {
 
 type GafferService interface {
 	Name() string
+	Path() string
+	Groups() []string
+	IsMemberOfGroup(string) bool
 }
 
 type GafferServiceGroup interface {

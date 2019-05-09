@@ -8,6 +8,11 @@
 
 package gaffer
 
+import (
+	"fmt"
+	"strconv"
+)
+
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
@@ -82,6 +87,25 @@ func (this *Service) Path() string {
 	return this.Path_
 }
 
+func (this *Service) Groups() []string {
+	var groups []string
+	copy(groups, this.Groups_)
+	return groups
+}
+
+func (this *Service) IsMemberOfGroup(group string) bool {
+	for _, group_ := range this.Groups_ {
+		if group_ == group {
+			return true
+		}
+	}
+	return false
+}
+
+func (this *Service) String() string {
+	return fmt.Sprintf("<gaffer.Service>{ name=%v }", strconv.Quote(this.Name_))
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // GROUP IMPLEMENTATION
 
@@ -93,4 +117,8 @@ func NewGroup(name string) *ServiceGroup {
 
 func (this *ServiceGroup) Name() string {
 	return this.Name_
+}
+
+func (this *ServiceGroup) String() string {
+	return fmt.Sprintf("<gaffer.ServiceGroup>{ name=%v }", strconv.Quote(this.Name_))
 }

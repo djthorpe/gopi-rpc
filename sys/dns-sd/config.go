@@ -90,8 +90,6 @@ func (this *Config) Destroy() error {
 		return err
 	}
 
-	// TODO: write if modified
-
 	// Success
 	return nil
 }
