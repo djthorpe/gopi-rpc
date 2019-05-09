@@ -241,6 +241,15 @@ func (this *gaffer) Groups() []rpc.GafferServiceGroup {
 	return groups
 }
 
+
+func (this *gaffer) Instances() []rpc.GafferServiceInstance {
+	groups := make([]rpc.GafferServiceGroup, len(this.config.ServiceGroups))
+	for i, group := range this.config.ServiceGroups {
+		groups[i] = group
+	}
+	return groups
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // EDIT METHODS
 
