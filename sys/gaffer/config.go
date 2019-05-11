@@ -238,8 +238,17 @@ func (this *config) Reader(fh io.Reader) error {
 	if err := dec.Decode(&this.config_); err != nil {
 		return err
 	} else {
-		return nil
+		// Re-create the services and groups
+		for i, service := range this.config_.Services {
+			this.config_.Services[i] = CopyService(service)
+		}
+		for i, group := range this.config_.ServiceGroups {
+			this.config_.ServiceGroups[i] = CopyGroup(group)
+		}
 	}
+
+	// Success
+	return nil
 }
 
 // Writer writes an array of service records to a io.Writer object
@@ -319,7 +328,7 @@ func (this *config) GetGroupsByName(groups []string) []*ServiceGroup {
 	defer this.Unlock()
 
 	if len(groups) == 0 {
-		return nil
+		return []*ServiceGroup{}
 	}
 	// Make a hash of the groups for quicker lookup
 	groups_map := make(map[string]*ServiceGroup)

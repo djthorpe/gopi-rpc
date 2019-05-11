@@ -11,6 +11,8 @@ package rpc
 
 import (
 	// Frameworks
+	"time"
+
 	"github.com/djthorpe/gopi"
 )
 
@@ -20,53 +22,69 @@ import (
 type Gaffer interface {
 	gopi.Driver
 
-	// Return list of executables
-	Executables(recursive bool) []string
+	// Return all services, groups, instances and executables
+	GetServices() []GafferService
+	GetGroups() []GafferServiceGroup
+	GetInstances() []GafferServiceInstance
+	GetExecutables(recursive bool) []string
 
-	// Return an existing service
-	GetServiceForName(string) GafferService
-
-	// Return an array of service groups or nil if any name could not be found
-	GetGroupsForNames([]string) []GafferServiceGroup
-
-	// Return a new service
+	// Services
 	AddServiceForPath(string) (GafferService, error)
-
-	// Return a new group
-	AddGroupForName(string) (GafferServiceGroup, error)
-
-	// Remove a service
+	GetServiceForName(string) GafferService
 	RemoveServiceForName(string) error
+	SetServiceNameForName(service string, new string) error
+	SetServiceModeForName(string, GafferServiceMode) error
+	SetServiceInstanceCountForName(service string, count uint) error
+	AddServiceGroupForName(service string, group string, position uint) error
+	RemoveServiceGroupForName(service string, group string) error
 
-	// Remove a group
+	// Groups
+	GetGroupsForNames([]string) []GafferServiceGroup
+	AddGroupForName(string) (GafferServiceGroup, error)
+	SetGroupNameForName(group string, new string) error
 	RemoveGroupForName(string) error
 
-	// Set service mode to manual or auto
-	SetServiceModeByName(string, GafferServiceMode) error
-
-	// Return all services, groups and instances
-	Services() []GafferService
-	Groups() []GafferServiceGroup
-	Instances() []GafferServiceInstance
+	// Instances
+	GenerateInstanceId() uint32
+	StartInstanceForServiceName(service string, id uint32) (GafferServiceInstance, error)
+	StopInstanceForId(id uint32) error
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// INSTANCES
 
 type GafferService interface {
 	Name() string
 	Path() string
 	Groups() []string
 	Mode() GafferServiceMode
-	Instances() uint
+	InstanceCount() uint
+	RunTime() time.Duration
+	IdleTime() time.Duration
 
+	// Flags
+	SetFlag(key, value string) error
+	Flags() []string
+
+	// Groups
 	IsMemberOfGroup(string) bool
 }
 
 type GafferServiceGroup interface {
 	Name() string
+
+	// Flags
+	SetFlag(key, value string) error
+	Flags() []string
+
+	// Env
+	SetEnv(key, value string) error
+	Env() []string
 }
 
 type GafferServiceInstance interface {
-	Id() uint
-	Service() string
+	Id() uint32
+	Service() GafferService
 }
 
 type GafferServiceMode uint

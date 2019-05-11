@@ -1,0 +1,114 @@
+syntax = "proto3";
+package gopi;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+
+// The gaffer service definition
+service Gaffer {
+    // Simple ping method to show server is "up"
+    rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
+
+    // Executables returns a list of executables which can be made into services
+    rpc ListExecutables(google.protobuf.Empty) returns (ListExecutablesReply);
+
+    // List instances, filtering by service or group
+    rpc ListServices(RequestFilter) returns (ListServicesReply);
+
+    // List groups, filtering by service or group
+    rpc ListGroups(RequestFilter) returns (ListGroupsReply);
+
+    // List instances, filtering by service or group
+    rpc ListInstances(RequestFilter) returns (ListInstancesReply);
+
+    // Add a service
+    rpc AddService(AddServiceRequest) returns (Service);
+
+    // Add a group
+    rpc AddGroup(AddGroupRequest) returns (Group);
+
+    // Get an Instance ID, used when starting a service instance
+    rpc GetInstanceId(google.protobuf.Empty) returns (InstanceId);
+
+    // Start an instance
+    rpc StartInstance(StartInstanceRequest) returns (Instance);
+}
+
+/////////////////////////////////////////////////////////////////////
+// MESSAGES
+
+message RequestFilter {
+    string value = 1;
+    RequestFilterType type = 2;
+
+    enum RequestFilterType {
+        NONE = 0;
+        SERVICE = 1;
+        GROUP = 2; 
+    }
+}
+
+message ListExecutablesReply { 
+    repeated string path = 1;
+}
+
+message ListServicesReply {
+    repeated Service service = 1;
+}
+
+message ListGroupsReply {
+    repeated Group group = 1;
+}
+
+message ListInstancesReply {
+    repeated Instance instance = 1;
+}
+
+message AddServiceRequest {
+    string path = 1;
+    repeated string groups = 2;
+}
+
+message AddGroupRequest {
+    string name = 1;
+}
+
+message InstanceId {
+    uint32 id = 1;
+}
+
+message StartInstanceRequest {
+    uint32 id = 1;
+    string service = 2;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SERVICES< GROUPS AND INSTANCES
+
+message Service {
+    string name = 1;
+    string path = 2;
+    repeated string groups = 3;
+    ServiceMode mode = 4;
+    uint32 instance_count = 5;
+    google.protobuf.Duration run_time = 6;
+    google.protobuf.Duration idle_time = 7;
+    repeated string flags = 8;
+
+    enum ServiceMode {
+        NONE = 0;
+        MANUAL = 1;
+        AUTO = 2; 
+    }
+}
+
+message Group {
+    string name = 1;    
+    repeated string flags = 2;
+    repeated string env = 3;
+}
+
+message Instance {
+    uint32 id = 1;
+    Service service = 2;
+}
