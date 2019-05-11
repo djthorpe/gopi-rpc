@@ -16,6 +16,7 @@ import (
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 	grpc "github.com/djthorpe/gopi-rpc/sys/grpc"
+	event "github.com/djthorpe/gopi/util/event"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/gaffer"
@@ -33,6 +34,8 @@ type Service struct {
 type service struct {
 	log    gopi.Logger
 	gaffer rpc.Gaffer
+
+	event.Tasks
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -53,12 +56,19 @@ func (config Service) Open(log gopi.Logger) (gopi.Driver, error) {
 	// Register service with GRPC server
 	pb.RegisterGafferServer(config.Server.(grpc.GRPCServer).GRPCServer(), this)
 
+	this.Tasks.Start(this.EventTask)
+
 	// Success
 	return this, nil
 }
 
 func (this *service) Close() error {
 	this.log.Debug("<grpc.service.gaffer>Close{ gaffer=%v }", this.gaffer)
+
+	// Stop background tasks
+	if err := this.Tasks.Close(); err != nil {
+		return err
+	}
 
 	// Release resources
 	this.gaffer = nil
@@ -187,6 +197,40 @@ func (this *service) ListGroups(_ context.Context, req *pb.RequestFilter) (*pb.L
 // List instances
 func (this *service) ListInstances(_ context.Context, req *pb.RequestFilter) (*pb.ListInstancesReply, error) {
 	this.log.Debug("<grpc.service.gaffer.ListInstances>{ req=%v }", req)
+
+	// Get instances
+	instances := this.gaffer.GetInstances()
+
+	// Obtain all instances
+	if req.Type == pb.RequestFilter_NONE {
+		return &pb.ListInstancesReply{
+			Instance: toProtoFromInstanceArray(instances, nil),
+		}, nil
+	}
+
+	// Obtain instances for a service
+	if req.Type == pb.RequestFilter_SERVICE {
+		if service := this.gaffer.GetServiceForName(req.Value); service == nil {
+			return nil, gopi.ErrNotFound
+		} else {
+			return &pb.ListInstancesReply{
+				Instance: toProtoFromInstanceArray(instances, func(i rpc.GafferServiceInstance) bool {
+					return i.Service() == service
+				}),
+			}, nil
+		}
+	}
+
+	// Obtain instances for services in a particular group
+	if req.Type == pb.RequestFilter_SERVICE {
+		return &pb.ListInstancesReply{
+			Instance: toProtoFromInstanceArray(instances, func(i rpc.GafferServiceInstance) bool {
+				return i.Service().IsMemberOfGroup(req.Value)
+			}),
+		}, nil
+	}
+
+	// Filter not implemented
 	return nil, gopi.ErrNotImplemented
 }
 
@@ -232,4 +276,69 @@ func (this *service) StartInstance(_ context.Context, req *pb.StartInstanceReque
 	} else {
 		return toProtoFromInstance(instance), nil
 	}
+}
+
+// Set group flags
+func (this *service) SetGroupFlags(_ context.Context, req *pb.SetTuplesRequest) (*pb.Group, error) {
+	this.log.Debug("<grpc.service.gaffer.SetGroupFlags>{ req=%v }", req)
+
+	if groups := this.gaffer.GetGroupsForNames([]string{req.Name}); len(groups) == 0 {
+		return nil, gopi.ErrNotFound
+	} else if len(groups) > 1 {
+		return nil, gopi.ErrAppError
+	} else if err := groups[0].SetFlags(req.Tuples); err != nil {
+		return nil, err
+	} else {
+		return toProtoFromGroup(groups[0]), nil
+	}
+}
+
+// Set group env
+func (this *service) SetGroupEnv(_ context.Context, req *pb.SetTuplesRequest) (*pb.Group, error) {
+	this.log.Debug("<grpc.service.gaffer.SetGroupEnv>{ req=%v }", req)
+
+	if groups := this.gaffer.GetGroupsForNames([]string{req.Name}); len(groups) == 0 {
+		return nil, gopi.ErrNotFound
+	} else if len(groups) > 1 {
+		return nil, gopi.ErrAppError
+	} else if err := groups[0].SetEnv(req.Tuples); err != nil {
+		return nil, err
+	} else {
+		return toProtoFromGroup(groups[0]), nil
+	}
+}
+
+// Set service flags
+func (this *service) SetServiceFlags(_ context.Context, req *pb.SetTuplesRequest) (*pb.Service, error) {
+	this.log.Debug("<grpc.service.gaffer.SetServiceFlags>{ req=%v }", req)
+
+	if service := this.gaffer.GetServiceForName(req.Name); service == nil {
+		return nil, gopi.ErrNotFound
+	} else if err := service.SetFlags(req.Tuples); err != nil {
+		return nil, err
+	} else {
+		return toProtoFromService(service), nil
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// BACKGROUND TASKS
+
+func (this *service) EventTask(start chan<- event.Signal, stop <-chan event.Signal) error {
+	start <- gopi.DONE
+	events := this.gaffer.Subscribe()
+FOR_LOOP:
+	for {
+		select {
+		case evt := <-events:
+			fmt.Println(evt)
+		case <-stop:
+			break FOR_LOOP
+		}
+	}
+
+	this.gaffer.Unsubscribe(events)
+
+	// Success
+	return nil
 }

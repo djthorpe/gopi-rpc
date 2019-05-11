@@ -21,6 +21,7 @@ import (
 
 type Gaffer interface {
 	gopi.Driver
+	gopi.Publisher
 
 	// Return all services, groups, instances and executables
 	GetServices() []GafferService
@@ -63,7 +64,7 @@ type GafferService interface {
 	IdleTime() time.Duration
 
 	// Flags
-	SetFlag(key, value string) error
+	SetFlags(map[string]string) error
 	Flags() []string
 
 	// Groups
@@ -74,20 +75,33 @@ type GafferServiceGroup interface {
 	Name() string
 
 	// Flags
-	SetFlag(key, value string) error
+	SetFlags(map[string]string) error
 	Flags() []string
 
 	// Env
-	SetEnv(key, value string) error
+	SetEnv(map[string]string) error
 	Env() []string
 }
 
 type GafferServiceInstance interface {
 	Id() uint32
 	Service() GafferService
+	Flags() []string
+	Env() []string
+}
+
+type GafferEvent interface {
+	gopi.Event
+
+	Type() GafferEventType
+	Service() GafferService
+	Group() GafferServiceGroup
+	Instance() GafferServiceInstance
 }
 
 type GafferServiceMode uint
+
+type GafferEventType uint
 
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
@@ -96,6 +110,17 @@ const (
 	GAFFER_MODE_NONE GafferServiceMode = iota
 	GAFFER_MODE_MANUAL
 	GAFFER_MODE_AUTO
+)
+
+const (
+	GAFFER_EVENT_NONE GafferEventType = iota
+	GAFFER_EVENT_SERVICE_ADD
+	GAFFER_EVENT_SERVICE_CHANGE
+	GAFFER_EVENT_SERVICE_REMOVE
+	GAFFER_EVENT_GROUP_ADD
+	GAFFER_EVENT_GROUP_CHANGE
+	GAFFER_EVENT_GROUP_REMOVE
+	GAFFER_EVENT_INSTANCE_ADD
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -109,5 +134,26 @@ func (m GafferServiceMode) String() string {
 		return "GAFFER_MODE_AUTO"
 	default:
 		return "[?? Invalid GafferServiceMode value]"
+	}
+}
+
+func (t GafferEventType) String() string {
+	switch t {
+	case GAFFER_EVENT_SERVICE_ADD:
+		return "GAFFER_EVENT_SERVICE_ADD"
+	case GAFFER_EVENT_SERVICE_CHANGE:
+		return "GAFFER_EVENT_SERVICE_CHANGE"
+	case GAFFER_EVENT_SERVICE_REMOVE:
+		return "GAFFER_EVENT_SERVICE_REMOVE"
+	case GAFFER_EVENT_GROUP_ADD:
+		return "GAFFER_EVENT_GROUP_ADD"
+	case GAFFER_EVENT_GROUP_CHANGE:
+		return "GAFFER_EVENT_GROUP_CHANGE"
+	case GAFFER_EVENT_GROUP_REMOVE:
+		return "GAFFER_EVENT_GROUP_REMOVE"
+	case GAFFER_EVENT_INSTANCE_ADD:
+		return "GAFFER_EVENT_INSTANCE_ADD"
+	default:
+		return "[?? Invalid GafferEventType value]"
 	}
 }

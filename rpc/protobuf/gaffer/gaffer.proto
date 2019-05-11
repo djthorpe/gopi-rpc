@@ -27,6 +27,15 @@ service Gaffer {
     // Add a group
     rpc AddGroup(AddGroupRequest) returns (Group);
 
+    // Set group flags
+    rpc SetGroupFlags(SetTuplesRequest) returns (Group);
+
+    // Set group env
+    rpc SetGroupEnv(SetTuplesRequest) returns (Group);
+
+    // Set service flags
+    rpc SetServiceFlags(SetTuplesRequest) returns (Service);
+
     // Get an Instance ID, used when starting a service instance
     rpc GetInstanceId(google.protobuf.Empty) returns (InstanceId);
 
@@ -82,6 +91,11 @@ message StartInstanceRequest {
     string service = 2;
 }
 
+message SetTuplesRequest {
+    string name = 1;
+    map<string,string> tuples = 2;
+}
+
 /////////////////////////////////////////////////////////////////////
 // SERVICES< GROUPS AND INSTANCES
 
@@ -111,4 +125,6 @@ message Group {
 message Instance {
     uint32 id = 1;
     Service service = 2;
+    repeated string flags = 3;
+    repeated string env = 4;
 }

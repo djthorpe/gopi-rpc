@@ -165,8 +165,9 @@ func (this *Service) Flags() []string {
 	return this.Flags_.Strings()
 }
 
-func (this *Service) SetFlag(key, value string) error {
-	return this.Flags_.Set(key, value)
+func (this *Service) SetFlags(map[string]string) error {
+	// TODO
+	return gopi.ErrNotImplemented
 }
 
 func (this *Service) String() string {
@@ -199,12 +200,14 @@ func (this *ServiceGroup) Name() string {
 	return this.Name_
 }
 
-func (this *ServiceGroup) SetFlag(key, value string) error {
-	return this.Flags_.Set(key, value)
+func (this *ServiceGroup) SetFlags(map[string]string) error {
+	// TODO
+	return gopi.ErrNotImplemented
 }
 
-func (this *ServiceGroup) SetEnv(key, value string) error {
-	return this.Env_.Set(key, value)
+func (this *ServiceGroup) SetEnv(map[string]string) error {
+	// TODO
+	return gopi.ErrNotImplemented
 }
 
 func (this *ServiceGroup) Flags() []string {
@@ -293,6 +296,10 @@ func (this *ServiceInstance) Env() []string {
 
 func (this *ServiceInstance) RunTime() time.Duration {
 	return this.Service_.RunTime()
+}
+
+func (this *ServiceInstance) IdleTime() time.Duration {
+	return this.Service_.IdleTime()
 }
 
 func (this *ServiceInstance) String() string {

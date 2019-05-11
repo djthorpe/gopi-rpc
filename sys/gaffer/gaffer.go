@@ -20,6 +20,7 @@ import (
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
+	event "github.com/djthorpe/gopi/util/event"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -41,6 +42,7 @@ type gaffer struct {
 
 	config
 	Instances
+	event.Publisher
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -76,6 +78,9 @@ func (config Gaffer) Open(logger gopi.Logger) (gopi.Driver, error) {
 // Close an opened gaffer instance
 func (this *gaffer) Close() error {
 	this.log.Debug("<gaffer.Close>{ }")
+
+	// Unsubscribe subscribers
+	this.Publisher.Close()
 
 	// Release resources, etc
 	if err := this.Instances.Destroy(); err != nil {
@@ -171,6 +176,7 @@ func (this *gaffer) AddServiceForPath(executable string) (rpc.GafferService, err
 		} else if err := this.config.AddService(service); err != nil {
 			return nil, err
 		} else {
+			this.EmitService(rpc.GAFFER_EVENT_SERVICE_ADD, service)
 			return service, nil
 		}
 	}
@@ -196,6 +202,7 @@ func (this *gaffer) AddGroupForName(name string) (rpc.GafferServiceGroup, error)
 	} else if err := this.config.AddGroup(group); err != nil {
 		return nil, err
 	} else {
+		this.EmitGroup(rpc.GAFFER_EVENT_GROUP_ADD, group)
 		return group, nil
 	}
 }
@@ -237,9 +244,12 @@ func (this *gaffer) RemoveGroupForName(group string) error {
 			services_[i] = strconv.Quote(service.Name())
 		}
 		return fmt.Errorf("Group %v is in use by services %v", strconv.Quote(group), strings.Join(services_, ","))
+	} else if group_ := groups[0]; group_ == nil {
+		return gopi.ErrNotFound
 	} else if err := this.config.RemoveGroup(groups[0]); err != nil {
 		return err
 	} else {
+		this.EmitGroup(rpc.GAFFER_EVENT_GROUP_REMOVE, group_)
 		return nil
 	}
 }
@@ -254,6 +264,7 @@ func (this *gaffer) RemoveServiceForName(service string) error {
 	} else if err := this.config.RemoveService(service_); err != nil {
 		return err
 	} else {
+		this.EmitService(rpc.GAFFER_EVENT_SERVICE_REMOVE, service_)
 		return nil
 	}
 }
@@ -342,4 +353,19 @@ func (this *gaffer) StartInstanceForServiceName(service string, id uint32) (rpc.
 
 func (this *gaffer) StopInstanceForId(id uint32) error {
 	return gopi.ErrNotImplemented
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// EMIT
+
+func (this *gaffer) EmitService(t rpc.GafferEventType, service rpc.GafferService) {
+	this.Emit(NewEventWithService(this, t, service))
+}
+
+func (this *gaffer) EmitGroup(t rpc.GafferEventType, group rpc.GafferServiceGroup) {
+	this.Emit(NewEventWithGroup(this, t, group))
+}
+
+func (this *gaffer) EmitInstance(t rpc.GafferEventType, instance rpc.GafferServiceInstance) {
+	this.Emit(NewEventWithInstance(this, t, instance))
 }

@@ -86,5 +86,20 @@ func toProtoFromInstance(instance rpc.GafferServiceInstance) *pb.Instance {
 	return &pb.Instance{
 		Id:      instance.Id(),
 		Service: toProtoFromService(instance.Service()),
+		Flags:   instance.Flags(),
+		Env:     instance.Env(),
 	}
+}
+
+func toProtoFromInstanceArray(instances []rpc.GafferServiceInstance, filter func(rpc.GafferServiceInstance) bool) []*pb.Instance {
+	if instances == nil {
+		return nil
+	}
+	instances_ := make([]*pb.Instance, 0, len(instances))
+	for _, instance := range instances {
+		if filter == nil || filter(instance) {
+			instances_ = append(instances_, toProtoFromInstance(instance))
+		}
+	}
+	return instances_
 }
