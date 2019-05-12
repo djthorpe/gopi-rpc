@@ -157,6 +157,8 @@ func (this *Instances) DeleteInstance(instance *ServiceInstance) error {
 
 func (this *Instances) Start(instance *ServiceInstance, stdout, stderr chan<- []byte) error {
 	this.log.Debug2("<gaffer.instances.Start>{ instance=%v }", instance)
+	this.Lock()
+	defer this.Unlock()
 
 	// Check parameters
 	if instance == nil || stdout == nil || stderr == nil {
@@ -170,15 +172,47 @@ func (this *Instances) Start(instance *ServiceInstance, stdout, stderr chan<- []
 	}
 }
 
+func (this *Instances) Stop(instance *ServiceInstance) error {
+	this.log.Debug2("<gaffer.instances.Stop>{ instance=%v }", instance)
+	this.Lock()
+	defer this.Unlock()
+
+	// Check parameters
+	if instance == nil {
+		return gopi.ErrBadParameter
+	}
+
+	// Stop the process
+	if err := instance.process.Stop(); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // RETURN INSTANCES
 
 func (this *Instances) GetInstances() []rpc.GafferServiceInstance {
+	this.Lock()
+	defer this.Unlock()
+
 	instances := make([]rpc.GafferServiceInstance, 0, len(this.instances))
 	for _, instance := range this.instances {
 		instances = append(instances, instance)
 	}
 	return instances
+}
+
+func (this *Instances) GetInstanceForId(id uint32) *ServiceInstance {
+	this.Lock()
+	defer this.Unlock()
+
+	if instance, exists := this.instances[id]; exists == false {
+		return nil
+	} else {
+		return instance
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

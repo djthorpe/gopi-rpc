@@ -27,8 +27,16 @@ type pb_service struct {
 	pb *pb.Service
 }
 
+type pb_group struct {
+	pb *pb.Group
+}
+
+type pb_instance struct {
+	pb *pb.Instance
+}
+
 ////////////////////////////////////////////////////////////////////////////////
-// Services
+// SERVICES
 
 func toProtoFromService(service rpc.GafferService) *pb.Service {
 	if service == nil {
@@ -75,7 +83,7 @@ func fromProtoServiceArray(services []*pb.Service) []rpc.GafferService {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Groups
+// GROUPS
 
 func toProtoFromGroup(group rpc.GafferServiceGroup) *pb.Group {
 	if group == nil {
@@ -101,8 +109,23 @@ func toProtoFromGroupArray(groups []rpc.GafferServiceGroup, filter func(rpc.Gaff
 	return groups_
 }
 
+func fromProtoGroup(group *pb.Group) rpc.GafferServiceGroup {
+	return &pb_group{group}
+}
+
+func fromProtoGroupArray(groups []*pb.Group) []rpc.GafferServiceGroup {
+	if groups == nil {
+		return nil
+	}
+	groups_ := make([]rpc.GafferServiceGroup, len(groups))
+	for i, group := range groups {
+		groups_[i] = fromProtoGroup(group)
+	}
+	return groups_
+}
+
 ////////////////////////////////////////////////////////////////////////////////
-// Instances
+// INSTANCES
 
 func toProtoFromInstance(instance rpc.GafferServiceInstance) *pb.Instance {
 	if instance == nil {
@@ -125,6 +148,21 @@ func toProtoFromInstanceArray(instances []rpc.GafferServiceInstance, filter func
 		if filter == nil || filter(instance) {
 			instances_ = append(instances_, toProtoFromInstance(instance))
 		}
+	}
+	return instances_
+}
+
+func fromProtoInstance(instance *pb.Instance) rpc.GafferServiceInstance {
+	return &pb_instance{instance}
+}
+
+func fromProtoInstanceArray(instances []*pb.Instance) []rpc.GafferServiceInstance {
+	if instances == nil {
+		return nil
+	}
+	instances_ := make([]rpc.GafferServiceInstance, len(instances))
+	for i, instance := range instances {
+		instances_[i] = fromProtoInstance(instance)
 	}
 	return instances_
 }
@@ -214,5 +252,75 @@ func (this *pb_service) IsMemberOfGroup(group string) bool {
 			}
 		}
 		return false
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// GROUP IMPLEMENTATION
+
+func (this *pb_group) Name() string {
+	if this.pb == nil {
+		return ""
+	} else {
+		return this.pb.Name
+	}
+}
+
+func (this *pb_group) Flags() []string {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Flags
+	}
+}
+
+func (this *pb_group) Env() []string {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Env
+	}
+}
+
+func (this *pb_group) SetEnv(map[string]string) error {
+	return gopi.ErrNotImplemented
+}
+
+func (this *pb_group) SetFlags(map[string]string) error {
+	return gopi.ErrNotImplemented
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// INSTANCE IMPLEMENTATION
+
+func (this *pb_instance) Id() uint32 {
+	if this.pb == nil {
+		return 0
+	} else {
+		return this.pb.Id
+	}
+}
+
+func (this *pb_instance) Service() rpc.GafferService {
+	if this.pb == nil {
+		return nil
+	} else {
+		return fromProtoService(this.pb.Service)
+	}
+}
+
+func (this *pb_instance) Flags() []string {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Flags
+	}
+}
+
+func (this *pb_instance) Env() []string {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Env
 	}
 }

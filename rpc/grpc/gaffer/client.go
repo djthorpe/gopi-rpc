@@ -72,7 +72,6 @@ func (this *Client) ListExecutables() ([]string, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	// Perform ping
 	if reply, err := this.GafferClient.ListExecutables(this.NewContext(), &empty.Empty{}); err != nil {
 		return nil, err
 	} else {
@@ -83,6 +82,7 @@ func (this *Client) ListExecutables() ([]string, error) {
 func (this *Client) ListServices() ([]rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
+
 	if reply, err := this.GafferClient.ListServices(this.NewContext(), &pb.RequestFilter{
 		Type: pb.RequestFilter_NONE,
 	}); err != nil {
@@ -95,6 +95,7 @@ func (this *Client) ListServices() ([]rpc.GafferService, error) {
 func (this *Client) ListServicesForGroup(group string) ([]rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
+
 	if reply, err := this.GafferClient.ListServices(this.NewContext(), &pb.RequestFilter{
 		Type:  pb.RequestFilter_GROUP,
 		Value: group,
@@ -108,6 +109,7 @@ func (this *Client) ListServicesForGroup(group string) ([]rpc.GafferService, err
 func (this *Client) GetService(service string) (rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
+
 	if reply, err := this.GafferClient.ListServices(this.NewContext(), &pb.RequestFilter{
 		Type:  pb.RequestFilter_SERVICE,
 		Value: service,
@@ -117,6 +119,150 @@ func (this *Client) GetService(service string) (rpc.GafferService, error) {
 		return nil, gopi.ErrNotFound
 	} else {
 		return fromProtoService(reply.Service[0]), nil
+	}
+}
+
+func (this *Client) ListGroups() ([]rpc.GafferServiceGroup, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.ListGroups(this.NewContext(), &pb.RequestFilter{
+		Type: pb.RequestFilter_NONE,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoGroupArray(reply.Group), nil
+	}
+}
+
+func (this *Client) ListGroupsForService(service string) ([]rpc.GafferServiceGroup, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.ListGroups(this.NewContext(), &pb.RequestFilter{
+		Type:  pb.RequestFilter_SERVICE,
+		Value: service,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoGroupArray(reply.Group), nil
+	}
+}
+
+func (this *Client) GetGroup(group string) (rpc.GafferServiceGroup, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.ListGroups(this.NewContext(), &pb.RequestFilter{
+		Type:  pb.RequestFilter_GROUP,
+		Value: group,
+	}); err != nil {
+		return nil, err
+	} else if len(reply.Group) == 0 {
+		return nil, gopi.ErrNotFound
+	} else {
+		return fromProtoGroup(reply.Group[0]), nil
+	}
+}
+
+func (this *Client) ListInstances() ([]rpc.GafferServiceInstance, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.ListInstances(this.NewContext(), &pb.RequestFilter{}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoInstanceArray(reply.Instance), nil
+	}
+}
+
+func (this *Client) AddServiceForPath(path string) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.AddService(this.NewContext(), &pb.AddServiceRequest{
+		Path: path,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
+	}
+}
+
+func (this *Client) AddGroupForName(name string) (rpc.GafferServiceGroup, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.AddGroup(this.NewContext(), &pb.NameRequest{
+		Name: name,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoGroup(reply), nil
+	}
+}
+
+func (this *Client) RemoveServiceForName(name string) error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if _, err := this.GafferClient.RemoveService(this.NewContext(), &pb.NameRequest{
+		Name: name,
+	}); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (this *Client) RemoveGroupForName(name string) error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if _, err := this.GafferClient.RemoveGroup(this.NewContext(), &pb.NameRequest{
+		Name: name,
+	}); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (this *Client) GetInstanceId() (uint32, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.GetInstanceId(this.NewContext(), &empty.Empty{}); err != nil {
+		return 0, err
+	} else {
+		return reply.Id, nil
+	}
+}
+
+func (this *Client) StartInstance(service string, id uint32) (rpc.GafferServiceInstance, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.StartInstance(this.NewContext(), &pb.StartInstanceRequest{
+		Id:      id,
+		Service: service,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoInstance(reply), nil
+	}
+}
+
+func (this *Client) StopInstance(id uint32) (rpc.GafferServiceInstance, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.StopInstance(this.NewContext(), &pb.InstanceId{
+		Id: id,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoInstance(reply), nil
 	}
 }
 

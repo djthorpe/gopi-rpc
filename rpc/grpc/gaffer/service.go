@@ -247,13 +247,35 @@ func (this *service) AddService(_ context.Context, req *pb.AddServiceRequest) (*
 }
 
 // Add a group
-func (this *service) AddGroup(_ context.Context, req *pb.AddGroupRequest) (*pb.Group, error) {
+func (this *service) AddGroup(_ context.Context, req *pb.NameRequest) (*pb.Group, error) {
 	this.log.Debug("<grpc.service.gaffer.AddGroup>{ req=%v }", req)
 
 	if group, err := this.gaffer.AddGroupForName(req.Name); err != nil {
 		return nil, err
 	} else {
 		return toProtoFromGroup(group), nil
+	}
+}
+
+// Remove a service
+func (this *service) RemoveService(_ context.Context, req *pb.NameRequest) (*empty.Empty, error) {
+	this.log.Debug("<grpc.service.gaffer.RemoveService>{ req=%v }", req)
+
+	if err := this.gaffer.RemoveServiceForName(req.Name); err != nil {
+		return nil, err
+	} else {
+		return &empty.Empty{}, nil
+	}
+}
+
+// Remove a group
+func (this *service) RemoveGroup(_ context.Context, req *pb.NameRequest) (*empty.Empty, error) {
+	this.log.Debug("<grpc.service.gaffer.RemoveGroup>{ req=%v }", req)
+
+	if err := this.gaffer.RemoveGroupForName(req.Name); err != nil {
+		return nil, err
+	} else {
+		return &empty.Empty{}, nil
 	}
 }
 
@@ -277,6 +299,19 @@ func (this *service) StartInstance(_ context.Context, req *pb.StartInstanceReque
 	} else {
 		return toProtoFromInstance(instance), nil
 	}
+}
+
+func (this *service) StopInstance(_ context.Context, req *pb.InstanceId) (*pb.Instance, error) {
+	this.log.Debug("<grpc.service.gaffer.StopInstance>{ req=%v }", req)
+
+	if instance := this.gaffer.GetInstanceForId(req.Id); instance == nil {
+		return nil, gopi.ErrNotFound
+	} else if err := this.gaffer.StopInstanceForId(req.Id); err != nil {
+		return nil, err
+	} else {
+		return toProtoFromInstance(instance), nil
+	}
+
 }
 
 // Set group flags

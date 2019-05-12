@@ -52,7 +52,9 @@ type gaffer struct {
 // CONSTANTS
 
 var (
-	reServiceGroupName = regexp.MustCompile("^[A-Za-z0-9][A-Za-z0-9\\-\\_\\.]*$")
+	// Group and service names must start with an alpha character to
+	// distinguish against a number
+	reServiceGroupName = regexp.MustCompile("^[A-Za-z][A-Za-z0-9\\-\\_\\.]*$")
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -353,6 +355,14 @@ func (this *gaffer) GenerateInstanceId() uint32 {
 	return this.Instances.GetUnusedIdentifier()
 }
 
+func (this *gaffer) GetInstanceForId(id uint32) rpc.GafferServiceInstance {
+	if instance := this.Instances.GetInstanceForId(id); instance != nil {
+		return instance
+	} else {
+		return nil
+	}
+}
+
 func (this *gaffer) StartInstanceForServiceName(service string, id uint32) (rpc.GafferServiceInstance, error) {
 	this.log.Debug2("<gaffer>StartInstanceForServiceName{ service=%v id=%v }", strconv.Quote(service), id)
 	if service == "" || id == 0 {
@@ -372,7 +382,20 @@ func (this *gaffer) StartInstanceForServiceName(service string, id uint32) (rpc.
 }
 
 func (this *gaffer) StopInstanceForId(id uint32) error {
-	return gopi.ErrNotImplemented
+	this.log.Debug2("<gaffer>StopInstanceForId{ id=%v }", id)
+	if id == 0 {
+		return gopi.ErrBadParameter
+	}
+
+	if instance := this.Instances.GetInstanceForId(id); instance == nil {
+		return gopi.ErrNotFound
+	} else if err := this.Instances.Stop(instance); err != nil {
+		// TODO: Check status, stop
+		return err
+	}
+
+	// Success
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////

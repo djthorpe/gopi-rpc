@@ -46,6 +46,7 @@ type Gaffer interface {
 	RemoveGroupForName(string) error
 
 	// Instances
+	GetInstanceForId(id uint32) GafferServiceInstance
 	GenerateInstanceId() uint32
 	StartInstanceForServiceName(service string, id uint32) (GafferServiceInstance, error)
 	StopInstanceForId(id uint32) error
@@ -112,6 +113,27 @@ type GafferClient interface {
 	ListServices() ([]GafferService, error)
 	ListServicesForGroup(string) ([]GafferService, error)
 	GetService(string) (GafferService, error)
+
+	// Return groups
+	ListGroups() ([]GafferServiceGroup, error)
+	ListGroupsForService(string) ([]GafferServiceGroup, error)
+	GetGroup(string) (GafferServiceGroup, error)
+
+	// Return instances
+	ListInstances() ([]GafferServiceInstance, error)
+
+	// Add services and groups
+	AddServiceForPath(path string) (GafferService, error)
+	AddGroupForName(name string) (GafferServiceGroup, error)
+
+	// Remove services and groups
+	RemoveServiceForName(name string) error
+	RemoveGroupForName(name string) error
+
+	// Start instances
+	GetInstanceId() (uint32, error)
+	StartInstance(string, uint32) (GafferServiceInstance, error)
+	StopInstance(uint32) (GafferServiceInstance, error)
 }
 
 type GafferServiceMode uint
