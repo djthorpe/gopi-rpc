@@ -266,6 +266,30 @@ func (this *Client) StopInstance(id uint32) (rpc.GafferServiceInstance, error) {
 	}
 }
 
+func (this *Client) NewTuples() rpc.GafferTuples {
+	return &pb_tuples{&pb.Tuples{
+		Tuple: make([]string, 0),
+	}}
+}
+
+func (this *Client) SetFlagsForService(service string, tuples rpc.GafferTuples) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+	return nil, gopi.ErrNotImplemented
+}
+
+func (this *Client) SetFlagsForGroup(group string, tuples rpc.GafferTuples) (rpc.GafferServiceGroup, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+	return nil, gopi.ErrNotImplemented
+}
+
+func (this *Client) SetEnvForGroup(group string, tuples rpc.GafferTuples) (rpc.GafferServiceGroup, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+	return nil, gopi.ErrNotImplemented
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 

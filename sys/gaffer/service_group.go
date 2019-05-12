@@ -173,13 +173,8 @@ func (this *Service) IsMemberOfGroup(group string) bool {
 	return false
 }
 
-func (this *Service) Flags() []string {
-	return this.Flags_.Strings()
-}
-
-func (this *Service) SetFlags(map[string]string) error {
-	// TODO
-	return gopi.ErrNotImplemented
+func (this *Service) Flags() rpc.GafferTuples {
+	return this.Flags_
 }
 
 func (this *Service) String() string {
@@ -248,33 +243,39 @@ func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path strin
 	this.Service_ = service
 	this.Path_ = path
 	this.Id_ = id
-	this.Env_ = NewTuples()
 	this.Flags_ = NewTuples()
+	this.Env_ = NewTuples()
 
 	// Copy flags from service
 	if service.Flags_ != nil {
-		for k, v := range service.Flags_.Tuples_ {
-			this.Flags_.Set(k, v)
-		}
+		this.Flags_ = service.Flags_.Copy()
 	}
 
-	// Generate the environment & flags from groups
-	for _, group := range groups {
-		if group.Flags_ != nil {
-			for k, v := range group.Flags_.Tuples_ {
-				if _, exists := this.Flags_.Tuples_[k]; exists == false {
-					this.Flags_.Set(k, v)
+	// Generate the environment & flags from groups, in order
+	// from left to right
+	/* TODO */
+	fmt.Println("TODO: GROUP FLAGS")
+	/*
+		for _, group := range groups {
+			if group.Flags_ != nil {
+				for k, v := range group.Flags_.Tuples() {
+
+					if _, exists := this.Flags_.Tuples_[k]; exists == false {
+						this.Flags_.Set(k, v)
+					}
+				}
+			}
+			if group.Env_ != nil {
+				for k, v := range group.Env_.Tuples_ {
+					if _, exists := this.Env_.Tuples_[k]; exists == false {
+						this.Env_.Set(k, v)
+					}
 				}
 			}
 		}
-		if group.Env_ != nil {
-			for k, v := range group.Env_.Tuples_ {
-				if _, exists := this.Env_.Tuples_[k]; exists == false {
-					this.Env_.Set(k, v)
-				}
-			}
-		}
-	}
+	*/
+	// TODO: Resolve environment parameters
+	// TODO: Resolve flag parameters
 
 	// Make the process
 	if process, err := NewProcess(this); err != nil {
@@ -335,6 +336,14 @@ func (this *ServiceInstance) ExitCode() int64 {
 	}
 }
 
+func (this *ServiceInstance) IsRunning() bool {
+	if this.process == nil {
+		return false
+	} else {
+		return this.process.IsRunning()
+	}
+}
+
 func (this *ServiceInstance) String() string {
 	return fmt.Sprintf("<gaffer.ServiceInstance>{ id=%v service=%v flags=%v env=%v exit_code=%v %v }", this.Id_, strconv.Quote(this.Service_.Name()), this.Flags(), this.Env(), this.ExitCode(), this.process)
 }
@@ -348,7 +357,11 @@ func NewTuples() *Tuples {
 	return this
 }
 
-func (this *Tuples) Set(key, value string) error {
+func (this *Tuples) Copy() *Tuples {
+	// TODO
+}
+
+func (this *Tuples) AddString(key, value string) error {
 	if reTupleKey.MatchString(key) == false {
 		return gopi.ErrBadParameter
 	} else {

@@ -114,6 +114,14 @@ func (this *Process) Stop() error {
 	return nil
 }
 
+func (this *Process) IsRunning() bool {
+	if this.cmd == nil || this.cmd.ProcessState == nil {
+		return false
+	} else {
+		return this.cmd.ProcessState.Exited() == false
+	}
+}
+
 func (this *Process) Id() uint32 {
 	if this.cmd != nil && this.cmd.Process != nil {
 		return uint32(this.cmd.Process.Pid)

@@ -319,12 +319,11 @@ func (this *service) StopInstance(_ context.Context, req *pb.InstanceId) (*pb.In
 func (this *service) SetGroupFlags(_ context.Context, req *pb.SetTuplesRequest) (*pb.Group, error) {
 	this.log.Debug("<grpc.service.gaffer.SetGroupFlags>{ req=%v }", req)
 
+	// TODO
 	if groups := this.gaffer.GetGroupsForNames([]string{req.Name}); len(groups) == 0 {
 		return nil, gopi.ErrNotFound
 	} else if len(groups) > 1 {
 		return nil, gopi.ErrAppError
-	} else if err := groups[0].SetFlags(req.Tuples); err != nil {
-		return nil, err
 	} else {
 		return toProtoFromGroup(groups[0]), nil
 	}
@@ -334,12 +333,11 @@ func (this *service) SetGroupFlags(_ context.Context, req *pb.SetTuplesRequest) 
 func (this *service) SetGroupEnv(_ context.Context, req *pb.SetTuplesRequest) (*pb.Group, error) {
 	this.log.Debug("<grpc.service.gaffer.SetGroupEnv>{ req=%v }", req)
 
+	// TODO
 	if groups := this.gaffer.GetGroupsForNames([]string{req.Name}); len(groups) == 0 {
 		return nil, gopi.ErrNotFound
 	} else if len(groups) > 1 {
 		return nil, gopi.ErrAppError
-	} else if err := groups[0].SetEnv(req.Tuples); err != nil {
-		return nil, err
 	} else {
 		return toProtoFromGroup(groups[0]), nil
 	}
@@ -349,10 +347,9 @@ func (this *service) SetGroupEnv(_ context.Context, req *pb.SetTuplesRequest) (*
 func (this *service) SetServiceFlags(_ context.Context, req *pb.SetTuplesRequest) (*pb.Service, error) {
 	this.log.Debug("<grpc.service.gaffer.SetServiceFlags>{ req=%v }", req)
 
+	// TODO
 	if service := this.gaffer.GetServiceForName(req.Name); service == nil {
 		return nil, gopi.ErrNotFound
-	} else if err := service.SetFlags(req.Tuples); err != nil {
-		return nil, err
 	} else {
 		return toProtoFromService(service), nil
 	}

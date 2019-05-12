@@ -45,6 +45,12 @@ type Gaffer interface {
 	SetGroupNameForName(group string, new string) error
 	RemoveGroupForName(string) error
 
+	// Tuples
+	NewTuples() GafferTuples
+	SetServiceFlagsForName(string, GafferTuples) error
+	SetGroupFlagsForName(string, GafferTuples) error
+	SetGroupEnvForName(string, GafferTuples) error
+
 	// Instances
 	GetInstanceForId(id uint32) GafferServiceInstance
 	GenerateInstanceId() uint32
@@ -65,8 +71,7 @@ type GafferService interface {
 	IdleTime() time.Duration
 
 	// Flags
-	SetFlags(map[string]string) error
-	Flags() []string
+	Flags() GafferTuples
 
 	// Groups
 	IsMemberOfGroup(string) bool
@@ -76,11 +81,9 @@ type GafferServiceGroup interface {
 	Name() string
 
 	// Flags
-	SetFlags(map[string]string) error
 	Flags() []string
 
 	// Env
-	SetEnv(map[string]string) error
 	Env() []string
 }
 
@@ -102,6 +105,14 @@ type GafferEvent interface {
 	Group() GafferServiceGroup
 	Instance() GafferServiceInstance
 	Data() []byte
+}
+
+type GafferTuples interface {
+	// Return an array of tuples in string format
+	Strings() []string
+
+	// Add tuples
+	AddString(string, string) error
 }
 
 type GafferClient interface {
@@ -138,6 +149,12 @@ type GafferClient interface {
 	GetInstanceId() (uint32, error)
 	StartInstance(string, uint32) (GafferServiceInstance, error)
 	StopInstance(uint32) (GafferServiceInstance, error)
+
+	// Tuples
+	NewTuples() GafferTuples
+	SetFlagsForService(string, GafferTuples) (GafferService, error)
+	SetFlagsForGroup(string, GafferTuples) (GafferServiceGroup, error)
+	SetEnvForGroup(string, GafferTuples) (GafferServiceGroup, error)
 }
 
 type GafferServiceMode uint

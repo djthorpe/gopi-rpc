@@ -386,13 +386,57 @@ func (this *gaffer) StopInstanceForId(id uint32) error {
 
 	if instance := this.Instances.GetInstanceForId(id); instance == nil {
 		return gopi.ErrNotFound
+	} else if instance.IsRunning() == false {
+		return gopi.ErrOutOfOrder
 	} else if err := this.Instances.Stop(instance); err != nil {
-		// TODO: Check status, stop
 		return err
 	}
 
 	// Success
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TUPLES
+
+func (this *gaffer) NewTuples() rpc.GafferTuples {
+	return NewTuples()
+}
+
+func (this *gaffer) SetServiceFlagsForName(service string, tuples rpc.GafferTuples) error {
+	this.log.Debug2("<gaffer>SetServiceFlagsForName{ service=%v tuples=%v }", strconv.Quote(service), tuples)
+	if service == "" || tuples == nil {
+		return gopi.ErrBadParameter
+	}
+	if service_ := this.config.GetServiceByName(service); service_ == nil {
+		return gopi.ErrNotFound
+	} else {
+		return nil
+	}
+}
+
+func (this *gaffer) SetGroupFlagsForName(group string, tuples rpc.GafferTuples) error {
+	this.log.Debug2("<gaffer>SetGroupFlagsForName{ group=%v tuples=%v }", strconv.Quote(group), tuples)
+	if group == "" || tuples == nil {
+		return gopi.ErrBadParameter
+	}
+	if group_ := this.config.GetGroupsByName([]string{group}); len(group_) == 0 {
+		return gopi.ErrNotFound
+	} else {
+		return nil
+	}
+}
+
+func (this *gaffer) SetGroupEnvForName(group string, tuples rpc.GafferTuples) error {
+	this.log.Debug2("<gaffer>SetGroupEnvForName{ group=%v tuples=%v }", strconv.Quote(group), tuples)
+	if group == "" || tuples == nil {
+		return gopi.ErrBadParameter
+	}
+	if group_ := this.config.GetGroupsByName([]string{group}); len(group_) == 0 {
+		return gopi.ErrNotFound
+	} else {
+		return nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -420,7 +464,9 @@ FOR_LOOP:
 	for {
 		select {
 		case evt := <-events:
-			if evt_, ok := evt.(rpc.GafferEvent); ok == false {
+			if evt == nil {
+				// Do nothing
+			} else if evt_, ok := evt.(rpc.GafferEvent); ok == false {
 				this.log.Warn("InstanceTask: Unhandled event: %v", evt)
 			} else if err := this.InstanceTaskHandler(evt_); err != nil {
 				this.log.Error("InstanceTask: %v: %v", evt, err)

@@ -93,11 +93,11 @@ message StartInstanceRequest {
 
 message SetTuplesRequest {
     string name = 1;
-    map<string,string> tuples = 2;
+    Tuples tuples = 2;
 }
 
 /////////////////////////////////////////////////////////////////////
-// SERVICES< GROUPS AND INSTANCES
+// SERVICES & GROUPS AND INSTANCES
 
 message Service {
     string name = 1;
@@ -107,7 +107,7 @@ message Service {
     uint32 instance_count = 5;
     google.protobuf.Duration run_time = 6;
     google.protobuf.Duration idle_time = 7;
-    repeated string flags = 8;
+    Tuples flags = 8;
 
     enum ServiceMode {
         NONE = 0;
@@ -130,4 +130,8 @@ message Instance {
     google.protobuf.Timestamp start_ts = 5;
     google.protobuf.Timestamp stop_ts = 6;
     int64 exit_code = 7;
+}
+
+message Tuples {
+    repeated string tuple = 1;
 }

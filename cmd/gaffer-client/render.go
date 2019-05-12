@@ -32,15 +32,20 @@ func RenderGroupList(groups []string) string {
 	return groups_
 }
 
-func RenderFlags(flags []string) string {
-	flags_ := ""
-	for i, flag := range flags {
-		if i > 0 {
-			flags_ += "\n"
+func RenderFlags(flags rpc.GafferTuples) string {
+	flags_ := flags.Strings()
+	if len(flags_) == 0 {
+		return "-"
+	} else {
+		flags__ := ""
+		for i, flag := range flags_ {
+			if i > 0 {
+				flags__ += "\n"
+			}
+			flags__ += flag
 		}
-		flags_ += flag
+		return flags__
 	}
-	return flags_
 }
 
 func RenderMode(service rpc.GafferService) string {
@@ -56,8 +61,7 @@ func RenderMode(service rpc.GafferService) string {
 
 func RenderInstanceStatus(instance rpc.GafferServiceInstance) string {
 	if instance.Start().IsZero() && instance.Stop().IsZero() {
-		// Not started or stopped
-		return "-"
+		return "Starting"
 	} else if instance.Stop().IsZero() == false {
 		// Stopped
 		return fmt.Sprintf("Exit code %v", instance.ExitCode())
@@ -99,8 +103,8 @@ func RenderGroups(fh io.Writer, groups []rpc.GafferServiceGroup) {
 	for _, group := range groups {
 		output.Append([]string{
 			"@" + group.Name(),
-			RenderFlags(group.Flags()),
-			RenderFlags(group.Env()),
+			"TODO",
+			"TODO",
 		})
 	}
 	output.Render()
@@ -113,8 +117,8 @@ func RenderInstances(fh io.Writer, instances []rpc.GafferServiceInstance) {
 		output.Append([]string{
 			fmt.Sprint(instance.Id()),
 			fmt.Sprint(instance.Service().Name()),
-			RenderFlags(instance.Flags()),
-			RenderFlags(instance.Env()),
+			"TODO",
+			"TODO",
 			RenderInstanceStatus(instance),
 		})
 	}

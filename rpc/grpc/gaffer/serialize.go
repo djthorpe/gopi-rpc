@@ -35,6 +35,10 @@ type pb_instance struct {
 	pb *pb.Instance
 }
 
+type pb_tuples struct {
+	pb *pb.Tuples
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // SERVICES
 
@@ -50,7 +54,7 @@ func toProtoFromService(service rpc.GafferService) *pb.Service {
 		InstanceCount: uint32(service.InstanceCount()),
 		RunTime:       ptypes.DurationProto(service.RunTime()),
 		IdleTime:      ptypes.DurationProto(service.IdleTime()),
-		Flags:         service.Flags(),
+		Flags:         toProtoTuples(service.Flags()),
 	}
 }
 
@@ -177,6 +181,22 @@ func fromProtoInstanceArray(instances []*pb.Instance) []rpc.GafferServiceInstanc
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// TUPLES
+
+func toProtoTuples(tuples rpc.GafferTuples) *pb.Tuples {
+	if tuples == nil {
+		return nil
+	}
+	return &pb.Tuples{
+		Tuple: tuples.Strings(),
+	}
+}
+
+func fromProtoTuples(tuples *pb.Tuples) rpc.GafferTuples {
+	return &pb_tuples{tuples}
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // SERVICE IMPLEMENTATION
 
 func (this *pb_service) Name() string {
@@ -243,11 +263,11 @@ func (this *pb_service) SetFlags(map[string]string) error {
 	return gopi.ErrNotImplemented
 }
 
-func (this *pb_service) Flags() []string {
+func (this *pb_service) Flags() rpc.GafferTuples {
 	if this.pb == nil {
 		return nil
 	} else {
-		return this.pb.Flags
+		return fromProtoTuples(this.pb.Flags)
 	}
 }
 
@@ -289,14 +309,6 @@ func (this *pb_group) Env() []string {
 	} else {
 		return this.pb.Env
 	}
-}
-
-func (this *pb_group) SetEnv(map[string]string) error {
-	return gopi.ErrNotImplemented
-}
-
-func (this *pb_group) SetFlags(map[string]string) error {
-	return gopi.ErrNotImplemented
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -359,5 +371,24 @@ func (this *pb_instance) ExitCode() int64 {
 		return 0
 	} else {
 		return this.pb.ExitCode
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TUPLES IMPLEMENTATION
+
+func (this *pb_tuples) Strings() []string {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Tuple
+	}
+}
+
+func (this *pb_tuples) AddString(key, value string) error {
+	if this.pb == nil {
+		return gopi.ErrAppError
+	} else {
+		return gopi.ErrNotImplemented
 	}
 }
