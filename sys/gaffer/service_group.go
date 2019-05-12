@@ -359,6 +359,7 @@ func NewTuples() *Tuples {
 
 func (this *Tuples) Copy() *Tuples {
 	// TODO
+	return nil
 }
 
 func (this *Tuples) AddString(key, value string) error {

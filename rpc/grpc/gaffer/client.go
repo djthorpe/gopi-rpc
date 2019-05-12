@@ -275,7 +275,15 @@ func (this *Client) NewTuples() rpc.GafferTuples {
 func (this *Client) SetFlagsForService(service string, tuples rpc.GafferTuples) (rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
-	return nil, gopi.ErrNotImplemented
+
+	if service, err := this.GafferClient.SetServiceFlags(this.NewContext(), &pb.SetTuplesRequest{
+		Name:   service,
+		Tuples: toProtoTuples(tuples),
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(service), nil
+	}
 }
 
 func (this *Client) SetFlagsForGroup(group string, tuples rpc.GafferTuples) (rpc.GafferServiceGroup, error) {
