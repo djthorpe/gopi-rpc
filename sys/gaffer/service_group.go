@@ -77,8 +77,17 @@ type ServiceInstance struct {
 	// Environment parameters for the instance
 	Env_ *Tuples `json:"env"`
 
+	// Start timestamp
+	Start_ time.Time `json:"start_ts"`
+
+	// Stop timestamp
+	Stop_ time.Time `json:"stop_ts"`
+
 	// Private members
 	process *Process
+	stdout  chan []byte
+	stderr  chan []byte
+	stop    chan error
 }
 
 type Tuples struct {
@@ -274,6 +283,10 @@ func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path strin
 		this.process = process
 	}
 
+	// Make the channels and start receiving data on them
+	this.stdout, this.stderr = make(chan []byte), make(chan []byte)
+	this.stop = make(chan error)
+
 	// Success
 	return this, nil
 }
@@ -306,8 +319,24 @@ func (this *ServiceInstance) IdleTime() time.Duration {
 	return this.Service_.IdleTime()
 }
 
+func (this *ServiceInstance) Start() time.Time {
+	return this.Start_
+}
+
+func (this *ServiceInstance) Stop() time.Time {
+	return this.Stop_
+}
+
+func (this *ServiceInstance) ExitCode() int64 {
+	if this.process == nil {
+		return 0
+	} else {
+		return this.process.ExitCode()
+	}
+}
+
 func (this *ServiceInstance) String() string {
-	return fmt.Sprintf("<gaffer.ServiceInstance>{ id=%v service=%v flags=%v env=%v process=%v }", this.Id_, strconv.Quote(this.Service_.Name()), this.Flags(), this.Env(), this.process)
+	return fmt.Sprintf("<gaffer.ServiceInstance>{ id=%v service=%v flags=%v env=%v exit_code=%v %v }", this.Id_, strconv.Quote(this.Service_.Name()), this.Flags(), this.Env(), this.ExitCode(), this.process)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

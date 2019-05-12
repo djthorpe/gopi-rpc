@@ -155,21 +155,35 @@ func (this *Instances) DeleteInstance(instance *ServiceInstance) error {
 	}
 }
 
-func (this *Instances) Start(instance *ServiceInstance, stdout, stderr chan<- []byte) error {
+func (this *Instances) Start(instance *ServiceInstance, ch chan<- rpc.GafferEvent) error {
 	this.log.Debug2("<gaffer.instances.Start>{ instance=%v }", instance)
 	this.Lock()
 	defer this.Unlock()
 
 	// Check parameters
-	if instance == nil || stdout == nil || stderr == nil {
+	if instance == nil {
 		return gopi.ErrBadParameter
 	}
 
-	if err := instance.process.Start(stdout, stderr); err != nil {
+	if err := instance.process.Start(instance.stdout, instance.stderr, instance.stop); err != nil {
 		return err
-	} else {
-		return nil
 	}
+
+	// Start goroutines for receiving data from stdout and stderr
+	go this.processLog(instance, instance.stdout, rpc.GAFFER_EVENT_LOG_STDOUT, ch)
+	go this.processLog(instance, instance.stderr, rpc.GAFFER_EVENT_LOG_STDERR, ch)
+	go this.processStop(instance, instance.stop, ch)
+
+	if ch != nil {
+		// Send start signal
+		ch <- NewEventWithInstance(nil, rpc.GAFFER_EVENT_INSTANCE_RUN, instance)
+	}
+
+	// Set start
+	instance.Start_ = time.Now()
+
+	// Return success
+	return nil
 }
 
 func (this *Instances) Stop(instance *ServiceInstance) error {
@@ -305,6 +319,37 @@ func (this *Instances) IsUnusedIdentifier(id uint32) bool {
 		return false
 	} else {
 		return true
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PROCESS LOGS AND STOP SIGNAL
+
+func (this *Instances) processLog(instance *ServiceInstance, in <-chan []byte, t rpc.GafferEventType, out chan<- rpc.GafferEvent) {
+	for {
+		if buf := <-in; buf == nil {
+			break
+		} else {
+			out <- NewEventWithInstanceData(nil, t, instance, buf)
+		}
+	}
+}
+
+func (this *Instances) processStop(instance *ServiceInstance, in <-chan error, out chan<- rpc.GafferEvent) {
+	for {
+		if err := <-in; err == nil {
+			break
+		} else if err == ErrSuccess {
+			// Set stop
+			instance.Stop_ = time.Now()
+			// Emit stop event
+			out <- NewEventWithInstance(nil, rpc.GAFFER_EVENT_INSTANCE_STOP_OK, instance)
+		} else {
+			// Set stop
+			instance.Stop_ = time.Now()
+			// Emit stop event
+			out <- NewEventWithInstanceData(nil, rpc.GAFFER_EVENT_INSTANCE_STOP_ERROR, instance, []byte(err.Error()))
+		}
 	}
 }
 

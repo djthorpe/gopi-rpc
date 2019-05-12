@@ -11,6 +11,7 @@ package gaffer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -367,7 +368,11 @@ FOR_LOOP:
 	for {
 		select {
 		case evt := <-events:
-			fmt.Println(evt)
+			if evt_, ok := evt.(rpc.GafferEvent); ok {
+				this.EventPrint(evt_)
+			} else {
+				this.log.Warn("Ignoring: %v", evt)
+			}
 		case <-stop:
 			break FOR_LOOP
 		}
@@ -377,4 +382,14 @@ FOR_LOOP:
 
 	// Success
 	return nil
+}
+
+func (this *service) EventPrint(evt rpc.GafferEvent) {
+	switch evt.Type() {
+	case rpc.GAFFER_EVENT_LOG_STDERR, rpc.GAFFER_EVENT_LOG_STDOUT:
+		line := strings.Trim(string(evt.Data()), "\n")
+		this.log.Info("%v[%v]: %v", evt.Service().Name(), evt.Instance().Id(), line)
+	default:
+		this.log.Info("%v", evt)
+	}
 }

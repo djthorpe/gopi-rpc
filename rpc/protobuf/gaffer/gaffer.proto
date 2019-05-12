@@ -3,6 +3,7 @@ package gopi;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
 // The gaffer service definition
 service Gaffer {
@@ -126,4 +127,7 @@ message Instance {
     Service service = 2;
     repeated string flags = 3;
     repeated string env = 4;
+    google.protobuf.Timestamp start_ts = 5;
+    google.protobuf.Timestamp stop_ts = 6;
+    int64 exit_code = 7;
 }

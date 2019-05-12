@@ -11,6 +11,7 @@ package gaffer
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -29,6 +30,13 @@ type Process struct {
 	stdout, stderr io.ReadCloser
 	start, stop    time.Time
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// CONSTANTS
+
+var (
+	ErrSuccess = errors.New("No Error")
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // NEW
@@ -62,7 +70,7 @@ func NewProcess(instance *ServiceInstance) (*Process, error) {
 ////////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
-func (this *Process) Start(stdout, stderr chan<- []byte) error {
+func (this *Process) Start(stdout, stderr chan<- []byte, stop chan<- error) error {
 	this.Lock()
 	defer this.Unlock()
 
@@ -72,6 +80,16 @@ func (this *Process) Start(stdout, stderr chan<- []byte) error {
 	if err := this.cmd.Start(); err != nil {
 		return err
 	}
+
+	// Call wait in the background, which then returns the error
+	go func() {
+		if err := this.cmd.Wait(); err != nil {
+			stop <- err
+		} else {
+			stop <- ErrSuccess
+		}
+		close(stop)
+	}()
 
 	// Start logging to channels
 	go ProcessLogger(this.stdout, stdout)
@@ -142,7 +160,8 @@ func ProcessLogger(fh io.Reader, c chan<- []byte) error {
 			c <- line
 		}
 	}
-	// Close channel and return success
+	// Close channel to quit parent goroutine
 	close(c)
+	// Return after channel closed
 	return nil
 }

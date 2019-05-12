@@ -39,13 +39,12 @@ type Gaffer struct {
 
 type gaffer struct {
 	log gopi.Logger
+	evt chan rpc.GafferEvent
 
 	config
 	Instances
 	event.Publisher
 	event.Tasks
-
-	stdout, stderr chan []byte
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,6 +65,7 @@ func (config Gaffer) Open(logger gopi.Logger) (gopi.Driver, error) {
 
 	this := new(gaffer)
 	this.log = logger
+	this.evt = make(chan rpc.GafferEvent)
 
 	if err := this.config.Init(config, logger); err != nil {
 		logger.Debug2("Config.Init returned nil")
@@ -75,8 +75,6 @@ func (config Gaffer) Open(logger gopi.Logger) (gopi.Driver, error) {
 		logger.Debug2("Instances.Init returned nil")
 		return nil, err
 	}
-
-	this.stdout, this.stderr = make(chan []byte), make(chan []byte)
 
 	// Start background task which starts and stops instances
 	this.Tasks.Start(this.InstanceTask, this.LoggingTask)
@@ -97,6 +95,9 @@ func (this *gaffer) Close() error {
 		return err
 	}
 
+	// Close channels
+	close(this.evt)
+
 	// Release resources, etc
 	if err := this.Instances.Destroy(); err != nil {
 		return err
@@ -104,10 +105,6 @@ func (this *gaffer) Close() error {
 	if err := this.config.Destroy(); err != nil {
 		return err
 	}
-
-	// Close channels
-	close(this.stderr)
-	close(this.stdout)
 
 	// Return success
 	return nil
@@ -446,7 +443,7 @@ func (this *gaffer) InstanceTaskHandler(evt rpc.GafferEvent) error {
 			return gopi.ErrBadParameter
 		} else if instance_, ok := instance.(*ServiceInstance); ok == false {
 			return gopi.ErrBadParameter
-		} else if err := this.Instances.Start(instance_, this.stdout, this.stderr); err != nil {
+		} else if err := this.Instances.Start(instance_, this.evt); err != nil {
 			return err
 		}
 	}
@@ -459,10 +456,8 @@ func (this *gaffer) LoggingTask(start chan<- event.Signal, stop <-chan event.Sig
 FOR_LOOP:
 	for {
 		select {
-		case stdout := <-this.stdout:
-			fmt.Printf("STDOUT: %v\n", stdout)
-		case stderr := <-this.stderr:
-			fmt.Printf("STDERR: %v\n", stderr)
+		case evt := <-this.evt:
+			this.Emit(evt)
 		case <-stop:
 			break FOR_LOOP
 		}

@@ -54,6 +54,22 @@ func RenderMode(service rpc.GafferService) string {
 	}
 }
 
+func RenderInstanceStatus(instance rpc.GafferServiceInstance) string {
+	if instance.Start().IsZero() && instance.Stop().IsZero() {
+		// Not started or stopped
+		return "-"
+	} else if instance.Stop().IsZero() == false {
+		// Stopped
+		return fmt.Sprintf("Exit code %v", instance.ExitCode())
+	} else if instance.Start().IsZero() == false {
+		dur := time.Now().Sub(instance.Start()).Truncate(time.Minute)
+		return fmt.Sprintf("Running %dm", uint(dur.Minutes()))
+	}
+
+	// Unhandled status
+	return "??"
+}
+
 func RenderDuration(duration time.Duration) string {
 	if duration == 0 {
 		return "-"
@@ -92,13 +108,14 @@ func RenderGroups(fh io.Writer, groups []rpc.GafferServiceGroup) {
 
 func RenderInstances(fh io.Writer, instances []rpc.GafferServiceInstance) {
 	output := tablewriter.NewWriter(fh)
-	output.SetHeader([]string{"INSTANCE", "SERVICE", "FLAGS", "ENV"})
+	output.SetHeader([]string{"INSTANCE", "SERVICE", "FLAGS", "ENV", "STATUS"})
 	for _, instance := range instances {
 		output.Append([]string{
 			fmt.Sprint(instance.Id()),
 			fmt.Sprint(instance.Service().Name()),
 			RenderFlags(instance.Flags()),
 			RenderFlags(instance.Env()),
+			RenderInstanceStatus(instance),
 		})
 	}
 	output.Render()

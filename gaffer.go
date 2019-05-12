@@ -89,6 +89,9 @@ type GafferServiceInstance interface {
 	Service() GafferService
 	Flags() []string
 	Env() []string
+	Start() time.Time
+	Stop() time.Time
+	ExitCode() int64
 }
 
 type GafferEvent interface {
@@ -98,6 +101,7 @@ type GafferEvent interface {
 	Service() GafferService
 	Group() GafferServiceGroup
 	Instance() GafferServiceInstance
+	Data() []byte
 }
 
 type GafferClient interface {
@@ -158,6 +162,13 @@ const (
 	GAFFER_EVENT_GROUP_CHANGE
 	GAFFER_EVENT_GROUP_REMOVE
 	GAFFER_EVENT_INSTANCE_ADD
+	GAFFER_EVENT_INSTANCE_START
+	GAFFER_EVENT_INSTANCE_RUN
+	GAFFER_EVENT_INSTANCE_STOP_OK
+	GAFFER_EVENT_INSTANCE_STOP_ERROR
+	GAFFER_EVENT_INSTANCE_STOP_ZOMBIE
+	GAFFER_EVENT_LOG_STDOUT
+	GAFFER_EVENT_LOG_STDERR
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -190,6 +201,20 @@ func (t GafferEventType) String() string {
 		return "GAFFER_EVENT_GROUP_REMOVE"
 	case GAFFER_EVENT_INSTANCE_ADD:
 		return "GAFFER_EVENT_INSTANCE_ADD"
+	case GAFFER_EVENT_LOG_STDOUT:
+		return "GAFFER_EVENT_LOG_STDOUT"
+	case GAFFER_EVENT_LOG_STDERR:
+		return "GAFFER_EVENT_LOG_STDERR"
+	case GAFFER_EVENT_INSTANCE_START:
+		return "GAFFER_EVENT_INSTANCE_START"
+	case GAFFER_EVENT_INSTANCE_RUN:
+		return "GAFFER_EVENT_INSTANCE_RUN"
+	case GAFFER_EVENT_INSTANCE_STOP_OK:
+		return "GAFFER_EVENT_INSTANCE_STOP_OK"
+	case GAFFER_EVENT_INSTANCE_STOP_ERROR:
+		return "GAFFER_EVENT_INSTANCE_STOP_ERROR"
+	case GAFFER_EVENT_INSTANCE_STOP_ZOMBIE:
+		return "GAFFER_EVENT_INSTANCE_STOP_ZOMBIE"
 	default:
 		return "[?? Invalid GafferEventType value]"
 	}

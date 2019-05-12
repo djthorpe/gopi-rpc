@@ -131,11 +131,20 @@ func toProtoFromInstance(instance rpc.GafferServiceInstance) *pb.Instance {
 	if instance == nil {
 		return nil
 	}
-	return &pb.Instance{
-		Id:      instance.Id(),
-		Service: toProtoFromService(instance.Service()),
-		Flags:   instance.Flags(),
-		Env:     instance.Env(),
+	if start_ts, err := ptypes.TimestampProto(instance.Start()); err != nil {
+		return nil
+	} else if stop_ts, err := ptypes.TimestampProto(instance.Stop()); err != nil {
+		return nil
+	} else {
+		return &pb.Instance{
+			Id:       instance.Id(),
+			Service:  toProtoFromService(instance.Service()),
+			Flags:    instance.Flags(),
+			Env:      instance.Env(),
+			StartTs:  start_ts,
+			StopTs:   stop_ts,
+			ExitCode: instance.ExitCode(),
+		}
 	}
 }
 
@@ -322,5 +331,33 @@ func (this *pb_instance) Env() []string {
 		return nil
 	} else {
 		return this.pb.Env
+	}
+}
+
+func (this *pb_instance) Start() time.Time {
+	if this.pb == nil {
+		return time.Time{}
+	} else if ts, err := ptypes.Timestamp(this.pb.StartTs); err != nil {
+		return time.Time{}
+	} else {
+		return ts
+	}
+}
+
+func (this *pb_instance) Stop() time.Time {
+	if this.pb == nil {
+		return time.Time{}
+	} else if ts, err := ptypes.Timestamp(this.pb.StopTs); err != nil {
+		return time.Time{}
+	} else {
+		return ts
+	}
+}
+
+func (this *pb_instance) ExitCode() int64 {
+	if this.pb == nil {
+		return 0
+	} else {
+		return this.pb.ExitCode
 	}
 }
