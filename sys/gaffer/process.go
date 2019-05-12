@@ -60,24 +60,6 @@ func NewProcess(instance *ServiceInstance) (*Process, error) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// PROCESS LOG FILES
-
-func ProcessLogger(fh io.Reader, c chan<- []byte) error {
-	buf := bufio.NewReader(fh)
-	for {
-		if line, err := buf.ReadBytes('\n'); err == io.EOF {
-			break
-		} else {
-			c <- line
-		}
-	}
-
-	// Close channel and return success
-	close(c)
-	return nil
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
 func (this *Process) Start(stdout, stderr chan<- []byte) error {
@@ -146,4 +128,21 @@ func ctxForTimeout(timeout time.Duration) (context.Context, context.CancelFunc) 
 	} else {
 		return context.WithTimeout(context.Background(), timeout)
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PROCESS LOG FILES
+
+func ProcessLogger(fh io.Reader, c chan<- []byte) error {
+	buf := bufio.NewReader(fh)
+	for {
+		if line, err := buf.ReadBytes('\n'); err == io.EOF {
+			break
+		} else {
+			c <- line
+		}
+	}
+	// Close channel and return success
+	close(c)
+	return nil
 }

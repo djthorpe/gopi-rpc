@@ -56,6 +56,7 @@ func (config Service) Open(log gopi.Logger) (gopi.Driver, error) {
 	// Register service with GRPC server
 	pb.RegisterGafferServer(config.Server.(grpc.GRPCServer).GRPCServer(), this)
 
+	// Start background task which reports on all events (for debugging)
 	this.Tasks.Start(this.EventTask)
 
 	// Success

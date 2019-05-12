@@ -29,6 +29,7 @@ func init() {
 		},
 	})
 
+	// Client
 	gopi.RegisterModule(gopi.Module{
 		Name:     "rpc/helloworld:client",
 		Type:     gopi.MODULE_TYPE_CLIENT,

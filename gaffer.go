@@ -99,6 +99,21 @@ type GafferEvent interface {
 	Instance() GafferServiceInstance
 }
 
+type GafferClient interface {
+	gopi.RPCClient
+
+	// Ping remote microservice
+	Ping() error
+
+	// Return list of executables which can be used as microservices
+	ListExecutables() ([]string, error)
+
+	// Return services
+	ListServices() ([]GafferService, error)
+	ListServicesForGroup(string) ([]GafferService, error)
+	GetService(string) (GafferService, error)
+}
+
 type GafferServiceMode uint
 
 type GafferEventType uint

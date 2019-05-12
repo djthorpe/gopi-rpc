@@ -43,6 +43,9 @@ type gaffer struct {
 	config
 	Instances
 	event.Publisher
+	event.Tasks
+
+	stdout, stderr chan []byte
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +74,11 @@ func (config Gaffer) Open(logger gopi.Logger) (gopi.Driver, error) {
 		return nil, err
 	}
 
+	this.stdout, this.stderr = make(chan []byte), make(chan []byte)
+
+	// Start background task which starts and stops instances
+	this.Tasks.Start(this.InstanceTask, this.LoggingTask)
+
 	// Success
 	return this, nil
 }
@@ -82,6 +90,11 @@ func (this *gaffer) Close() error {
 	// Unsubscribe subscribers
 	this.Publisher.Close()
 
+	// Stop background tasks
+	if err := this.Tasks.Close(); err != nil {
+		return err
+	}
+
 	// Release resources, etc
 	if err := this.Instances.Destroy(); err != nil {
 		return err
@@ -89,6 +102,10 @@ func (this *gaffer) Close() error {
 	if err := this.config.Destroy(); err != nil {
 		return err
 	}
+
+	// Close channels
+	close(this.stderr)
+	close(this.stdout)
 
 	// Return success
 	return nil
@@ -344,9 +361,12 @@ func (this *gaffer) StartInstanceForServiceName(service string, id uint32) (rpc.
 		return nil, gopi.ErrNotFound
 	} else if groups := this.config.GetGroupsByName(service_.Groups_); groups == nil {
 		return nil, gopi.ErrBadParameter
-	} else if instance, err := this.Instances.NewInstance(id, service_, groups); err != nil {
+	} else if root, err := this.Root(); err != nil {
+		return nil, err
+	} else if instance, err := this.Instances.NewInstance(id, service_, groups, root); err != nil {
 		return nil, err
 	} else {
+		this.EmitInstance(rpc.GAFFER_EVENT_INSTANCE_ADD, instance)
 		return instance, nil
 	}
 }
@@ -368,4 +388,63 @@ func (this *gaffer) EmitGroup(t rpc.GafferEventType, group rpc.GafferServiceGrou
 
 func (this *gaffer) EmitInstance(t rpc.GafferEventType, instance rpc.GafferServiceInstance) {
 	this.Emit(NewEventWithInstance(this, t, instance))
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// BACKGROUND TASKS
+
+func (this *gaffer) InstanceTask(start chan<- event.Signal, stop <-chan event.Signal) error {
+	start <- gopi.DONE
+	events := this.Subscribe()
+FOR_LOOP:
+	for {
+		select {
+		case evt := <-events:
+			if evt_, ok := evt.(rpc.GafferEvent); ok == false {
+				this.log.Warn("InstanceTask: Unhandled event: %v", evt)
+			} else if err := this.InstanceTaskHandler(evt_); err != nil {
+				this.log.Error("InstanceTask: %v: %v", evt, err)
+			}
+		case <-stop:
+			break FOR_LOOP
+		}
+	}
+
+	this.Unsubscribe(events)
+
+	// Success
+	return nil
+}
+
+func (this *gaffer) InstanceTaskHandler(evt rpc.GafferEvent) error {
+	switch evt.Type() {
+	case rpc.GAFFER_EVENT_INSTANCE_ADD:
+		if instance := evt.Instance(); instance == nil {
+			return gopi.ErrBadParameter
+		} else if instance_, ok := instance.(*ServiceInstance); ok == false {
+			return gopi.ErrBadParameter
+		} else if err := this.Instances.Start(instance_, this.stdout, this.stderr); err != nil {
+			return err
+		}
+	}
+	// Return success
+	return nil
+}
+
+func (this *gaffer) LoggingTask(start chan<- event.Signal, stop <-chan event.Signal) error {
+	start <- gopi.DONE
+FOR_LOOP:
+	for {
+		select {
+		case stdout := <-this.stdout:
+			fmt.Printf("STDOUT: %v\n", stdout)
+		case stderr := <-this.stderr:
+			fmt.Printf("STDERR: %v\n", stderr)
+		case <-stop:
+			break FOR_LOOP
+		}
+	}
+
+	// Success
+	return nil
 }

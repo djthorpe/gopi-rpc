@@ -9,13 +9,23 @@
 package gaffer
 
 import (
+	"time"
+
 	"github.com/golang/protobuf/ptypes"
 	// Frameworks
+	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/gaffer"
 )
+
+////////////////////////////////////////////////////////////////////////////////
+// TYPES
+
+type pb_service struct {
+	pb *pb.Service
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Services
@@ -45,6 +55,21 @@ func toProtoFromServiceArray(services []rpc.GafferService, filter func(rpc.Gaffe
 		if filter == nil || filter(service) {
 			services_ = append(services_, toProtoFromService(service))
 		}
+	}
+	return services_
+}
+
+func fromProtoService(service *pb.Service) rpc.GafferService {
+	return &pb_service{service}
+}
+
+func fromProtoServiceArray(services []*pb.Service) []rpc.GafferService {
+	if services == nil {
+		return nil
+	}
+	services_ := make([]rpc.GafferService, len(services))
+	for i, service := range services {
+		services_[i] = fromProtoService(service)
 	}
 	return services_
 }
@@ -102,4 +127,92 @@ func toProtoFromInstanceArray(instances []rpc.GafferServiceInstance, filter func
 		}
 	}
 	return instances_
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SERVICE IMPLEMENTATION
+
+func (this *pb_service) Name() string {
+	if this.pb == nil {
+		return ""
+	} else {
+		return this.pb.Name
+	}
+}
+
+func (this *pb_service) Path() string {
+	if this.pb == nil {
+		return ""
+	} else {
+		return this.pb.Path
+	}
+}
+
+func (this *pb_service) Groups() []string {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Groups
+	}
+}
+
+func (this *pb_service) Mode() rpc.GafferServiceMode {
+	if this.pb == nil {
+		return rpc.GAFFER_MODE_NONE
+	} else {
+		return rpc.GafferServiceMode(this.pb.Mode)
+	}
+}
+
+func (this *pb_service) InstanceCount() uint {
+	if this.pb == nil {
+		return 0
+	} else {
+		return uint(this.pb.InstanceCount)
+	}
+}
+
+func (this *pb_service) RunTime() time.Duration {
+	if this.pb == nil {
+		return 0
+	} else if duration, err := ptypes.Duration(this.pb.RunTime); err != nil {
+		return 0
+	} else {
+		return duration
+	}
+}
+
+func (this *pb_service) IdleTime() time.Duration {
+	if this.pb == nil {
+		return 0
+	} else if duration, err := ptypes.Duration(this.pb.IdleTime); err != nil {
+		return 0
+	} else {
+		return duration
+	}
+}
+
+func (this *pb_service) SetFlags(map[string]string) error {
+	return gopi.ErrNotImplemented
+}
+
+func (this *pb_service) Flags() []string {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Flags
+	}
+}
+
+func (this *pb_service) IsMemberOfGroup(group string) bool {
+	if this.pb == nil {
+		return false
+	} else {
+		for _, group_ := range this.pb.Groups {
+			if group == group_ {
+				return true
+			}
+		}
+		return false
+	}
 }

@@ -11,6 +11,8 @@ package gaffer
 import (
 	"fmt"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -89,7 +91,7 @@ func (this *Instances) Destroy() error {
 ////////////////////////////////////////////////////////////////////////////////
 // CREATE INSTANCE WITH ID
 
-func (this *Instances) NewInstance(id uint32, service *Service, groups []*ServiceGroup) (*ServiceInstance, error) {
+func (this *Instances) NewInstance(id uint32, service *Service, groups []*ServiceGroup, root string) (*ServiceInstance, error) {
 	this.log.Debug2("<gaffer.instances.NewInstance>{ id=%v service=%v groups=%v }", id, service, groups)
 	// Check incoming parameters
 	if id == 0 || service == nil {
@@ -109,8 +111,18 @@ func (this *Instances) NewInstance(id uint32, service *Service, groups []*Servic
 	this.Lock()
 	defer this.Unlock()
 
+	// Obtain path to the executable
+	path := filepath.Join(root, service.Path())
+	if stat, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, gopi.ErrNotFound
+	} else if stat.Mode().IsRegular() == false {
+		return nil, fmt.Errorf("Not a regular file: %v", service.Path())
+	} else if isExecutableFileAtPath(path) != nil {
+		return nil, fmt.Errorf("Not an executable file: %v", service.Path())
+	}
+
 	// Create instance
-	if instance, err := NewInstance(id, service, groups); err != nil {
+	if instance, err := NewInstance(id, service, groups, path); err != nil {
 		return nil, err
 	} else if instance == nil {
 		return nil, gopi.ErrAppError
@@ -151,7 +163,11 @@ func (this *Instances) Start(instance *ServiceInstance, stdout, stderr chan<- []
 		return gopi.ErrBadParameter
 	}
 
-	return gopi.ErrNotFound
+	if err := instance.process.Start(stdout, stderr); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

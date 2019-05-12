@@ -9,46 +9,79 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"os"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
-	_ "github.com/djthorpe/gopi-rpc/sys/gaffer"
+	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
+	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi/sys/logger"
+
+	// Services
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/gaffer"
 )
 
+////////////////////////////////////////////////////////////////////////////////
+
+func Conn(app *gopi.AppInstance) (gopi.RPCServiceRecord, error) {
+	addr, _ := app.AppFlags.GetString("addr")
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+
+	if addr == "" {
+		if addr_, _, _, err := app.Service(); err != nil {
+			return nil, err
+		} else {
+			addr = addr_
+		}
+	}
+
+	if _, _, err := net.SplitHostPort(addr); err == nil {
+		if service, err := pool.Lookup(ctx, "", addr, 1); err != nil {
+			return nil, err
+		} else {
+			return service[0], nil
+		}
+	} else if service, err := pool.Lookup(ctx, fmt.Sprintf("_%v._tcp", addr), "", 1); err != nil {
+		return nil, err
+	} else {
+		return service[0], nil
+	}
+}
+
+func Stub(app *gopi.AppInstance, sr gopi.RPCServiceRecord) (rpc.GafferClient, error) {
+	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+	if sr == nil || pool == nil {
+		return nil, gopi.ErrBadParameter
+	} else if conn, err := pool.Connect(sr, 0); err != nil {
+		return nil, err
+	} else if stub := pool.NewClient("gopi.Gaffer", conn); stub == nil {
+		return nil, gopi.ErrBadParameter
+	} else if stub_, ok := stub.(rpc.GafferClient); ok == false {
+		return nil, fmt.Errorf("Stub is not an rpc.GafferClient")
+	} else if err := stub_.Ping(); err != nil {
+		return nil, err
+	} else {
+		return stub_, nil
+	}
+}
+
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
-	gaffer := app.ModuleInstance("gaffer").(rpc.Gaffer)
-
-	groups := []string{"prod", "dev", "staging"}
-	for _, name := range groups {
-		if group, err := gaffer.AddGroupForName(name); err != nil {
-			app.Logger.Warn("%v: %v", name, err)
-		} else {
-			app.Logger.Info("%v: %v", name, group)
-		}
+	if record, err := Conn(app); err != nil {
+		return err
+	} else if client, err := Stub(app, record); err != nil {
+		return err
+	} else if err := Run(app, client); err != nil {
+		return err
 	}
-
-	for _, exec := range gaffer.Executables(true) {
-		if service, err := gaffer.AddServiceForPath(exec); err != nil {
-			app.Logger.Warn("%v: %v", exec, err)
-		} else {
-			app.Logger.Info("%v: %v", exec, service)
-		}
-	}
-
-	for _, name := range groups {
-		if err := gaffer.RemoveGroupForName(name); err != nil {
-			app.Logger.Warn("%v: %v", name, err)
-		}
-	}
-
-	app.Logger.Info("Waiting for CTRL+C")
-	app.WaitForSignal()
-	done <- gopi.DONE
 
 	// Success
 	return nil
@@ -58,7 +91,10 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("gaffer")
+	config := gopi.NewAppConfig("rpc/gaffer:client", "discovery")
+
+	// Set flags
+	config.AppFlags.FlagString("addr", "", "Service name or gateway address")
 
 	// Run the command line tool
 	os.Exit(gopi.CommandLineTool2(config, Main))

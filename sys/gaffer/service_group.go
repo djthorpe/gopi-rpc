@@ -65,6 +65,9 @@ type ServiceInstance struct {
 	// Id is unique identifier for the service
 	Id_ uint32 `json:"id"`
 
+	// Path to executable
+	Path_ string `json:"path"`
+
 	// Service
 	Service_ *Service `json:"service"`
 
@@ -225,7 +228,7 @@ func (this *ServiceGroup) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // INSTANCE IMPLEMENTATION
 
-func NewInstance(id uint32, service *Service, groups []*ServiceGroup) (*ServiceInstance, error) {
+func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path string) (*ServiceInstance, error) {
 	// Check parameters
 	if id == 0 || service == nil {
 		return nil, gopi.ErrBadParameter
@@ -234,6 +237,7 @@ func NewInstance(id uint32, service *Service, groups []*ServiceGroup) (*ServiceI
 	// Create the instance
 	this := new(ServiceInstance)
 	this.Service_ = service
+	this.Path_ = path
 	this.Id_ = id
 	this.Env_ = NewTuples()
 	this.Flags_ = NewTuples()
@@ -283,7 +287,7 @@ func (this *ServiceInstance) Service() rpc.GafferService {
 }
 
 func (this *ServiceInstance) Path() string {
-	return this.Service_.Path()
+	return this.Path_
 }
 
 func (this *ServiceInstance) Flags() []string {
