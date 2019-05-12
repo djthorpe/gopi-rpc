@@ -133,5 +133,10 @@ message Instance {
 }
 
 message Tuples {
-    repeated string tuple = 1;
+    repeated Tuple tuples = 1;
+}
+
+message Tuple {
+    string key = 1;
+    string value = 2;
 }

@@ -9,6 +9,8 @@
 package gaffer
 
 import (
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -187,9 +189,7 @@ func toProtoTuples(tuples rpc.GafferTuples) *pb.Tuples {
 	if tuples == nil {
 		return nil
 	}
-	return &pb.Tuples{
-		Tuple: tuples.Strings(),
-	}
+	return &pb.Tuples{}
 }
 
 func fromProtoTuples(tuples *pb.Tuples) rpc.GafferTuples {
@@ -381,7 +381,11 @@ func (this *pb_tuples) Strings() []string {
 	if this.pb == nil {
 		return nil
 	} else {
-		return this.pb.Tuple
+		reply := make([]string, len(this.pb.Tuples))
+		for i, tuple := range this.pb.Tuples {
+			reply[i] = fmt.Sprintf("%v=%v", tuple.Key, tuple.Value)
+		}
+		return reply
 	}
 }
 
@@ -389,6 +393,14 @@ func (this *pb_tuples) AddString(key, value string) error {
 	if this.pb == nil {
 		return gopi.ErrAppError
 	} else {
-		return gopi.ErrNotImplemented
+		// Check to make sure tuple is not added
+		for _, tuple := range this.pb.Tuples {
+			if key == tuple.Key {
+				return fmt.Errorf("Key exists: %v", strconv.Quote(key))
+			}
+		}
+		// Add tuple
+		this.pb.Tuples = append(this.pb.Tuples, &pb.Tuple{Key: key, Value: value})
+		return nil
 	}
 }

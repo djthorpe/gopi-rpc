@@ -268,7 +268,7 @@ func (this *Client) StopInstance(id uint32) (rpc.GafferServiceInstance, error) {
 
 func (this *Client) NewTuples() rpc.GafferTuples {
 	return &pb_tuples{&pb.Tuples{
-		Tuple: make([]string, 0),
+		Tuples: make([]*pb.Tuple, 0),
 	}}
 }
 

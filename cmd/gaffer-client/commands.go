@@ -218,6 +218,7 @@ func SetFlags(args []string, client rpc.GafferClient) error {
 	if len(args) <= 2 {
 		return gopi.ErrBadParameter
 	}
+
 	if service_group := args[1]; reServiceName.MatchString(service_group) {
 		if tuples, err := Tuples(client, args[2:], true); err != nil {
 			return err
@@ -274,8 +275,6 @@ func Tuples(client rpc.GafferClient, args []string, flag bool) (rpc.GafferTuples
 }
 
 func TupleConv(value string) (string, error) {
-	fmt.Println(value)
-
 	if value_int, err := strconv.ParseInt(value, 10, 64); err == nil {
 		return fmt.Sprint(value_int), nil
 	}
@@ -288,10 +287,8 @@ func TupleConv(value string) (string, error) {
 	if value_duration, err := time.ParseDuration(value); err == nil {
 		return fmt.Sprint(value_duration), nil
 	}
-	if value_string, err := strconv.Unquote(value); err == nil {
-		return value_string, nil
-	}
-	return "", fmt.Errorf("Syntax error: %v", strconv.Quote(value))
+	// We assume it's a string at this point
+	return value, nil
 }
 
 func Run(app *gopi.AppInstance, client rpc.GafferClient) error {
