@@ -15,7 +15,7 @@ jobs:
             chmod +x /tmp/bin/protoc
             echo 'export PATH=/tmp/bin:$PATH' >> $BASH_ENV
             source $BASH_ENV
-            echo $PATH        
       - run: go get -u github.com/golang/protobuf/protoc-gen-go
       - run: make test
-
+      - run: make install
+  

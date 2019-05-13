@@ -272,51 +272,6 @@ func Test_Gaffer_Groups_014(t *testing.T) {
 			_ = gaffer_.(rpc.Gaffer)
 		} else if group, err := gaffer.AddGroupForName("test"); err != nil {
 			t.Errorf("AddGroupForName: %v", err)
-		} else if len(group.Flags()) != 0 {
-			t.Errorf("Expected len(flags) == 0")
-		} else if err := group.SetFlag("key", "value"); err != nil {
-			t.Errorf("SetFlag: %v", err)
-		} else if flags := group.Flags(); len(flags) != 1 {
-			t.Errorf("Expected len(flags) == 1")
-		} else if flags[0] != "key=\"value\"" {
-			t.Errorf("Unexpected flags, %v", flags)
-		} else if err := group.SetFlag("key", "value2"); err != nil {
-			t.Errorf("SetFlag: %v", err)
-		} else if flags := group.Flags(); len(flags) != 1 {
-			t.Errorf("Expected len(flags) == 1")
-		} else if flags[0] != "key=\"value2\"" {
-			t.Errorf("Unexpected flags, %v", flags)
-		} else {
-			t.Log(group)
-		}
-	}
-}
-
-func Test_Gaffer_Groups_014(t *testing.T) {
-	log, _ := gopi.Open(logger.Config{Level: logger.LOG_DEBUG2}, nil)
-	if gaffer_, err := gopi.Open(gaffer.Gaffer{}, log.(gopi.Logger)); err != nil {
-		t.Fatal(err)
-	} else {
-		defer gaffer_.Close()
-		if gaffer, ok := gaffer_.(rpc.Gaffer); ok == false {
-			t.Error("Cannot cast to rpc.Gaffer interface")
-			_ = gaffer_.(rpc.Gaffer)
-		} else if group, err := gaffer.AddGroupForName("test"); err != nil {
-			t.Errorf("AddGroupForName: %v", err)
-		} else if len(group.Flags()) != 0 {
-			t.Errorf("Expected len(flags) == 0")
-		} else if err := group.SetFlag("key", "value"); err != nil {
-			t.Errorf("SetFlag: %v", err)
-		} else if flags := group.Flags(); len(flags) != 1 {
-			t.Errorf("Expected len(flags) == 1")
-		} else if flags[0] != "key=\"value\"" {
-			t.Errorf("Unexpected flags, %v", flags)
-		} else if err := group.SetFlag("key", "value2"); err != nil {
-			t.Errorf("SetFlag: %v", err)
-		} else if flags := group.Flags(); len(flags) != 1 {
-			t.Errorf("Expected len(flags) == 1")
-		} else if flags[0] != "key=\"value2\"" {
-			t.Errorf("Unexpected flags, %v", flags)
 		} else {
 			t.Log(group)
 		}

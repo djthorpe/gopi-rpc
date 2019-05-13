@@ -126,13 +126,13 @@ func Test_Instances_006(t *testing.T) {
 		t.Fatalf("instances: %v", err)
 	} else {
 		defer instances.Destroy()
-		if _, err := instances.NewInstance(0, nil, nil); err == nil {
+		if _, err := instances.NewInstance(0, nil, nil, ""); err == nil {
 			t.Error("Expecing err != nil")
 		}
-		if _, err := instances.NewInstance(1, nil, nil); err == nil {
+		if _, err := instances.NewInstance(1, nil, nil, ""); err == nil {
 			t.Error("Expecing err != nil")
 		}
-		if _, err := instances.NewInstance(1, &gaffer.Service{InstanceCount_: 0}, nil); err == nil {
+		if _, err := instances.NewInstance(1, &gaffer.Service{InstanceCount_: 0}, nil, ""); err == nil {
 			t.Error("Expecing err != nil")
 		}
 	}
@@ -148,7 +148,7 @@ func Test_Instances_007(t *testing.T) {
 		defer instances.Destroy()
 		service := &gaffer.Service{Name_: "test_service", InstanceCount_: 1}
 
-		if _, err := instances.NewInstance(1, service, nil); err == nil {
+		if _, err := instances.NewInstance(1, service, nil, ""); err == nil {
 			t.Error("Expecting err != nil")
 		} else {
 			t.Logf("OK, expected error=%v", err)
@@ -156,7 +156,7 @@ func Test_Instances_007(t *testing.T) {
 
 		if id := instances.GetUnusedIdentifier(); id == 0 {
 			t.Error("Expecting id != 0")
-		} else if instance, err := instances.NewInstance(id, service, nil); err != nil {
+		} else if instance, err := instances.NewInstance(id, service, nil, ""); err != nil {
 			t.Errorf("Unexpected error=%v", err)
 		} else if instance == nil {
 			t.Errorf("Unexpected instance == nil")
@@ -184,7 +184,7 @@ func Test_Instances_008(t *testing.T) {
 			service.InstanceCount_ = 0
 			if id := instances.GetUnusedIdentifier(); id == 0 {
 				t.Error("Expecting id != 0")
-			} else if _, err := instances.NewInstance(id, service, nil); err == nil {
+			} else if _, err := instances.NewInstance(id, service, nil, ""); err == nil {
 				t.Errorf("NewInstance: Expecting error")
 			} else {
 				t.Logf("OK, Got error: %v", err)
@@ -205,7 +205,7 @@ func Test_Instances_009(t *testing.T) {
 			t.Error("Expecting service != nil")
 		} else if id := instances.GetUnusedIdentifier(); id == 0 {
 			t.Error("Expecting id != 0")
-		} else if instance, err := instances.NewInstance(id, service, nil); err != nil {
+		} else if instance, err := instances.NewInstance(id, service, nil, ""); err != nil {
 			t.Errorf("NewInstance: %v", err)
 		} else if instance == nil {
 			t.Error("instance != nil")
