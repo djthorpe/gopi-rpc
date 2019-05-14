@@ -305,11 +305,19 @@ func (this *ServiceInstance) Path() string {
 }
 
 func (this *ServiceInstance) Flags() []string {
-	return this.Flags_.Strings()
+	if this.Flags_ == nil {
+		return nil
+	} else {
+		return this.Flags_.Strings()
+	}
 }
 
 func (this *ServiceInstance) Env() []string {
-	return this.Env_.Strings()
+	if this.Env_ == nil {
+		return nil
+	} else {
+		return this.Env_.Strings()
+	}
 }
 
 func (this *ServiceInstance) RunTime() time.Duration {
