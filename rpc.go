@@ -89,6 +89,10 @@ type ServiceRecord interface {
 }
 
 type Tuples interface {
+	// Copy tuples
+	Copy() Tuples
+
+	// Return strings for tuple
 	Strings() []string
 
 	// Add tuples
