@@ -54,6 +54,9 @@ var (
 	// Group and service names must start with an alpha character to
 	// distinguish against a number
 	reServiceGroupName = regexp.MustCompile("^[A-Za-z][A-Za-z0-9\\-\\_\\.]*$")
+
+	// Use similar pattern for executables
+	reExecutableName = regexp.MustCompile("^[A-Za-z][A-Za-z0-9\\-\\_\\.\\/]*$")
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -143,8 +146,13 @@ func (this *gaffer) GetExecutables(recursive bool) []string {
 			// Trim prefix
 			sep := string(filepath.Separator)
 			path := strings.TrimPrefix(strings.TrimPrefix(path, root), sep)
+
 			// Append
-			executables = append(executables, path)
+			if reExecutableName.MatchString(path) {
+				executables = append(executables, path)
+			} else {
+				this.log.Warn("Ignoring path: %v", strconv.Quote(path))
+			}
 		}
 		return nil
 	}); err != nil {

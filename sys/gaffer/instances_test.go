@@ -145,19 +145,18 @@ func Test_Instances_007(t *testing.T) {
 	log, _ := gopi.Open(logger.Config{Level: logger.LOG_DEBUG}, nil)
 	config := gaffer.Gaffer{MaxInstances: 100, DeltaCleanup: 1 * time.Second}
 	instances := new(gaffer.Instances)
-	executable := "testfile"
+	test_folder, test_exec := "test_folder", "test_file"
 
-	if tmpfolder, err := ioutil.TempDir("", "instances_test"); err != nil {
+	if tmp_folder, err := ioutil.TempDir("", test_folder); err != nil {
 		t.Fatalf("instances: %v", err)
 	} else if err := instances.Init(config, log.(gopi.Logger)); err != nil {
 		t.Fatalf("instances: %v", err)
-	} else if err := MakeRegularFile(tmpfolder, executable, 0755); err != nil {
+	} else if err := MakeRegularFile(tmp_folder, test_exec, 0755); err != nil {
 		t.Fatalf("instances: %v", err)
 	} else {
 		defer instances.Destroy()
-		service := &gaffer.Service{Name_: "test_service", InstanceCount_: 1, Path_: executable}
-
-		if _, err := instances.NewInstance(1, service, nil, tmpfolder); err == nil {
+		service := &gaffer.Service{Name_: test_exec, InstanceCount_: 1, Path_: test_exec}
+		if _, err := instances.NewInstance(1, service, nil, test_folder); err == nil {
 			t.Error("Expecting err != nil")
 		} else {
 			t.Logf("OK, expected error=%v", err)
@@ -165,7 +164,7 @@ func Test_Instances_007(t *testing.T) {
 
 		if id := instances.GetUnusedIdentifier(); id == 0 {
 			t.Error("Expecting id != 0")
-		} else if instance, err := instances.NewInstance(id, service, nil, tmpfolder); err != nil {
+		} else if instance, err := instances.NewInstance(id, service, nil, tmp_folder); err != nil {
 			t.Errorf("Unexpected error=%v", err)
 		} else if instance == nil {
 			t.Errorf("Unexpected instance == nil")
@@ -222,7 +221,7 @@ func Test_Instances_009(t *testing.T) {
 	}
 }
 
-////
+////////////////////////////////////////////////////////////////////////////////
 
 func MakeRegularFile(tmpfolder, tmpfile string, permissions os.FileMode) error {
 	if f, err := os.OpenFile(filepath.Join(tmpfolder, tmpfile), os.O_RDWR|os.O_CREATE, permissions); err != nil {
