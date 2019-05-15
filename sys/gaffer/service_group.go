@@ -34,6 +34,9 @@ type Service struct {
 	// Flags for the command line
 	Flags_ rpc.Tuples `json:"flags"`
 
+	// Env for the command line (not used)
+	Env_ rpc.Tuples `json:"-"`
+
 	// Mode is whether the instances are started automatically
 	Mode_ rpc.GafferServiceMode `json:"mode"`
 
@@ -92,21 +95,30 @@ type ServiceInstance struct {
 ////////////////////////////////////////////////////////////////////////////////
 // SERVICE IMPLEMENTATION
 
-func NewService(name, executable string, flags rpc.Tuples) *Service {
+func NewService(name, executable string, flags rpc.Tuples, env rpc.Tuples) *Service {
+	// Check parameters
+	if name == "" || executable == "" || flags == nil || env == nil {
+		return nil
+	}
+
+	// Set members mostly as defaults
 	this := new(Service)
 	this.Name_ = name
 	this.Path_ = executable
 	this.Groups_ = make([]string, 0)
 	this.Flags_ = flags
+	this.Env_ = env
 	this.Mode_ = rpc.GAFFER_MODE_MANUAL
 	this.InstanceCount_ = 1
 	this.RunTime_ = 0
 	this.IdleTime_ = 0
+
+	// Return success
 	return this
 }
 
 func CopyService(service *Service) *Service {
-	this := NewService(service.Name_, service.Path_, service.Flags_.Copy())
+	this := NewService(service.Name_, service.Path_, service.Flags_.Copy(), service.Env_.Copy())
 	if service.Mode_ != rpc.GAFFER_MODE_NONE {
 		this.Mode_ = service.Mode_
 	}
@@ -170,18 +182,23 @@ func (this *Service) String() string {
 // GROUP IMPLEMENTATION
 
 func NewGroup(name string, flags, env rpc.Tuples) *ServiceGroup {
+	// Check parameters
+	if name == "" || flags == nil || env == nil {
+		return nil
+	}
+
+	// Set members
 	this := new(ServiceGroup)
 	this.Name_ = name
 	this.Flags_ = flags
 	this.Env_ = env
+
+	// Return success
 	return this
 }
 
 func CopyGroup(group *ServiceGroup) *ServiceGroup {
-	this := NewGroup(group.Name_)
-	this.Flags_ = group.Flags_.Copy()
-	this.Env_ = group.Env_.Copy()
-	return this
+	return NewGroup(group.Name_, group.Flags_.Copy(), group.Env_.Copy())
 }
 
 func (this *ServiceGroup) Name() string {
@@ -189,7 +206,7 @@ func (this *ServiceGroup) Name() string {
 }
 
 func (this *ServiceGroup) Flags() rpc.Tuples {
-	return this.Flags
+	return this.Flags_
 }
 
 func (this *ServiceGroup) Env() rpc.Tuples {
@@ -205,7 +222,7 @@ func (this *ServiceGroup) String() string {
 
 func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path string) (*ServiceInstance, error) {
 	// Check parameters
-	if id == 0 || service == nil {
+	if id == 0 || service == nil || groups == nil {
 		return nil, gopi.ErrBadParameter
 	}
 
@@ -214,37 +231,16 @@ func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path strin
 	this.Service_ = service
 	this.Path_ = path
 	this.Id_ = id
-	this.Flags_ = NewTuples()
-	this.Env_ = NewTuples()
-
-	// Copy flags from service
-	if service.Flags_ != nil {
-		this.Flags_ = service.Flags_.Copy()
-	}
+	this.Flags_ = service.Flags_.Copy()
+	this.Env_ = service.Env_.Copy()
 
 	// Generate the environment & flags from groups, in order
 	// from left to right
-	/* TODO */
-	fmt.Println("TODO: GROUP FLAGS")
-	/*
-		for _, group := range groups {
-			if group.Flags_ != nil {
-				for k, v := range group.Flags_.Tuples() {
+	for _, group := range groups {
+		this.Flags_.Merge(group.Flags_)
+		this.Env_.Merge(group.Env_)
+	}
 
-					if _, exists := this.Flags_.Tuples_[k]; exists == false {
-						this.Flags_.Set(k, v)
-					}
-				}
-			}
-			if group.Env_ != nil {
-				for k, v := range group.Env_.Tuples_ {
-					if _, exists := this.Env_.Tuples_[k]; exists == false {
-						this.Env_.Set(k, v)
-					}
-				}
-			}
-		}
-	*/
 	// TODO: Resolve environment parameters
 	// TODO: Resolve flag parameters
 
@@ -275,20 +271,12 @@ func (this *ServiceInstance) Path() string {
 	return this.Path_
 }
 
-func (this *ServiceInstance) Flags() []string {
-	if this.Flags_ == nil {
-		return nil
-	} else {
-		return this.Flags_.Strings()
-	}
+func (this *ServiceInstance) Flags() rpc.Tuples {
+	return this.Flags_
 }
 
-func (this *ServiceInstance) Env() []string {
-	if this.Env_ == nil {
-		return nil
-	} else {
-		return this.Env_.Strings()
-	}
+func (this *ServiceInstance) Env() rpc.Tuples {
+	return this.Env_
 }
 
 func (this *ServiceInstance) RunTime() time.Duration {

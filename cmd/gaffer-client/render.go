@@ -32,7 +32,7 @@ func RenderGroupList(groups []string) string {
 	return groups_
 }
 
-func RenderFlags(flags rpc.GafferTuples) string {
+func RenderFlags(flags rpc.Tuples) string {
 	flags_ := flags.Strings()
 	if len(flags_) == 0 {
 		return "-"

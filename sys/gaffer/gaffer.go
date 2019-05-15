@@ -209,7 +209,9 @@ func (this *gaffer) AddServiceForPath(executable string) (rpc.GafferService, err
 			return nil, gopi.ErrBadParameter
 		} else if flags := this.util.NewTuples(); flags == nil {
 			return nil, gopi.ErrAppError
-		} else if service := NewService(name, executable, flags); service == nil {
+		} else if env := this.util.NewTuples(); flags == nil {
+			return nil, gopi.ErrAppError
+		} else if service := NewService(name, executable, flags, env); service == nil {
 			return nil, gopi.ErrBadParameter
 		} else if err := this.config.AddService(service); err != nil {
 			return nil, err
@@ -235,7 +237,7 @@ func (this *gaffer) AddGroupForName(name string) (rpc.GafferServiceGroup, error)
 	}
 
 	// Create a new group
-	if group := NewGroup(name); group == nil {
+	if group := NewGroup(name, this.util.NewTuples(), this.util.NewTuples()); group == nil {
 		return nil, gopi.ErrBadParameter
 	} else if err := this.config.AddGroup(group); err != nil {
 		return nil, err
@@ -421,11 +423,7 @@ func (this *gaffer) StopInstanceForId(id uint32) error {
 ////////////////////////////////////////////////////////////////////////////////
 // TUPLES
 
-func (this *gaffer) NewTuples() rpc.GafferTuples {
-	return NewTuples()
-}
-
-func (this *gaffer) SetServiceFlagsForName(service string, tuples rpc.GafferTuples) error {
+func (this *gaffer) SetServiceFlagsForName(service string, tuples rpc.Tuples) error {
 	this.log.Debug2("<gaffer>SetServiceFlagsForName{ service=%v tuples=%v }", strconv.Quote(service), tuples)
 	if service == "" || tuples == nil {
 		return gopi.ErrBadParameter
@@ -437,7 +435,7 @@ func (this *gaffer) SetServiceFlagsForName(service string, tuples rpc.GafferTupl
 	}
 }
 
-func (this *gaffer) SetGroupFlagsForName(group string, tuples rpc.GafferTuples) error {
+func (this *gaffer) SetGroupFlagsForName(group string, tuples rpc.Tuples) error {
 	this.log.Debug2("<gaffer>SetGroupFlagsForName{ group=%v tuples=%v }", strconv.Quote(group), tuples)
 	if group == "" || tuples == nil {
 		return gopi.ErrBadParameter
@@ -449,7 +447,7 @@ func (this *gaffer) SetGroupFlagsForName(group string, tuples rpc.GafferTuples) 
 	}
 }
 
-func (this *gaffer) SetGroupEnvForName(group string, tuples rpc.GafferTuples) error {
+func (this *gaffer) SetGroupEnvForName(group string, tuples rpc.Tuples) error {
 	this.log.Debug2("<gaffer>SetGroupEnvForName{ group=%v tuples=%v }", strconv.Quote(group), tuples)
 	if group == "" || tuples == nil {
 		return gopi.ErrBadParameter

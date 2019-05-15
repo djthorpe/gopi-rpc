@@ -85,6 +85,30 @@ func (this *tuples) IndexForKey(key string) int {
 	return -1
 }
 
+// Copy tuples
+func (this *tuples) Copy() rpc.Tuples {
+	that := new(tuples)
+	that.values = make([]*tuple, len(this.values))
+	for i, value := range this.values {
+		that.values[i] = &tuple{value.key, value.value}
+	}
+	return that
+}
+
+// Merge tuples in from another tuple set
+func (this *tuples) Merge(that rpc.Tuples) error {
+	for _, value := range that.(*tuples).values {
+		if this.IndexForKey(value.key) >= 0 {
+			// Do not add
+		} else if err := this.AddString(value.key, value.value); err != nil {
+			return err
+		}
+	}
+
+	// Success
+	return nil
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // TUPLE
 

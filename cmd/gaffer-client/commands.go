@@ -244,7 +244,7 @@ func SetFlags(args []string, client rpc.GafferClient) error {
 	return nil
 }
 
-func Tuples(client rpc.GafferClient, args []string, flag bool) (rpc.GafferTuples, error) {
+func Tuples(client rpc.GafferClient, args []string, flag bool) (rpc.Tuples, error) {
 	if len(args) == 0 {
 		// With zero arguments, return bad parameter
 		return nil, gopi.ErrBadParameter

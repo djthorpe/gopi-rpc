@@ -185,14 +185,14 @@ func fromProtoInstanceArray(instances []*pb.Instance) []rpc.GafferServiceInstanc
 ////////////////////////////////////////////////////////////////////////////////
 // TUPLES
 
-func toProtoTuples(tuples rpc.GafferTuples) *pb.Tuples {
+func toProtoTuples(tuples rpc.Tuples) *pb.Tuples {
 	if tuples == nil {
 		return nil
 	}
 	return &pb.Tuples{}
 }
 
-func fromProtoTuples(tuples *pb.Tuples) rpc.GafferTuples {
+func fromProtoTuples(tuples *pb.Tuples) rpc.Tuples {
 	return &pb_tuples{tuples}
 }
 
@@ -263,7 +263,7 @@ func (this *pb_service) SetFlags(map[string]string) error {
 	return gopi.ErrNotImplemented
 }
 
-func (this *pb_service) Flags() rpc.GafferTuples {
+func (this *pb_service) Flags() rpc.Tuples {
 	if this.pb == nil {
 		return nil
 	} else {

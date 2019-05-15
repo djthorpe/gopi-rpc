@@ -92,6 +92,9 @@ type Tuples interface {
 	// Copy tuples
 	Copy() Tuples
 
+	// Merge tuples in from another tuple set
+	Merge(Tuples) error
+
 	// Return strings for tuple
 	Strings() []string
 
