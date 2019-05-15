@@ -10,8 +10,11 @@
 package rpcutil
 
 import (
+	"encoding/json"
+	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -112,6 +115,22 @@ func (this *tuples) Merge(that rpc.Tuples) error {
 ////////////////////////////////////////////////////////////////////////////////
 // TUPLE
 
+func NewTuple(keyvalue string) *tuple {
+	if keyvalue == "" {
+		return nil
+	} else if arr := strings.SplitN(keyvalue, "=", 2); len(arr) == 0 {
+		return nil
+	} else if reTupleKey.MatchString(arr[0]) == false {
+		return nil
+	} else if len(arr) == 1 {
+		return &tuple{arr[0], ""}
+	} else if len(arr) > 2 {
+		return nil
+	} else {
+		return &tuple{arr[0], arr[1]}
+	}
+}
+
 func (this *tuple) String() string {
 	if reTupleValueIdent.MatchString(this.value) == true {
 		return this.key + "=" + this.value
@@ -120,4 +139,30 @@ func (this *tuple) String() string {
 		return this.key + "=" + this.value
 	}
 	return this.key + "=" + strconv.Quote(this.value)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// JSON ENCODE AND DECODE
+
+func (this *tuples) MarshalJSON() ([]byte, error) {
+	return json.Marshal(this.Strings())
+}
+
+func (this *tuples) UnmarshalJSON(data []byte) error {
+	var strs []string
+	if err := json.Unmarshal(data, &strs); err != nil {
+		return err
+	} else {
+		this.values = make([]*tuple, len(strs))
+		for i, str := range strs {
+			if tuple := NewTuple(str); tuple == nil {
+				return fmt.Errorf("Syntax error: %v", strconv.Quote(str))
+			} else if this.IndexForKey(tuple.key) >= 0 {
+				return fmt.Errorf("Duplicate key: %v", strconv.Quote(tuple.key))
+			} else {
+				this.values[i] = tuple
+			}
+		}
+		return nil
+	}
 }
