@@ -76,6 +76,7 @@ func (config Gaffer) Open(logger gopi.Logger) (gopi.Driver, error) {
 	this.util = config.Util
 
 	if this.util == nil {
+		this.log.Debug2("Open: this.util == nil")
 		return nil, gopi.ErrBadParameter
 	}
 

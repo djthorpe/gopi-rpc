@@ -12,6 +12,7 @@ import (
 
 	// Modules
 	gaffer "github.com/djthorpe/gopi-rpc/sys/gaffer"
+	rpcutil "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 	logger "github.com/djthorpe/gopi/sys/logger"
 )
 
@@ -23,10 +24,13 @@ const (
 func Test_Gaffer_001(t *testing.T) {
 	if log, err := gopi.Open(logger.Config{Level: LOG_LEVEL}, nil); err != nil {
 		t.Fatalf("Test_Gaffer_001: %v", err)
+	} else if util, err := gopi.Open(rpcutil.Util{}, log.(gopi.Logger)); err != nil {
+		t.Fatalf("Test_Gaffer_001: %v", err)
 	} else if tmp_folder, err := ioutil.TempDir("", TEST_FOLDER); err != nil {
 		t.Fatalf("Test_Gaffer_001: %v", err)
 	} else if gaffer, err := gopi.Open(gaffer.Gaffer{
 		BinRoot: tmp_folder,
+		Util:    util.(rpc.Util),
 	}, log.(gopi.Logger)); err != nil {
 		t.Fatal(err)
 	} else if err := gaffer.Close(); err != nil {
@@ -37,10 +41,13 @@ func Test_Gaffer_001(t *testing.T) {
 func Test_Gaffer_002(t *testing.T) {
 	if log, err := gopi.Open(logger.Config{Level: LOG_LEVEL}, nil); err != nil {
 		t.Fatalf("Test_Gaffer_002: %v", err)
+	} else if util, err := gopi.Open(rpcutil.Util{}, log.(gopi.Logger)); err != nil {
+		t.Fatalf("Test_Gaffer_002: %v", err)
 	} else if tmp_folder, err := ioutil.TempDir("", TEST_FOLDER); err != nil {
 		t.Fatalf("Test_Gaffer_002: %v", err)
 	} else if gaffer_, err := gopi.Open(gaffer.Gaffer{
 		BinRoot: tmp_folder,
+		Util:    util.(rpc.Util),
 	}, log.(gopi.Logger)); err != nil {
 		t.Fatalf("Test_Gaffer_002: %v", err)
 	} else if gaffer, ok := gaffer_.(rpc.Gaffer); ok == false {
@@ -54,10 +61,13 @@ func Test_Gaffer_002(t *testing.T) {
 func Test_Gaffer_003(t *testing.T) {
 	if log, err := gopi.Open(logger.Config{Level: LOG_LEVEL}, nil); err != nil {
 		t.Fatalf("Test_Gaffer_003: %v", err)
+	} else if util, err := gopi.Open(rpcutil.Util{}, log.(gopi.Logger)); err != nil {
+		t.Fatalf("Test_Gaffer_003: %v", err)
 	} else if tmp_folder, err := ioutil.TempDir("", TEST_FOLDER); err != nil {
 		t.Fatalf("Test_Gaffer_003: %v", err)
 	} else if gaffer_, err := gopi.Open(gaffer.Gaffer{
 		BinRoot: tmp_folder,
+		Util:    util.(rpc.Util),
 	}, log.(gopi.Logger)); err != nil {
 		t.Fatalf("Test_Gaffer_003: %v", err)
 	} else if gaffer, ok := gaffer_.(rpc.Gaffer); ok == false {
@@ -270,8 +280,11 @@ func NewGafferForPath(path string) (rpc.Gaffer, error) {
 	}
 	if log, err := gopi.Open(logger.Config{Level: LOG_LEVEL}, nil); err != nil {
 		return nil, err
+	} else if util, err := gopi.Open(rpcutil.Util{}, log.(gopi.Logger)); err != nil {
+		return nil, err
 	} else if gaffer_, err := gopi.Open(gaffer.Gaffer{
 		BinRoot: path,
+		Util:    util.(rpc.Util),
 	}, log.(gopi.Logger)); err != nil {
 		return nil, err
 	} else {

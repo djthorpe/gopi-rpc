@@ -97,8 +97,8 @@ func toProtoFromGroup(group rpc.GafferServiceGroup) *pb.Group {
 	}
 	return &pb.Group{
 		Name:  group.Name(),
-		Flags: group.Flags(),
-		Env:   group.Env(),
+		Flags: toProtoTuples(group.Flags()),
+		Env:   toProtoTuples(group.Env()),
 	}
 }
 
@@ -145,8 +145,8 @@ func toProtoFromInstance(instance rpc.GafferServiceInstance) *pb.Instance {
 		return &pb.Instance{
 			Id:       instance.Id(),
 			Service:  toProtoFromService(instance.Service()),
-			Flags:    instance.Flags(),
-			Env:      instance.Env(),
+			Flags:    toProtoTuples(instance.Flags()),
+			Env:      toProtoTuples(instance.Env()),
 			StartTs:  start_ts,
 			StopTs:   stop_ts,
 			ExitCode: instance.ExitCode(),
@@ -189,6 +189,7 @@ func toProtoTuples(tuples rpc.Tuples) *pb.Tuples {
 	if tuples == nil {
 		return nil
 	}
+	fmt.Println("TODO")
 	return &pb.Tuples{}
 }
 
@@ -259,10 +260,6 @@ func (this *pb_service) IdleTime() time.Duration {
 	}
 }
 
-func (this *pb_service) SetFlags(map[string]string) error {
-	return gopi.ErrNotImplemented
-}
-
 func (this *pb_service) Flags() rpc.Tuples {
 	if this.pb == nil {
 		return nil
@@ -295,19 +292,19 @@ func (this *pb_group) Name() string {
 	}
 }
 
-func (this *pb_group) Flags() []string {
+func (this *pb_group) Flags() rpc.Tuples {
 	if this.pb == nil {
 		return nil
 	} else {
-		return this.pb.Flags
+		return fromProtoTuples(this.pb.Flags)
 	}
 }
 
-func (this *pb_group) Env() []string {
+func (this *pb_group) Env() rpc.Tuples {
 	if this.pb == nil {
 		return nil
 	} else {
-		return this.pb.Env
+		return fromProtoTuples(this.pb.Env)
 	}
 }
 
@@ -330,19 +327,19 @@ func (this *pb_instance) Service() rpc.GafferService {
 	}
 }
 
-func (this *pb_instance) Flags() []string {
+func (this *pb_instance) Flags() rpc.Tuples {
 	if this.pb == nil {
 		return nil
 	} else {
-		return this.pb.Flags
+		return fromProtoTuples(this.pb.Flags)
 	}
 }
 
-func (this *pb_instance) Env() []string {
+func (this *pb_instance) Env() rpc.Tuples {
 	if this.pb == nil {
 		return nil
 	} else {
-		return this.pb.Env
+		return fromProtoTuples(this.pb.Env)
 	}
 }
 
@@ -387,6 +384,27 @@ func (this *pb_tuples) Strings() []string {
 		}
 		return reply
 	}
+}
+
+func (this *pb_tuples) Copy() rpc.Tuples {
+	if this.pb == nil {
+		return nil
+	} else {
+		reply := &pb_tuples{&pb.Tuples{
+			Tuples: make([]*pb.Tuple, len(this.pb.Tuples)),
+		}}
+		for i, tuple := range this.pb.Tuples {
+			reply.pb.Tuples[i] = &pb.Tuple{
+				Key:   tuple.Key,
+				Value: tuple.Value,
+			}
+		}
+		return reply
+	}
+}
+
+func (this *pb_tuples) Merge(that rpc.Tuples) error {
+	return gopi.ErrNotImplemented
 }
 
 func (this *pb_tuples) AddString(key, value string) error {

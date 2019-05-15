@@ -9,12 +9,10 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -50,7 +48,6 @@ var (
 		&Command{"rm", "Remove a service or group", RemoveServiceGroup},
 		&Command{"start", "Start a service or group", StartServiceGroup},
 		&Command{"stop", "Stop an instance, service or group", StopServiceGroup},
-		&Command{"flags", "Set flags for a service or group", SetFlags},
 	}
 
 	reInstanceId  = regexp.MustCompile("^[0-9]+$")
@@ -212,83 +209,6 @@ func StopServiceGroup(args []string, client rpc.GafferClient) error {
 
 	// Success
 	return nil
-}
-
-func SetFlags(args []string, client rpc.GafferClient) error {
-	if len(args) <= 2 {
-		return gopi.ErrBadParameter
-	}
-
-	if service_group := args[1]; reServiceName.MatchString(service_group) {
-		if tuples, err := Tuples(client, args[2:], true); err != nil {
-			return err
-		} else if service, err := client.SetFlagsForService(service_group, tuples); err != nil {
-			return err
-		} else {
-			RenderServices(os.Stdout, []rpc.GafferService{service})
-		}
-	} else if reGroupName.MatchString(service_group) {
-		group := strings.TrimPrefix(service_group, "@")
-		if tuples, err := Tuples(client, args[2:], false); err != nil {
-			return err
-		} else if group, err := client.SetFlagsForGroup(group, tuples); err != nil {
-			return err
-		} else {
-			RenderGroups(os.Stdout, []rpc.GafferServiceGroup{group})
-		}
-	} else {
-		return gopi.ErrBadParameter
-	}
-
-	// Success
-	return nil
-}
-
-func Tuples(client rpc.GafferClient, args []string, flag bool) (rpc.Tuples, error) {
-	if len(args) == 0 {
-		// With zero arguments, return bad parameter
-		return nil, gopi.ErrBadParameter
-	} else if len(args) == 1 && args[0] == "-" {
-		// Return empty tuples array
-		return client.NewTuples(), nil
-	} else {
-		tuples := client.NewTuples()
-		for _, tuple := range args {
-			if flag && strings.HasPrefix(tuple, "-") {
-				// Remove initial -
-				tuple = strings.TrimPrefix(tuple, "-")
-			}
-			if reTupleKey.MatchString(tuple) {
-				tuples.AddString(tuple, "true")
-			} else if match := reTuplePair.FindStringSubmatch(tuple); match != nil && len(match) == 3 {
-				if value, err := TupleConv(match[2]); err != nil {
-					return nil, err
-				} else {
-					tuples.AddString(match[1], value)
-				}
-			} else {
-				return nil, fmt.Errorf("Invalid argument: %v", strconv.Quote(tuple))
-			}
-		}
-		return tuples, nil
-	}
-}
-
-func TupleConv(value string) (string, error) {
-	if value_int, err := strconv.ParseInt(value, 10, 64); err == nil {
-		return fmt.Sprint(value_int), nil
-	}
-	if value_uint, err := strconv.ParseUint(value, 10, 64); err == nil {
-		return fmt.Sprint(value_uint), nil
-	}
-	if value_bool, err := strconv.ParseBool(value); err == nil {
-		return fmt.Sprint(value_bool), nil
-	}
-	if value_duration, err := time.ParseDuration(value); err == nil {
-		return fmt.Sprint(value_duration), nil
-	}
-	// We assume it's a string at this point
-	return value, nil
 }
 
 func Run(app *gopi.AppInstance, client rpc.GafferClient) error {

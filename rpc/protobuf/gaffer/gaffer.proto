@@ -118,15 +118,15 @@ message Service {
 
 message Group {
     string name = 1;    
-    repeated string flags = 2;
-    repeated string env = 3;
+    Tuples flags = 2;
+    Tuples env = 3;
 }
 
 message Instance {
     uint32 id = 1;
     Service service = 2;
-    repeated string flags = 3;
-    repeated string env = 4;
+    Tuples flags = 3;
+    Tuples env = 4;
     google.protobuf.Timestamp start_ts = 5;
     google.protobuf.Timestamp stop_ts = 6;
     int64 exit_code = 7;

@@ -166,7 +166,7 @@ func Test_Instances_007(t *testing.T) {
 
 		if id := instances.GetUnusedIdentifier(); id == 0 {
 			t.Error("Expecting id != 0")
-		} else if instance, err := instances.NewInstance(id, service, nil, tmp_folder); err != nil {
+		} else if instance, err := instances.NewInstance(id, service, []*gaffer.ServiceGroup{}, tmp_folder); err != nil {
 			t.Errorf("Unexpected error=%v", err)
 		} else if instance == nil {
 			t.Errorf("Unexpected instance == nil")
@@ -215,7 +215,7 @@ func Test_Instances_009(t *testing.T) {
 			t.Error("Expecting service != nil")
 		} else if id := instances.GetUnusedIdentifier(); id == 0 {
 			t.Error("Expecting id != 0")
-		} else if instance, err := instances.NewInstance(id, service, nil, ""); err != nil {
+		} else if instance, err := instances.NewInstance(id, service, []*gaffer.ServiceGroup{}, ""); err != nil {
 			t.Errorf("NewInstance: %v", err)
 		} else if instance == nil {
 			t.Error("instance != nil")
