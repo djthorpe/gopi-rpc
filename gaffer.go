@@ -40,8 +40,7 @@ type Gaffer interface {
 	SetServiceNameForName(service string, new string) error
 	SetServiceModeForName(string, GafferServiceMode) error
 	SetServiceInstanceCountForName(service string, count uint) error
-	AddServiceGroupForName(service string, group string, position uint) error
-	RemoveServiceGroupForName(service string, group string) error
+	SetServiceGroupsForName(service string, groups []string) error
 
 	// Groups
 	GetGroupsForNames([]string) []GafferServiceGroup
@@ -125,12 +124,12 @@ type GafferClient interface {
 	ListInstances() ([]GafferServiceInstance, error)
 
 	// Add services and groups
-	AddServiceForPath(path string) (GafferService, error)
-	AddGroupForName(name string) (GafferServiceGroup, error)
+	AddServiceForPath(path string, groups []string) (GafferService, error)
+	AddGroupForName(string) (GafferServiceGroup, error)
 
 	// Remove services and groups
-	RemoveServiceForName(name string) error
-	RemoveGroupForName(name string) error
+	RemoveServiceForName(string) error
+	RemoveGroupForName(string) error
 
 	// Start instances
 	GetInstanceId() (uint32, error)
@@ -141,6 +140,9 @@ type GafferClient interface {
 	SetFlagsForService(string, Tuples) (GafferService, error)
 	SetFlagsForGroup(string, Tuples) (GafferServiceGroup, error)
 	SetEnvForGroup(string, Tuples) (GafferServiceGroup, error)
+
+	// Set other service parameters
+	SetServiceGroups(string, []string) (GafferService, error)
 }
 
 type GafferServiceMode uint

@@ -50,6 +50,7 @@ var (
 		&Command{"start", "Start a service or group", StartServiceGroup},
 		&Command{"stop", "Stop an instance, service or group", StopServiceGroup},
 		&Command{"flags", "Set flags for instance or group", FlagsServiceGroup},
+		&Command{"groups", "Set groups for a service", SetServiceGroups},
 	}
 
 	reInstanceId  = regexp.MustCompile("^[0-9]+$")
@@ -136,7 +137,7 @@ func AddServiceGroup(args []string, client rpc.GafferClient) error {
 			RenderGroups(os.Stdout, []rpc.GafferServiceGroup{group_})
 		}
 	} else {
-		if service_, err := client.AddServiceForPath(service_group); err != nil {
+		if service_, err := client.AddServiceForPath(service_group, []string{}); err != nil {
 			return err
 		} else {
 			RenderServices(os.Stdout, []rpc.GafferService{service_})
@@ -238,6 +239,31 @@ func FlagsServiceGroup(args []string, client rpc.GafferClient) error {
 		return gopi.ErrBadParameter
 	}
 
+	// Return success
+	return nil
+}
+
+func SetServiceGroups(args []string, client rpc.GafferClient) error {
+	if len(args) < 3 {
+		return gopi.ErrBadParameter
+	}
+	if service_group := args[1]; reServiceName.MatchString(service_group) {
+		groups := make([]string, len(args)-2)
+		for i, group := range args[2:] {
+			if reGroupName.MatchString(group) == false {
+				return gopi.ErrBadParameter
+			} else {
+				groups[i] = strings.TrimPrefix(group, "@")
+			}
+		}
+		if service, err := client.SetServiceGroups(service_group, groups); err != nil {
+			return err
+		} else {
+			RenderServices(os.Stdout, []rpc.GafferService{service})
+		}
+	} else {
+		return gopi.ErrBadParameter
+	}
 	// Return success
 	return nil
 }

@@ -176,12 +176,13 @@ func (this *Client) ListInstances() ([]rpc.GafferServiceInstance, error) {
 	}
 }
 
-func (this *Client) AddServiceForPath(path string) (rpc.GafferService, error) {
+func (this *Client) AddServiceForPath(path string, groups []string) (rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	if reply, err := this.GafferClient.AddService(this.NewContext(), &pb.AddServiceRequest{
-		Path: path,
+	if reply, err := this.GafferClient.AddService(this.NewContext(), &pb.ServiceRequest{
+		Name:   path,
+		Groups: groups,
 	}); err != nil {
 		return nil, err
 	} else {
@@ -305,6 +306,20 @@ func (this *Client) SetEnvForGroup(group string, tuples rpc.Tuples) (rpc.GafferS
 		return nil, err
 	} else {
 		return fromProtoGroup(reply), nil
+	}
+}
+
+func (this *Client) SetServiceGroups(service string, groups []string) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.SetServiceParameters(this.NewContext(), &pb.ServiceRequest{
+		Name:   service,
+		Groups: groups,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
 	}
 }
 

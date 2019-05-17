@@ -440,6 +440,24 @@ func (this *config) SetServiceFlags(service *Service, tuples rpc.Tuples) error {
 
 }
 
+func (this *config) SetServiceGroups(service *Service, groups []string) error {
+	this.log.Debug2("<gaffer.config>SetServiceGroups{ service=%v groups=%v }", service, groups)
+	if service == nil || groups == nil {
+		return gopi.ErrBadParameter
+	} else if stringArrayEquals(service.Groups_, groups) == true {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		service.Groups_ = make([]string, len(groups))
+		for i, group := range groups {
+			service.Groups_[i] = group
+		}
+		this.modified = true
+		return nil
+	}
+}
+
 func (this *config) SetGroupFlags(group *ServiceGroup, tuples rpc.Tuples) error {
 	this.log.Debug2("<gaffer.config>SetGroupFlags{ group=%v tuples=%v }", group, tuples)
 	if group == nil {
@@ -509,4 +527,16 @@ FOR_LOOP:
 
 	// Success
 	return nil
+}
+
+func stringArrayEquals(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, elem := range a {
+		if elem != b[i] {
+			return false
+		}
+	}
+	return true
 }

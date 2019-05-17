@@ -333,23 +333,34 @@ func (this *gaffer) SetServiceNameForName(service string, new string) error {
 }
 
 func (this *gaffer) SetGroupNameForName(group string, new string) error {
+	this.log.Debug2("<gaffer>SetGroupNameForName{ group=%v new=%v }", strconv.Quote(group), strconv.Quote(new))
 	return gopi.ErrNotImplemented
 }
 
 func (this *gaffer) SetServiceModeForName(service string, mode rpc.GafferServiceMode) error {
+	this.log.Debug2("<gaffer>SetServiceModeForName{ service=%v mode=%v }", strconv.Quote(service), mode)
 	return gopi.ErrNotImplemented
 }
 
 func (this *gaffer) SetServiceInstanceCountForName(service string, count uint) error {
+	this.log.Debug2("<gaffer>SetServiceInstanceCountForName{ service=%v count=%v }", strconv.Quote(service), count)
 	return gopi.ErrNotImplemented
 }
 
-func (this *gaffer) AddServiceGroupForName(service string, group string, position uint) error {
-	return gopi.ErrNotImplemented
-}
+func (this *gaffer) SetServiceGroupsForName(service string, groups []string) error {
+	this.log.Debug2("<gaffer>SetServiceGroupsForName{ service=%v groups=%v }", strconv.Quote(service), groups)
 
-func (this *gaffer) RemoveServiceGroupForName(service string, group string) error {
-	return gopi.ErrNotImplemented
+	if service == "" {
+		return gopi.ErrBadParameter
+	} else if service_ := this.GetServiceByName(service); service_ == nil {
+		return gopi.ErrNotFound
+	} else if groups_ := this.GetGroupsForNames(groups); len(groups_) != len(groups) {
+		return gopi.ErrNotFound
+	} else if err := this.config.SetServiceGroups(service_, groups); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

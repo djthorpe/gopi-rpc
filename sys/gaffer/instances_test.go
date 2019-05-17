@@ -18,7 +18,6 @@ import (
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 	gaffer "github.com/djthorpe/gopi-rpc/sys/gaffer"
-	rpcutil "github.com/djthorpe/gopi-rpc/sys/rpcutil"
 	logger "github.com/djthorpe/gopi/sys/logger"
 )
 
@@ -188,7 +187,7 @@ func Test_Instances_008(t *testing.T) {
 		t.Fatalf("instances: %v", err)
 	} else {
 		defer instances.Destroy()
-		if service := gaffer.NewService("ls", "/bin/ls", NewTuples(), NewTuples()); service == nil {
+		if service := gaffer.NewService("ls", "/bin/ls"); service == nil {
 			t.Error("Expecting service != nil")
 		} else {
 			service.InstanceCount_ = 0
@@ -211,7 +210,7 @@ func Test_Instances_009(t *testing.T) {
 		t.Fatalf("instances: %v", err)
 	} else {
 		defer instances.Destroy()
-		if service := gaffer.NewService("ls", "/bin/ls", NewTuples(), NewTuples()); service == nil {
+		if service := gaffer.NewService("ls", "/bin/ls"); service == nil {
 			t.Error("Expecting service != nil")
 		} else if id := instances.GetUnusedIdentifier(); id == 0 {
 			t.Error("Expecting id != 0")
@@ -236,9 +235,5 @@ func MakeRegularFile(tmpfolder, tmpfile string, permissions os.FileMode) error {
 }
 
 func NewTuples() rpc.Tuples {
-	if util, err := gopi.Open(rpcutil.Util{}, nil); err != nil {
-		return nil
-	} else {
-		return util.(rpc.Util).NewTuples()
-	}
+	return rpc.Tuples{}
 }

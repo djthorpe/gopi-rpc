@@ -22,10 +22,13 @@ service Gaffer {
     // List instances, filtering by service or group
     rpc ListInstances(RequestFilter) returns (ListInstancesReply);
 
-    // Add and remove
-    rpc AddService(AddServiceRequest) returns (Service);
-    rpc AddGroup(NameRequest) returns (Group);
+    // Edit service
+    rpc AddService(ServiceRequest) returns (Service);
+    rpc SetServiceParameters(ServiceRequest) returns (Service);
     rpc RemoveService(NameRequest) returns (google.protobuf.Empty);
+
+    // Edit group
+    rpc AddGroup(NameRequest) returns (Group);
     rpc RemoveGroup(NameRequest) returns (google.protobuf.Empty);
 
     // Set flags & env
@@ -73,8 +76,8 @@ message ListInstancesReply {
     repeated Instance instance = 1;
 }
 
-message AddServiceRequest {
-    string path = 1;
+message ServiceRequest {
+    string name = 1;
     repeated string groups = 2;
 }
 

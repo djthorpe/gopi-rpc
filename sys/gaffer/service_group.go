@@ -120,8 +120,9 @@ func CopyService(service *Service) *Service {
 	if service.Mode_ != rpc.GAFFER_MODE_NONE {
 		this.Mode_ = service.Mode_
 	}
-	if service.Groups_ != nil {
-		copy(this.Groups_, service.Groups_)
+	this.Groups_ = make([]string, len(service.Groups_))
+	for i, group := range service.Groups_ {
+		this.Groups_[i] = group
 	}
 	this.Flags_ = service.Flags_.Copy()
 	this.Env_ = service.Env_.Copy()
@@ -140,9 +141,7 @@ func (this *Service) Path() string {
 }
 
 func (this *Service) Groups() []string {
-	var groups []string
-	copy(groups, this.Groups_)
-	return groups
+	return this.Groups_
 }
 
 func (this *Service) Mode() rpc.GafferServiceMode {

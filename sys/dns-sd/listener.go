@@ -14,10 +14,12 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"golang.org/x/net/ipv4"
@@ -486,7 +488,11 @@ func joinUdp4Multicast(ifaces []net.Interface, addr *net.UDPAddr) (*ipv4.PacketC
 		errs := &errors.CompoundError{}
 		for _, iface := range ifaces {
 			if err := packet_conn.JoinGroup(&iface, &net.UDPAddr{IP: addr.IP}); err != nil {
-				errs.Add(fmt.Errorf("JoinGroup4: %v: %v", iface.Name, err))
+				if err_, ok := err.(*os.SyscallError); ok && err_.Err == syscall.EAFNOSUPPORT {
+					continue
+				} else {
+					errs.Add(fmt.Errorf("JoinGroup4: %v: %v", iface.Name, err))
+				}
 			}
 		}
 		if errs.Success() {

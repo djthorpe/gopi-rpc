@@ -25,7 +25,7 @@ func RenderGroupList(groups []string) string {
 	groups_ := ""
 	for i, group := range groups {
 		if i > 0 {
-			groups_ += ","
+			groups_ += " "
 		}
 		groups_ += "@" + group
 	}

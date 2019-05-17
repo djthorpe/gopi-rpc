@@ -237,10 +237,26 @@ func (this *service) ListInstances(_ context.Context, req *pb.RequestFilter) (*p
 }
 
 // Add a service
-func (this *service) AddService(_ context.Context, req *pb.AddServiceRequest) (*pb.Service, error) {
+func (this *service) AddService(ctx context.Context, req *pb.ServiceRequest) (*pb.Service, error) {
 	this.log.Debug("<grpc.service.gaffer.AddService>{ req=%v }", req)
 
-	if service, err := this.gaffer.AddServiceForPath(req.Path); err != nil {
+	if groups := this.gaffer.GetGroupsForNames(req.Groups); len(groups) != len(req.Groups) {
+		return nil, gopi.ErrBadParameter
+	} else if service, err := this.gaffer.AddServiceForPath(req.Name); err != nil {
+		return nil, err
+	} else {
+		req.Name = service.Name()
+		return this.SetServiceParameters(ctx, req)
+	}
+}
+
+// Set parameters for a service
+func (this *service) SetServiceParameters(_ context.Context, req *pb.ServiceRequest) (*pb.Service, error) {
+	this.log.Debug("<grpc.service.gaffer.SetServiceParameters>{ req=%v }", req)
+
+	if service := this.gaffer.GetServiceForName(req.Name); service == nil {
+		return nil, gopi.ErrNotFound
+	} else if err := this.gaffer.SetServiceGroupsForName(req.Name, req.Groups); err != nil {
 		return nil, err
 	} else {
 		return toProtoFromService(service), nil
