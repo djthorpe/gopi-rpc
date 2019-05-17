@@ -219,7 +219,14 @@ func (t *Tuples) UnmarshalJSON(data []byte) error {
 				return err
 			}
 		} else if len(key_value) == 2 {
-			if err := t.SetStringForKey(key_value[0], key_value[1]); err != nil {
+			value := key_value[1]
+			if reTupleValueDigits.MatchString(value) || reTupleValueIdent.MatchString(value) {
+				if err := t.SetStringForKey(key_value[0], value); err != nil {
+					return err
+				}
+			} else if value_, err := strconv.Unquote(value); err != nil {
+				return err
+			} else if err := t.SetStringForKey(key_value[0], value_); err != nil {
 				return err
 			}
 		} else {
