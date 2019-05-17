@@ -256,9 +256,14 @@ func (this *service) SetServiceParameters(_ context.Context, req *pb.ServiceRequ
 
 	if service := this.gaffer.GetServiceForName(req.Name); service == nil {
 		return nil, gopi.ErrNotFound
-	} else if err := this.gaffer.SetServiceGroupsForName(req.Name, req.Groups); err != nil {
-		return nil, err
 	} else {
+		// Set Groups
+		if len(req.Groups) > 0 {
+			if err := this.gaffer.SetServiceGroupsForName(req.Name, req.Groups); err != nil {
+				return nil, err
+			}
+		}
+		// Return service
 		return toProtoFromService(service), nil
 	}
 }
