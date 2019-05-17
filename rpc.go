@@ -50,9 +50,6 @@ type Util interface {
 	// NewServiceRecord creates an empty service record
 	NewServiceRecord(source DiscoveryType) ServiceRecord
 
-	// NewTuples creates an empty tuples structure
-	NewTuples() Tuples
-
 	// Read and write array of service records
 	Writer(fh io.Writer, records []ServiceRecord, indent bool) error
 	Reader(fh io.Reader) ([]ServiceRecord, error)
@@ -86,20 +83,6 @@ type ServiceRecord interface {
 	SetTTL(time.Duration) error
 	AppendIP(...net.IP) error
 	AppendTXT(...string) error
-}
-
-type Tuples interface {
-	// Copy tuples
-	Copy() Tuples
-
-	// Merge tuples in from another tuple set
-	Merge(Tuples) error
-
-	// Return strings for tuple
-	Strings() []string
-
-	// Add tuples
-	AddString(string, string) error
 }
 
 ////////////////////////////////////////////////////////////////////////////////

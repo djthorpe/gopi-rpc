@@ -169,6 +169,10 @@ func (this *Instances) Start(instance *ServiceInstance, ch chan<- rpc.GafferEven
 		return err
 	}
 
+	if instance.process.cmd != nil {
+		this.log.Debug("%v %v", instance.process.cmd.Path, instance.Flags().Flags())
+	}
+
 	// Start goroutines for receiving data from stdout and stderr
 	go this.processLog(instance, instance.stdout, rpc.GAFFER_EVENT_LOG_STDOUT, ch)
 	go this.processLog(instance, instance.stderr, rpc.GAFFER_EVENT_LOG_STDERR, ch)

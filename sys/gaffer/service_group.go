@@ -95,9 +95,9 @@ type ServiceInstance struct {
 ////////////////////////////////////////////////////////////////////////////////
 // SERVICE IMPLEMENTATION
 
-func NewService(name, executable string, flags rpc.Tuples, env rpc.Tuples) *Service {
+func NewService(name, executable string) *Service {
 	// Check parameters
-	if name == "" || executable == "" || flags == nil || env == nil {
+	if name == "" || executable == "" {
 		return nil
 	}
 
@@ -106,8 +106,6 @@ func NewService(name, executable string, flags rpc.Tuples, env rpc.Tuples) *Serv
 	this.Name_ = name
 	this.Path_ = executable
 	this.Groups_ = make([]string, 0)
-	this.Flags_ = flags
-	this.Env_ = env
 	this.Mode_ = rpc.GAFFER_MODE_MANUAL
 	this.InstanceCount_ = 1
 	this.RunTime_ = 0
@@ -118,13 +116,15 @@ func NewService(name, executable string, flags rpc.Tuples, env rpc.Tuples) *Serv
 }
 
 func CopyService(service *Service) *Service {
-	this := NewService(service.Name_, service.Path_, service.Flags_.Copy(), service.Env_.Copy())
+	this := NewService(service.Name_, service.Path_)
 	if service.Mode_ != rpc.GAFFER_MODE_NONE {
 		this.Mode_ = service.Mode_
 	}
 	if service.Groups_ != nil {
 		copy(this.Groups_, service.Groups_)
 	}
+	this.Flags_ = service.Flags_.Copy()
+	this.Env_ = service.Env_.Copy()
 	this.InstanceCount_ = service.InstanceCount_
 	this.RunTime_ = service.RunTime_
 	this.IdleTime_ = service.IdleTime_
@@ -181,24 +181,28 @@ func (this *Service) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // GROUP IMPLEMENTATION
 
-func NewGroup(name string, flags, env rpc.Tuples) *ServiceGroup {
+func NewGroup(name string) *ServiceGroup {
 	// Check parameters
-	if name == "" || flags == nil || env == nil {
+	if name == "" {
 		return nil
 	}
 
 	// Set members
 	this := new(ServiceGroup)
 	this.Name_ = name
-	this.Flags_ = flags
-	this.Env_ = env
 
 	// Return success
 	return this
 }
 
 func CopyGroup(group *ServiceGroup) *ServiceGroup {
-	return NewGroup(group.Name_, group.Flags_.Copy(), group.Env_.Copy())
+	if this := NewGroup(group.Name_); this == nil {
+		return nil
+	} else {
+		this.Flags_ = group.Flags_.Copy()
+		this.Env_ = group.Env_.Copy()
+		return this
+	}
 }
 
 func (this *ServiceGroup) Name() string {
@@ -234,11 +238,22 @@ func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path strin
 	this.Flags_ = service.Flags_.Copy()
 	this.Env_ = service.Env_.Copy()
 
-	// Generate the environment & flags from groups, in order
-	// from left to right
+	// Generate the environment & flags from groups, in order from left to right
 	for _, group := range groups {
-		this.Flags_.Merge(group.Flags_)
-		this.Env_.Merge(group.Env_)
+		for _, key := range group.Flags_.Keys() {
+			if exists := this.Flags_.ExistsForKey(key); exists == false {
+				if err := this.Flags_.SetStringForKey(key, group.Flags_.StringForKey(key)); err != nil {
+					return nil, err
+				}
+			}
+		}
+		for _, key := range group.Env_.Keys() {
+			if exists := this.Env_.ExistsForKey(key); exists == false {
+				if err := this.Env_.SetStringForKey(key, group.Env_.StringForKey(key)); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	// TODO: Resolve environment parameters

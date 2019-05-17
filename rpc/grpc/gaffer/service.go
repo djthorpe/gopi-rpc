@@ -319,8 +319,9 @@ func (this *service) StopInstance(_ context.Context, req *pb.InstanceId) (*pb.In
 func (this *service) SetGroupFlags(_ context.Context, req *pb.SetTuplesRequest) (*pb.Group, error) {
 	this.log.Debug("<grpc.service.gaffer.SetGroupFlags>{ req=%v }", req)
 
-	// TODO
-	if groups := this.gaffer.GetGroupsForNames([]string{req.Name}); len(groups) == 0 {
+	if err := this.gaffer.SetGroupFlagsForName(req.Name, fromProtoTuples(req.Tuples)); err != nil {
+		return nil, err
+	} else if groups := this.gaffer.GetGroupsForNames([]string{req.Name}); len(groups) == 0 {
 		return nil, gopi.ErrNotFound
 	} else if len(groups) > 1 {
 		return nil, gopi.ErrAppError
@@ -333,8 +334,9 @@ func (this *service) SetGroupFlags(_ context.Context, req *pb.SetTuplesRequest) 
 func (this *service) SetGroupEnv(_ context.Context, req *pb.SetTuplesRequest) (*pb.Group, error) {
 	this.log.Debug("<grpc.service.gaffer.SetGroupEnv>{ req=%v }", req)
 
-	// TODO
-	if groups := this.gaffer.GetGroupsForNames([]string{req.Name}); len(groups) == 0 {
+	if err := this.gaffer.SetGroupEnvForName(req.Name, fromProtoTuples(req.Tuples)); err != nil {
+		return nil, err
+	} else if groups := this.gaffer.GetGroupsForNames([]string{req.Name}); len(groups) == 0 {
 		return nil, gopi.ErrNotFound
 	} else if len(groups) > 1 {
 		return nil, gopi.ErrAppError
@@ -347,8 +349,9 @@ func (this *service) SetGroupEnv(_ context.Context, req *pb.SetTuplesRequest) (*
 func (this *service) SetServiceFlags(_ context.Context, req *pb.SetTuplesRequest) (*pb.Service, error) {
 	this.log.Debug("<grpc.service.gaffer.SetServiceFlags>{ req=%v }", req)
 
-	// TODO
-	if service := this.gaffer.GetServiceForName(req.Name); service == nil {
+	if err := this.gaffer.SetServiceFlagsForName(req.Name, fromProtoTuples(req.Tuples)); err != nil {
+		return nil, err
+	} else if service := this.gaffer.GetServiceForName(req.Name); service == nil {
 		return nil, gopi.ErrNotFound
 	} else {
 		return toProtoFromService(service), nil

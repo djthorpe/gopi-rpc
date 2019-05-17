@@ -33,7 +33,7 @@ func RenderGroupList(groups []string) string {
 }
 
 func RenderFlags(flags rpc.Tuples) string {
-	flags_ := flags.Strings()
+	flags_ := flags.Flags()
 	if len(flags_) == 0 {
 		return "-"
 	} else {

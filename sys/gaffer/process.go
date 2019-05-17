@@ -45,7 +45,7 @@ var (
 func NewProcess(instance *ServiceInstance) (*Process, error) {
 	this := new(Process)
 	ctx, cancel := ctxForTimeout(instance.RunTime())
-	this.cmd = exec.CommandContext(ctx, instance.Path(), instance.Flags().Strings()...)
+	this.cmd = exec.CommandContext(ctx, instance.Path(), instance.Flags().Flags()...)
 	this.cancel = cancel
 
 	if stdout, err := this.cmd.StdoutPipe(); err != nil {
@@ -61,7 +61,7 @@ func NewProcess(instance *ServiceInstance) (*Process, error) {
 	}
 
 	// Set environment
-	this.cmd.Env = instance.Env().Strings()
+	this.cmd.Env = instance.Env().Env()
 
 	// Success
 	return this, nil

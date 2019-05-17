@@ -11,6 +11,10 @@ package rpc
 
 import (
 	// Frameworks
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/djthorpe/gopi"
@@ -212,4 +216,34 @@ func (t GafferEventType) String() string {
 	default:
 		return "[?? Invalid GafferEventType value]"
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// JSONIFY
+
+func (m GafferServiceMode) MarshalJSON() ([]byte, error) {
+	switch m {
+	case GAFFER_MODE_MANUAL:
+		return []byte("\"manual\""), nil
+	case GAFFER_MODE_AUTO:
+		return []byte("\"auto\""), nil
+	default:
+		return nil, fmt.Errorf("Syntax error: %v", m)
+	}
+}
+
+func (m *GafferServiceMode) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch strings.ToLower(s) {
+	case "auto":
+		*m = GAFFER_MODE_AUTO
+	case "manual":
+		*m = GAFFER_MODE_MANUAL
+	default:
+		return fmt.Errorf("Syntax error: %v (expecting 'auto' or 'manual')", strconv.Quote(s))
+	}
+	return nil
 }

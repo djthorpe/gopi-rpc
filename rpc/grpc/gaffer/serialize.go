@@ -9,17 +9,14 @@
 package gaffer
 
 import (
-	"fmt"
-	"strconv"
 	"time"
 
-	"github.com/golang/protobuf/ptypes"
 	// Frameworks
-	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/gaffer"
+	ptypes "github.com/golang/protobuf/ptypes"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,10 +32,6 @@ type pb_group struct {
 
 type pb_instance struct {
 	pb *pb.Instance
-}
-
-type pb_tuples struct {
-	pb *pb.Tuples
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -186,15 +179,33 @@ func fromProtoInstanceArray(instances []*pb.Instance) []rpc.GafferServiceInstanc
 // TUPLES
 
 func toProtoTuples(tuples rpc.Tuples) *pb.Tuples {
-	if tuples == nil {
-		return nil
+	proto := &pb.Tuples{
+		Tuples: make([]*pb.Tuple, tuples.Len()),
 	}
-	fmt.Println("TODO")
-	return &pb.Tuples{}
+	for i, key := range tuples.Keys() {
+		proto.Tuples[i] = &pb.Tuple{
+			Key:   key,
+			Value: tuples.StringForKey(key),
+		}
+	}
+	return proto
 }
 
-func fromProtoTuples(tuples *pb.Tuples) rpc.Tuples {
-	return &pb_tuples{tuples}
+func fromProtoTuples(proto *pb.Tuples) rpc.Tuples {
+	if proto == nil {
+		return rpc.Tuples{}
+	}
+
+	// Copy over the tuples
+	tuples := rpc.Tuples{}
+	for _, tuple := range proto.Tuples {
+		if err := tuples.SetStringForKey(tuple.Key, tuple.Value); err != nil {
+			return rpc.Tuples{}
+		}
+	}
+
+	// Return tuples
+	return tuples
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -262,7 +273,7 @@ func (this *pb_service) IdleTime() time.Duration {
 
 func (this *pb_service) Flags() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
 		return fromProtoTuples(this.pb.Flags)
 	}
@@ -294,7 +305,7 @@ func (this *pb_group) Name() string {
 
 func (this *pb_group) Flags() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
 		return fromProtoTuples(this.pb.Flags)
 	}
@@ -302,7 +313,7 @@ func (this *pb_group) Flags() rpc.Tuples {
 
 func (this *pb_group) Env() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
 		return fromProtoTuples(this.pb.Env)
 	}
@@ -329,7 +340,7 @@ func (this *pb_instance) Service() rpc.GafferService {
 
 func (this *pb_instance) Flags() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
 		return fromProtoTuples(this.pb.Flags)
 	}
@@ -337,7 +348,7 @@ func (this *pb_instance) Flags() rpc.Tuples {
 
 func (this *pb_instance) Env() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
 		return fromProtoTuples(this.pb.Env)
 	}
@@ -368,57 +379,5 @@ func (this *pb_instance) ExitCode() int64 {
 		return 0
 	} else {
 		return this.pb.ExitCode
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// TUPLES IMPLEMENTATION
-
-func (this *pb_tuples) Strings() []string {
-	if this.pb == nil {
-		return nil
-	} else {
-		reply := make([]string, len(this.pb.Tuples))
-		for i, tuple := range this.pb.Tuples {
-			reply[i] = fmt.Sprintf("%v=%v", tuple.Key, tuple.Value)
-		}
-		return reply
-	}
-}
-
-func (this *pb_tuples) Copy() rpc.Tuples {
-	if this.pb == nil {
-		return nil
-	} else {
-		reply := &pb_tuples{&pb.Tuples{
-			Tuples: make([]*pb.Tuple, len(this.pb.Tuples)),
-		}}
-		for i, tuple := range this.pb.Tuples {
-			reply.pb.Tuples[i] = &pb.Tuple{
-				Key:   tuple.Key,
-				Value: tuple.Value,
-			}
-		}
-		return reply
-	}
-}
-
-func (this *pb_tuples) Merge(that rpc.Tuples) error {
-	return gopi.ErrNotImplemented
-}
-
-func (this *pb_tuples) AddString(key, value string) error {
-	if this.pb == nil {
-		return gopi.ErrAppError
-	} else {
-		// Check to make sure tuple is not added
-		for _, tuple := range this.pb.Tuples {
-			if key == tuple.Key {
-				return fmt.Errorf("Key exists: %v", strconv.Quote(key))
-			}
-		}
-		// Add tuple
-		this.pb.Tuples = append(this.pb.Tuples, &pb.Tuple{Key: key, Value: value})
-		return nil
 	}
 }
