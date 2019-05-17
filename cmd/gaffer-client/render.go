@@ -48,6 +48,22 @@ func RenderFlags(flags rpc.Tuples) string {
 	}
 }
 
+func RenderEnv(env rpc.Tuples) string {
+	env_ := env.Env()
+	if len(env_) == 0 {
+		return "-"
+	} else {
+		env__ := ""
+		for i, e := range env_ {
+			if i > 0 {
+				env__ += "\n"
+			}
+			env__ += e
+		}
+		return env__
+	}
+}
+
 func RenderMode(service rpc.GafferService) string {
 	if service.InstanceCount() == 0 {
 		return "disabled"
@@ -103,8 +119,8 @@ func RenderGroups(fh io.Writer, groups []rpc.GafferServiceGroup) {
 	for _, group := range groups {
 		output.Append([]string{
 			"@" + group.Name(),
-			"TODO",
-			"TODO",
+			RenderFlags(group.Flags()),
+			RenderEnv(group.Env()),
 		})
 	}
 	output.Render()

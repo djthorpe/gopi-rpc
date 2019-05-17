@@ -136,6 +136,11 @@ type GafferClient interface {
 	GetInstanceId() (uint32, error)
 	StartInstance(string, uint32) (GafferServiceInstance, error)
 	StopInstance(uint32) (GafferServiceInstance, error)
+
+	// Set flags and env
+	SetFlagsForService(string, Tuples) (GafferService, error)
+	SetFlagsForGroup(string, Tuples) (GafferServiceGroup, error)
+	SetEnvForGroup(string, Tuples) (GafferServiceGroup, error)
 }
 
 type GafferServiceMode uint

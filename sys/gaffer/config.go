@@ -20,6 +20,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 	event "github.com/djthorpe/gopi/util/event"
 )
 
@@ -419,6 +420,55 @@ func (this *config) RemoveGroup(group *ServiceGroup) error {
 		return nil
 	} else {
 		return gopi.ErrNotModified
+	}
+}
+
+func (this *config) SetServiceFlags(service *Service, tuples rpc.Tuples) error {
+	this.log.Debug2("<gaffer.config>SetServiceFlags{ service=%v tuples=%v }", service, tuples)
+	if service == nil {
+		return gopi.ErrBadParameter
+	}
+	if service.Flags_.Equals(tuples) {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		service.Flags_ = tuples
+		this.modified = true
+		return nil
+	}
+
+}
+
+func (this *config) SetGroupFlags(group *ServiceGroup, tuples rpc.Tuples) error {
+	this.log.Debug2("<gaffer.config>SetGroupFlags{ group=%v tuples=%v }", group, tuples)
+	if group == nil {
+		return gopi.ErrBadParameter
+	}
+	if group.Flags_.Equals(tuples) {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		group.Flags_ = tuples
+		this.modified = true
+		return nil
+	}
+}
+
+func (this *config) SetGroupEnv(group *ServiceGroup, tuples rpc.Tuples) error {
+	this.log.Debug2("<gaffer.config>SetGroupEnv{ group=%v tuples=%v }", group, tuples)
+	if group == nil {
+		return gopi.ErrBadParameter
+	}
+	if group.Env_.Equals(tuples) {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		group.Env_ = tuples
+		this.modified = true
+		return nil
 	}
 }
 

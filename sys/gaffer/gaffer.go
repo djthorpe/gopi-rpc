@@ -414,8 +414,9 @@ func (this *gaffer) SetServiceFlagsForName(service string, tuples rpc.Tuples) er
 	}
 	if service_ := this.config.GetServiceByName(service); service_ == nil {
 		return gopi.ErrNotFound
+	} else if err := this.config.SetServiceFlags(service_, tuples); err != nil {
+		return err
 	} else {
-		service_.Flags_ = tuples
 		return nil
 	}
 }
@@ -427,8 +428,9 @@ func (this *gaffer) SetGroupFlagsForName(group string, tuples rpc.Tuples) error 
 	}
 	if group_ := this.config.GetGroupsByName([]string{group}); len(group_) == 0 {
 		return gopi.ErrNotFound
+	} else if err := this.config.SetGroupFlags(group_[0], tuples); err != nil {
+		return err
 	} else {
-		group_[0].Flags_ = tuples
 		return nil
 	}
 }
@@ -440,8 +442,9 @@ func (this *gaffer) SetGroupEnvForName(group string, tuples rpc.Tuples) error {
 	}
 	if group_ := this.config.GetGroupsByName([]string{group}); len(group_) == 0 {
 		return gopi.ErrNotFound
+	} else if err := this.config.SetGroupEnv(group_[0], tuples); err != nil {
+		return err
 	} else {
-		group_[0].Env_ = tuples
 		return nil
 	}
 }

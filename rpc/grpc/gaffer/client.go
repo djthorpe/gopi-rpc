@@ -269,19 +269,43 @@ func (this *Client) StopInstance(id uint32) (rpc.GafferServiceInstance, error) {
 func (this *Client) SetFlagsForService(service string, tuples rpc.Tuples) (rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
-	return nil, gopi.ErrNotImplemented
+
+	if reply, err := this.GafferClient.SetServiceFlags(this.NewContext(), &pb.SetTuplesRequest{
+		Name:   service,
+		Tuples: toProtoTuples(tuples),
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
+	}
 }
 
 func (this *Client) SetFlagsForGroup(group string, tuples rpc.Tuples) (rpc.GafferServiceGroup, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
-	return nil, gopi.ErrNotImplemented
+
+	if reply, err := this.GafferClient.SetGroupFlags(this.NewContext(), &pb.SetTuplesRequest{
+		Name:   group,
+		Tuples: toProtoTuples(tuples),
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoGroup(reply), nil
+	}
 }
 
 func (this *Client) SetEnvForGroup(group string, tuples rpc.Tuples) (rpc.GafferServiceGroup, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
-	return nil, gopi.ErrNotImplemented
+
+	if reply, err := this.GafferClient.SetGroupEnv(this.NewContext(), &pb.SetTuplesRequest{
+		Name:   group,
+		Tuples: toProtoTuples(tuples),
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoGroup(reply), nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -72,6 +72,19 @@ func (this *Tuples) RemoveAll() {
 	this.tuples = make([]*tuple, 0, cap(this.tuples))
 }
 
+// Equals returns true if the tuples are identical
+func (this Tuples) Equals(that Tuples) bool {
+	if this.Len() != that.Len() {
+		return false
+	}
+	for i, t := range this.tuples {
+		if t.Equals(that.tuples[i]) == false {
+			return false
+		}
+	}
+	return true
+}
+
 // SetStringForKey sets a tuple key-value pair. Returns error
 // if a key is invalid
 func (this *Tuples) SetStringForKey(k, v string) error {
@@ -160,7 +173,13 @@ func (this *Tuples) indexForKey(k string) int {
 }
 
 func (this *tuple) String() string {
-	return fmt.Sprintf("%v=%v", this.key, strconv.Quote(this.value))
+	if this.value == "" {
+		return fmt.Sprintf("%v", this.key)
+	} else if reTupleValueDigits.MatchString(this.value) || reTupleValueIdent.MatchString(this.value) {
+		return fmt.Sprintf("%v=%v", this.key, this.value)
+	} else {
+		return fmt.Sprintf("%v=%v", this.key, strconv.Quote(this.value))
+	}
 }
 
 func (this *tuple) Flag() string {
@@ -169,8 +188,12 @@ func (this *tuple) Flag() string {
 	} else if reTupleValueDigits.MatchString(this.value) || reTupleValueIdent.MatchString(this.value) {
 		return fmt.Sprintf("-%v=%v", this.key, this.value)
 	} else {
-		return fmt.Sprintf("%v=%v", this.key, strconv.Quote(this.value))
+		return fmt.Sprintf("-%v=%v", this.key, strconv.Quote(this.value))
 	}
+}
+
+func (this *tuple) Equals(that *tuple) bool {
+	return (this.key == that.key) && (this.value == that.value)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
