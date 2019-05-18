@@ -133,8 +133,8 @@ func RenderInstances(fh io.Writer, instances []rpc.GafferServiceInstance) {
 		output.Append([]string{
 			fmt.Sprint(instance.Id()),
 			fmt.Sprint(instance.Service().Name()),
-			"TODO",
-			"TODO",
+			RenderFlags(instance.Flags()),
+			RenderEnv(instance.Env()),
 			RenderInstanceStatus(instance),
 		})
 	}

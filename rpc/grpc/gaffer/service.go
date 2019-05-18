@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -38,6 +39,11 @@ type service struct {
 
 	event.Tasks
 }
+
+var (
+	prev_line = ""
+	prev_time = time.Now()
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // OPEN AND CLOSE
@@ -409,7 +415,11 @@ func (this *service) EventPrint(evt rpc.GafferEvent) {
 	switch evt.Type() {
 	case rpc.GAFFER_EVENT_LOG_STDERR, rpc.GAFFER_EVENT_LOG_STDOUT:
 		line := strings.Trim(string(evt.Data()), "\n")
-		this.log.Info("%v[%v]: %v", evt.Service().Name(), evt.Instance().Id(), line)
+		if line != prev_line || time.Now().Sub(prev_time) >= time.Second {
+			this.log.Info("%v[%v]: %v", evt.Service().Name(), evt.Instance().Id(), line)
+			prev_line = line
+			prev_time = time.Now()
+		}
 	default:
 		this.log.Info("%v", evt)
 	}
