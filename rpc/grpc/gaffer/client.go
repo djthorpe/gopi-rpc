@@ -11,6 +11,7 @@ package gaffer
 import (
 	"context"
 	"fmt"
+	"io"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -321,6 +322,29 @@ func (this *Client) SetServiceGroups(service string, groups []string) (rpc.Gaffe
 	} else {
 		return fromProtoService(reply), nil
 	}
+}
+
+func (this *Client) StreamEvents(events chan<- rpc.GafferEvent) error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	// Keep reading from stream
+	if stream, err := this.GafferClient.StreamEvents(this.NewContext(), &empty.Empty{}); err != nil {
+		return err
+	} else {
+		for {
+			if msg, err := stream.Recv(); err == io.EOF {
+				break
+			} else if err != nil {
+				return err
+			} else if evt := fromProtoEvent(msg); evt != nil {
+				events <- evt
+			}
+		}
+	}
+
+	// Success
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////

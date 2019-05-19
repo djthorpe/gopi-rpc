@@ -12,6 +12,7 @@ import (
 	"time"
 
 	// Frameworks
+	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Protocol buffers
@@ -32,6 +33,10 @@ type pb_group struct {
 
 type pb_instance struct {
 	pb *pb.Instance
+}
+
+type pb_event struct {
+	pb *pb.Event
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -173,6 +178,30 @@ func fromProtoInstanceArray(instances []*pb.Instance) []rpc.GafferServiceInstanc
 		instances_[i] = fromProtoInstance(instance)
 	}
 	return instances_
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// EVENTS
+
+func toProtoEvent(evt rpc.GafferEvent) *pb.Event {
+	if evt == nil {
+		return nil
+	}
+	return &pb.Event{
+		Type:     pb.Event_Type(evt.Type()),
+		Service:  toProtoFromService(evt.Service()),
+		Group:    toProtoFromGroup(evt.Group()),
+		Instance: toProtoFromInstance(evt.Instance()),
+		Data:     evt.Data(),
+		Ts:       ptypes.TimestampNow(),
+	}
+}
+
+func fromProtoEvent(evt *pb.Event) rpc.GafferEvent {
+	if evt == nil {
+		return nil
+	}
+	return &pb_event{evt}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -379,5 +408,60 @@ func (this *pb_instance) ExitCode() int64 {
 		return 0
 	} else {
 		return this.pb.ExitCode
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// EVENT IMPLEMENTATION
+
+func (this *pb_event) Source() gopi.Driver {
+	return nil
+}
+
+func (this *pb_event) Name() string {
+	return "GafferEvent"
+}
+
+func (this *pb_event) Type() rpc.GafferEventType {
+	if this.pb == nil {
+		return rpc.GAFFER_EVENT_NONE
+	} else {
+		return rpc.GafferEventType(this.pb.Type)
+	}
+}
+
+func (this *pb_event) Service() rpc.GafferService {
+	if this.pb == nil {
+		return nil
+	} else if this.pb.Service != nil {
+		return fromProtoService(this.pb.Service)
+	} else if this.pb.Instance.Service != nil {
+		return fromProtoService(this.pb.Instance.Service)
+	} else {
+		return nil
+	}
+}
+
+func (this *pb_event) Group() rpc.GafferServiceGroup {
+	if this.pb == nil {
+		return nil
+	} else {
+		return fromProtoGroup(this.pb.Group)
+	}
+}
+
+func (this *pb_event) Instance() rpc.GafferServiceInstance {
+	if this.pb == nil {
+		return nil
+	} else {
+		return fromProtoInstance(this.pb.Instance)
+	}
+}
+
+func (this *pb_event) Data() []byte {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Data
 	}
 }

@@ -31,14 +31,6 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type Command struct {
-	Name        string
-	Description string
-	Callback    func([]string, rpc.GafferClient) error
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 var (
 	commands = []*Command{
 		&Command{"service", "List available services", ListServices},
@@ -284,7 +276,7 @@ func DecodeTuples(args []string) (rpc.Tuples, error) {
 	return tuples, nil
 }
 
-func Run(app *gopi.AppInstance, client rpc.GafferClient) error {
+func Run2(app *gopi.AppInstance, client rpc.GafferClient) error {
 	args := app.AppFlags.Args()
 	if cmd, err := GetCommand(args); err != nil {
 		return err

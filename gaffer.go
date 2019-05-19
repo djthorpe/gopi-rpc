@@ -143,6 +143,9 @@ type GafferClient interface {
 
 	// Set other service parameters
 	SetServiceGroups(string, []string) (GafferService, error)
+
+	// Stream Events
+	StreamEvents(chan<- GafferEvent) error
 }
 
 type GafferServiceMode uint
