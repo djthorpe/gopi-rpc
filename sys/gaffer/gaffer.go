@@ -35,6 +35,9 @@ type Gaffer struct {
 	// Instances configuration
 	MaxInstances uint32
 	DeltaCleanup time.Duration
+
+	// Appflags
+	AppFlags *gopi.Flags
 }
 
 type gaffer struct {

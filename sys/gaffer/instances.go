@@ -11,9 +11,11 @@ package gaffer
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +37,7 @@ type Instances struct {
 	instances     map[uint32]*ServiceInstance
 	ids           map[uint32]time.Time
 	r             *rand.Rand
+	flags         *gopi.Flags
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -58,6 +61,7 @@ func (this *Instances) Init(config Gaffer, logger gopi.Logger) error {
 	this.instances = make(map[uint32]*ServiceInstance)
 	this.r = rand.New(rand.NewSource(time.Now().Unix()))
 	this.ids = make(map[uint32]time.Time)
+	this.flags = config.AppFlags
 
 	if config.MaxInstances == 0 {
 		this.max_instances = MAX_INSTANCES
@@ -92,7 +96,7 @@ func (this *Instances) Destroy() error {
 // CREATE INSTANCE WITH ID
 
 func (this *Instances) NewInstance(id uint32, service *Service, groups []*ServiceGroup, root string) (*ServiceInstance, error) {
-	this.log.Debug2("<gaffer.instances.NewInstance>{ id=%v service=%v groups=%v }", id, service, groups)
+	this.log.Debug2("<gaffer.instances.NewInstance>{ id=%v service=%v groups=%v root=%v }", id, service, groups, strconv.Quote(root))
 	// Check incoming parameters
 	if id == 0 || service == nil {
 		return nil, gopi.ErrBadParameter
@@ -122,7 +126,7 @@ func (this *Instances) NewInstance(id uint32, service *Service, groups []*Servic
 	}
 
 	// Create instance
-	if instance, err := NewInstance(id, service, groups, path); err != nil {
+	if instance, err := NewInstance(id, service, groups, path, this.TupleExpander); err != nil {
 		return nil, err
 	} else if instance == nil {
 		return nil, gopi.ErrAppError
@@ -170,7 +174,7 @@ func (this *Instances) Start(instance *ServiceInstance, ch chan<- rpc.GafferEven
 	}
 
 	if instance.process.cmd != nil {
-		this.log.Debug("%v %v", instance.process.cmd.Path, instance.Flags().Flags())
+		this.log.Debug("%v %v", instance.process.cmd.Path, strings.Join(instance.Flags().Flags(), " "))
 	}
 
 	// Start goroutines for receiving data from stdout and stderr
@@ -362,4 +366,42 @@ func (this *Instances) processStop(instance *ServiceInstance, in <-chan error, o
 
 func (this *Instances) String() string {
 	return fmt.Sprintf("<instances>{ instances=%v }", this.GetInstances())
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RESOLVER
+
+func (this *Instances) TupleExpander(key string) string {
+	this.log.Debug("<instances>TupleExpander{ key=%v flags=%v }", strconv.Quote(key))
+	switch key {
+	case "rpc.port":
+		// Return an unused port
+		if port, err := getUnusedPort(); err != nil {
+			this.log.Warn("getUnusedPort: %v", err)
+			return "0"
+		} else {
+			return fmt.Sprint(port)
+		}
+	case "rpc.sslcert", "rpc.sslkey":
+		// Return flag argument
+		if this.flags != nil {
+			if value, exists := this.flags.GetString(key); exists {
+				return value
+			}
+		}
+		fallthrough
+	default:
+		return "${" + key + "}"
+	}
+}
+
+func getUnusedPort() (int, error) {
+	if addr, err := net.ResolveTCPAddr("tcp", "localhost:0"); err != nil {
+		return 0, err
+	} else if listen, err := net.ListenTCP("tcp", addr); err != nil {
+		return 0, err
+	} else {
+		defer listen.Close()
+		return listen.Addr().(*net.TCPAddr).Port, nil
+	}
 }

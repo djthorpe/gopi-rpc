@@ -24,14 +24,13 @@ service Gaffer {
 
     // Edit service
     rpc AddService(ServiceRequest) returns (Service);
-    rpc SetServiceParameters(ServiceRequest) returns (Service);
     rpc RemoveService(NameRequest) returns (google.protobuf.Empty);
+    rpc SetServiceParameters(ServiceRequest) returns (Service);
 
     // Edit group
     rpc AddGroup(NameRequest) returns (Group);
     rpc RemoveGroup(NameRequest) returns (google.protobuf.Empty);
 
-    // Set flags & env
     rpc SetGroupFlags(SetTuplesRequest) returns (Group);
     rpc SetGroupEnv(SetTuplesRequest) returns (Group);
     rpc SetServiceFlags(SetTuplesRequest) returns (Service);

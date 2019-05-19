@@ -10,6 +10,7 @@ package gaffer
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -223,7 +224,7 @@ func (this *ServiceGroup) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // INSTANCE IMPLEMENTATION
 
-func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path string) (*ServiceInstance, error) {
+func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path string, expander func(string) string) (*ServiceInstance, error) {
 	// Check parameters
 	if id == 0 || service == nil || groups == nil {
 		return nil, gopi.ErrBadParameter
@@ -255,8 +256,38 @@ func NewInstance(id uint32, service *Service, groups []*ServiceGroup, path strin
 		}
 	}
 
-	// TODO: Resolve environment parameters
-	// TODO: Resolve flag parameters
+	// Resolve environment parameters
+	for _, key := range this.Env_.Keys() {
+		value := this.Env_.StringForKey(key)
+		this.Env_.SetStringForKey(key, os.Expand(value, func(key_ string) string {
+			if this.Env_.ExistsForKey(key_) {
+				return this.Env_.StringForKey(key_)
+			} else if key_ == "$" {
+				return key_
+			} else if expander != nil {
+				return expander(key_)
+			} else {
+				return "${" + key_ + "}"
+			}
+		}))
+	}
+
+	// Resolve flag parameters
+	for _, key := range this.Flags_.Keys() {
+		value := this.Flags_.StringForKey(key)
+		this.Flags_.SetStringForKey(key, os.Expand(value, func(key_ string) string {
+			if this.Env_.ExistsForKey(key_) {
+				return this.Env_.StringForKey(key_)
+			} else if key_ == "$" {
+				return key_
+			} else if expander != nil {
+				return expander(key_)
+			} else {
+				// Not found, replace with ${key}
+				return "${" + key_ + "}"
+			}
+		}))
+	}
 
 	// Make the process
 	if process, err := NewProcess(this); err != nil {

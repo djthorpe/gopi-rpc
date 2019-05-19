@@ -18,7 +18,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 type Command struct {
-	Name        string
+	Name        *regexp.Regexp
 	Description string
 	Callback    func([]string, rpc.GafferClient, rpc.DiscoveryClient) error
 }
@@ -26,41 +26,53 @@ type Command struct {
 ////////////////////////////////////////////////////////////////////////////////
 
 var (
-	reGroup      = regexp.MustCompile("^@[A-Za-z][A-Za-z0-9\\.\\-_]*$")
-	reExecutable = regexp.MustCompile("^/[A-Za-z][A-Za-z0-9\\/\\.\\-_]*$")
-	reService    = regexp.MustCompile("^[A-Za-z][A-Za-z0-9\\.\\-_]*$")
-	reInstance   = regexp.MustCompile("^[1-9][0-9]*$")
-	reRecord     = regexp.MustCompile("^_[A-Za-z][A-Za-z0-9\\.\\-_]*$")
+	reListGroups  = regexp.MustCompile("^@$")
+	reListRecords = regexp.MustCompile("^_$")
+	reListExecs   = regexp.MustCompile("^/$")
+	reGroup       = regexp.MustCompile("^@([A-Za-z][A-Za-z0-9\\.\\-_]*)$")
+	reExecutable  = regexp.MustCompile("^/([A-Za-z][A-Za-z0-9\\/\\.\\-_]*)$")
+	reService     = regexp.MustCompile("^([A-Za-z][A-Za-z0-9\\.\\-_]*)$")
+	reInstance    = regexp.MustCompile("^[1-9][0-9]*$")
+	reRecord      = regexp.MustCompile("^_[A-Za-z][A-Za-z0-9\\.\\-_]*$")
 )
 
 var (
 	cmd = []*Command{
 		// First command is the default one
-		&Command{"services", "List services and instances", CommandServices},
-		&Command{"groups", "List groups", CommandGroups},
-		&Command{"records", "List service records", CommandRecords},
-		&Command{"execs", "List executables", CommandExecs},
+		&Command{nil, "List all instances", ListAllInstances},
+		&Command{reListExecs, "List all executables", ListAllExecutables},
+		&Command{reListGroups, "List all groups", ListAllGroups},
+		&Command{reListRecords, "List all service records", ListAllServiceRecords},
+		&Command{reGroup, "Group commands", GroupCommands},
+		&Command{reRecord, "Service record commands", RecordCommands},
+		&Command{reService, "Service commands", ServiceCommands},
 	}
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func GetCommandForName(name string) *Command {
-	for _, command := range cmd {
-		if command.Name == name {
-			return command
+	if name == "" {
+		return cmd[0]
+	} else {
+		for _, command := range cmd {
+			if command.Name != nil && command.Name.MatchString(name) {
+				return command
+			}
 		}
 	}
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 func Run(app *gopi.AppInstance, gaffer rpc.GafferClient, discovery rpc.DiscoveryClient) error {
 	args := app.AppFlags.Args()
 	if len(args) == 0 {
-		RunCommand(cmd[0], app, gaffer, discovery)
+		return cmd[0].Callback(args, gaffer, discovery)
 	} else {
-		return gopi.ErrNotImplemented
+		if command := GetCommandForName(args[0]); command == nil {
+			return gopi.ErrHelp
+		} else {
+			return command.Callback(args, gaffer, discovery)
+		}
 	}
 }

@@ -26,7 +26,7 @@ import (
 
 	// Services
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/discovery"
-	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/googlecast"
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/gaffer"
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
 )
 

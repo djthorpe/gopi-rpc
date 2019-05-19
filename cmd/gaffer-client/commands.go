@@ -8,6 +8,7 @@
 
 package main
 
+/*
 import (
 	"encoding/json"
 	"os"
@@ -287,3 +288,4 @@ func Run2(app *gopi.AppInstance, client rpc.GafferClient) error {
 	// Success
 	return nil
 }
+*/
