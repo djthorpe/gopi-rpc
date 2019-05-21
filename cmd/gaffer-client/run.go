@@ -9,6 +9,7 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 
 	gopi "github.com/djthorpe/gopi"
@@ -43,9 +44,10 @@ var (
 		&Command{reListExecs, "List all executables", ListAllExecutables},
 		&Command{reListGroups, "List all groups", ListAllGroups},
 		&Command{reListRecords, "List all service records", ListAllServiceRecords},
-		&Command{reGroup, "Group commands", GroupCommands},
-		&Command{reRecord, "Service record commands", RecordCommands},
-		&Command{reService, "Service commands", ServiceCommands},
+		&Command{reGroup, "@<group> (add|rm|set|env|flags)", GroupCommands},
+		&Command{reRecord, "_<service-type>._tcp", RecordCommands},
+		&Command{reService, "<service> (rm|set|flags) (groups=@<group-list>)", ServiceCommands},
+		&Command{reExecutable, "/<executable> add (groups=@<group-list>)", AddService},
 	}
 )
 
@@ -65,14 +67,21 @@ func GetCommandForName(name string) *Command {
 }
 
 func Run(app *gopi.AppInstance, gaffer rpc.GafferClient, discovery rpc.DiscoveryClient) error {
+
 	args := app.AppFlags.Args()
 	if len(args) == 0 {
-		return cmd[0].Callback(args, gaffer, discovery)
+		if err := cmd[0].Callback(args, gaffer, discovery); err == gopi.ErrBadParameter {
+			return fmt.Errorf("Usage: %v %v", app.AppFlags.Name(), cmd[0].Description)
+		} else {
+			return err
+		}
 	} else {
 		if command := GetCommandForName(args[0]); command == nil {
 			return gopi.ErrHelp
+		} else if err := command.Callback(args, gaffer, discovery); err == gopi.ErrBadParameter {
+			return fmt.Errorf("Usage: %v %v", app.AppFlags.Name(), command.Description)
 		} else {
-			return command.Callback(args, gaffer, discovery)
+			return err
 		}
 	}
 }

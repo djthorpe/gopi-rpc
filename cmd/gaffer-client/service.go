@@ -10,6 +10,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -19,7 +20,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 func ServiceCommands(args []string, gaffer rpc.GafferClient, discovery rpc.DiscoveryClient) error {
-	// Obtain the group name
+	// Obtain the service name
 	service := reService.FindStringSubmatch(args[0])
 	if len(service) != 2 {
 		return gopi.ErrBadParameter
@@ -30,4 +31,23 @@ func ServiceCommands(args []string, gaffer rpc.GafferClient, discovery rpc.Disco
 
 	// Success
 	return nil
+}
+
+func AddService(args []string, gaffer rpc.GafferClient, discovery rpc.DiscoveryClient) error {
+	// Obtain the executable name
+	exec := reExecutable.FindStringSubmatch(args[0])
+	if len(exec) != 2 {
+		return gopi.ErrBadParameter
+	}
+	if len(args) < 2 {
+		return gopi.ErrBadParameter
+	}
+	if args[1] != "add" {
+		return gopi.ErrBadParameter
+	}
+	if service, err := gaffer.AddServiceForPath(exec[1], []string{}); err != nil {
+		return err
+	} else {
+		return OutputServices(os.Stdout, []rpc.GafferService{service})
+	}
 }
