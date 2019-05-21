@@ -36,7 +36,7 @@ type pb_instance struct {
 }
 
 type pb_event struct {
-	pb *pb.Event
+	pb *pb.GafferEvent
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -183,12 +183,12 @@ func fromProtoInstanceArray(instances []*pb.Instance) []rpc.GafferServiceInstanc
 ////////////////////////////////////////////////////////////////////////////////
 // EVENTS
 
-func toProtoEvent(evt rpc.GafferEvent) *pb.Event {
+func toProtoEvent(evt rpc.GafferEvent) *pb.GafferEvent {
 	if evt == nil {
 		return nil
 	}
-	return &pb.Event{
-		Type:     pb.Event_Type(evt.Type()),
+	return &pb.GafferEvent{
+		Type:     pb.GafferEvent_Type(evt.Type()),
 		Service:  toProtoFromService(evt.Service()),
 		Group:    toProtoFromGroup(evt.Group()),
 		Instance: toProtoFromInstance(evt.Instance()),
@@ -197,7 +197,7 @@ func toProtoEvent(evt rpc.GafferEvent) *pb.Event {
 	}
 }
 
-func fromProtoEvent(evt *pb.Event) rpc.GafferEvent {
+func fromProtoEvent(evt *pb.GafferEvent) rpc.GafferEvent {
 	if evt == nil {
 		return nil
 	}

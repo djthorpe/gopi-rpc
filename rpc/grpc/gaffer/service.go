@@ -416,7 +416,7 @@ FOR_LOOP:
 				this.log.Warn("StreamEvents: Ignoring event: %v", evt)
 			}
 		case <-ticker.C:
-			if err := stream.Send(&pb.Event{}); err != nil {
+			if err := stream.Send(&pb.GafferEvent{}); err != nil {
 				this.log.Warn("StreamEvents: %v", err)
 				break FOR_LOOP
 			}

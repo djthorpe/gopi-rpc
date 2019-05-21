@@ -43,6 +43,9 @@ service Gaffer {
 
     // Stop an instance
     rpc StopInstance(InstanceId) returns (Instance);
+
+    // Stream events
+    rpc StreamEvents (google.protobuf.Empty) returns (stream GafferEvent); 
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -132,6 +135,33 @@ message Instance {
     google.protobuf.Timestamp start_ts = 5;
     google.protobuf.Timestamp stop_ts = 6;
     int64 exit_code = 7;
+}
+
+message GafferEvent {
+    Type type = 1;
+    Service service = 2;
+    Instance instance = 3;
+    Group group = 4;
+    bytes data = 5;
+    google.protobuf.Timestamp ts = 6;
+    
+    enum Type {
+        NONE = 0;
+        SERVICE_ADD = 1;
+    	SERVICE_CHANGE = 2;
+    	SERVICE_REMOVE = 3;
+    	GROUP_ADD = 4;
+    	GROUP_CHANGE = 5;
+    	GROUP_REMOVE = 6;
+    	INSTANCE_ADD = 7;
+    	INSTANCE_START = 8;
+    	INSTANCE_RUN = 9;
+    	INSTANCE_STOP_OK = 10;
+    	INSTANCE_STOP_ERROR = 11;
+    	INSTANCE_STOP_KILLED = 12;
+	    LOG_STDOUT = 13;
+    	LOG_STDERR = 14;
+    }
 }
 
 message Tuples {
