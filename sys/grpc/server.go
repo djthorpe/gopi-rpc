@@ -33,6 +33,7 @@ type Server struct {
 	SSLCertificate string
 	Port           uint
 	ServerOption   []grpc.ServerOption
+	Zone           string
 	Util           rpc.Util
 }
 
@@ -42,6 +43,7 @@ type server struct {
 	server *grpc.Server
 	addr   net.Addr
 	ssl    bool
+	zone   string
 	util   rpc.Util
 
 	event.Publisher
@@ -49,6 +51,10 @@ type server struct {
 
 ////////////////////////////////////////////////////////////////////////////////
 // GLOBAL VARIABLES
+
+const (
+	DEFAULT_ZONE = "local."
+)
 
 var (
 	reService = regexp.MustCompile("[A-za-z][A-Za-z0-9\\-]*")
@@ -59,16 +65,20 @@ var (
 
 // Open the server
 func (config Server) Open(log gopi.Logger) (gopi.Driver, error) {
-	log.Debug("<grpc.Server>Open(port=%v,sslcert=\"%v\",sslkey=\"%v\")", config.Port, config.SSLCertificate, config.SSLKey)
+	log.Debug("<grpc.Server>Open{ port=%v sslcert=%v sslkey=%v zone=%v }", config.Port, strconv.Quote(config.SSLCertificate), strconv.Quote(config.SSLKey), strconv.Quote(config.Zone))
 
 	this := new(server)
 	this.log = log
 	this.port = config.Port
 	this.ssl = false
+	this.zone = strings.Trim(config.Zone, ".")
 	this.util = config.Util
 
-	if this.util == nil {
+	if this.util == nil || this.zone == "" {
 		return nil, gopi.ErrBadParameter
+	} else {
+		// Fully-qualified zone
+		this.zone = this.zone + "."
 	}
 
 	if config.SSLKey != "" && config.SSLCertificate != "" {
@@ -78,6 +88,9 @@ func (config Server) Open(log gopi.Logger) (gopi.Driver, error) {
 			this.server = grpc.NewServer(append(config.ServerOption, grpc.Creds(creds))...)
 		}
 		this.ssl = true
+	} else if config.SSLKey != "" || config.SSLCertificate != "" {
+		this.log.Warn("Both flags required: -rpc.sslcert and -rpc.sslkey")
+		return nil, gopi.ErrBadParameter
 	} else {
 		this.server = grpc.NewServer(config.ServerOption...)
 	}
@@ -173,6 +186,16 @@ func (this *server) Port() uint {
 	}
 }
 
+func (this *server) Hostname() (string, error) {
+	if hostname, err := os.Hostname(); err != nil {
+		return "", err
+	} else if strings.HasSuffix(hostname, this.zone) == true {
+		return hostname, nil
+	} else {
+		return strings.TrimSuffix(hostname, ".") + "." + this.zone, nil
+	}
+}
+
 // Return the gRPC server object
 func (this *server) GRPCServer() *grpc.Server {
 	return this.server
@@ -220,7 +243,7 @@ func (this *server) Service(service, subtype, name string, text ...string) gopi.
 		} else if err := r.SetName(name); err != nil {
 			this.log.Warn("grpc.Service: SetName: %v", err)
 			return nil
-		} else if hostname, err := os.Hostname(); err != nil {
+		} else if hostname, err := this.Hostname(); err != nil {
 			this.log.Warn("grpc.Service: SetAddr: %v", err)
 			return nil
 		} else if err := r.SetAddr(fmt.Sprintf("%v:%v", hostname, this.Port())); err != nil {

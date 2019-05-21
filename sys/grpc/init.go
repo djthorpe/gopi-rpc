@@ -34,15 +34,18 @@ func init() {
 			config.AppFlags.FlagUint("rpc.port", 0, "Server Port")
 			config.AppFlags.FlagString("rpc.sslcert", "", "SSL Certificate Path")
 			config.AppFlags.FlagString("rpc.sslkey", "", "SSL Key Path")
+			config.AppFlags.FlagString("rpc.zone", DEFAULT_ZONE, "Zone in which to register server")
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
 			port, _ := app.AppFlags.GetUint("rpc.port")
 			key, _ := app.AppFlags.GetString("rpc.sslkey")
 			cert, _ := app.AppFlags.GetString("rpc.sslcert")
+			zone, _ := app.AppFlags.GetString("rpc.zone")
 			return gopi.Open(Server{
 				Port:           port,
 				SSLCertificate: cert,
 				SSLKey:         key,
+				Zone:           zone,
 				ServerOption:   []grpc.ServerOption{},
 				Util:           app.ModuleInstance("rpc/util").(rpc.Util),
 			}, app.Logger)
