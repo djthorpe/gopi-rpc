@@ -11,6 +11,7 @@ package gaffer
 import (
 	"context"
 	"fmt"
+	"io"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -176,12 +177,13 @@ func (this *Client) ListInstances() ([]rpc.GafferServiceInstance, error) {
 	}
 }
 
-func (this *Client) AddServiceForPath(path string) (rpc.GafferService, error) {
+func (this *Client) AddServiceForPath(path string, groups []string) (rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	if reply, err := this.GafferClient.AddService(this.NewContext(), &pb.AddServiceRequest{
-		Path: path,
+	if reply, err := this.GafferClient.AddService(this.NewContext(), &pb.ServiceRequest{
+		Name:   path,
+		Groups: groups,
 	}); err != nil {
 		return nil, err
 	} else {
@@ -266,36 +268,83 @@ func (this *Client) StopInstance(id uint32) (rpc.GafferServiceInstance, error) {
 	}
 }
 
-func (this *Client) NewTuples() rpc.GafferTuples {
-	return &pb_tuples{&pb.Tuples{
-		Tuples: make([]*pb.Tuple, 0),
-	}}
-}
-
-func (this *Client) SetFlagsForService(service string, tuples rpc.GafferTuples) (rpc.GafferService, error) {
+func (this *Client) SetFlagsForService(service string, tuples rpc.Tuples) (rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	if service, err := this.GafferClient.SetServiceFlags(this.NewContext(), &pb.SetTuplesRequest{
+	if reply, err := this.GafferClient.SetServiceFlags(this.NewContext(), &pb.SetTuplesRequest{
 		Name:   service,
 		Tuples: toProtoTuples(tuples),
 	}); err != nil {
 		return nil, err
 	} else {
-		return fromProtoService(service), nil
+		return fromProtoService(reply), nil
 	}
 }
 
-func (this *Client) SetFlagsForGroup(group string, tuples rpc.GafferTuples) (rpc.GafferServiceGroup, error) {
+func (this *Client) SetFlagsForGroup(group string, tuples rpc.Tuples) (rpc.GafferServiceGroup, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
-	return nil, gopi.ErrNotImplemented
+
+	if reply, err := this.GafferClient.SetGroupFlags(this.NewContext(), &pb.SetTuplesRequest{
+		Name:   group,
+		Tuples: toProtoTuples(tuples),
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoGroup(reply), nil
+	}
 }
 
-func (this *Client) SetEnvForGroup(group string, tuples rpc.GafferTuples) (rpc.GafferServiceGroup, error) {
+func (this *Client) SetEnvForGroup(group string, tuples rpc.Tuples) (rpc.GafferServiceGroup, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
-	return nil, gopi.ErrNotImplemented
+
+	if reply, err := this.GafferClient.SetGroupEnv(this.NewContext(), &pb.SetTuplesRequest{
+		Name:   group,
+		Tuples: toProtoTuples(tuples),
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoGroup(reply), nil
+	}
+}
+
+func (this *Client) SetServiceGroups(service string, groups []string) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.SetServiceParameters(this.NewContext(), &pb.ServiceRequest{
+		Name:   service,
+		Groups: groups,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
+	}
+}
+
+func (this *Client) StreamEvents(events chan<- rpc.GafferEvent) error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	// Keep reading from stream
+	if stream, err := this.GafferClient.StreamEvents(this.NewContext(), &empty.Empty{}); err != nil {
+		return err
+	} else {
+		for {
+			if msg, err := stream.Recv(); err == io.EOF {
+				break
+			} else if err != nil {
+				return err
+			} else if evt := fromProtoEvent(msg); evt != nil {
+				events <- evt
+			}
+		}
+	}
+
+	// Success
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -32,6 +32,7 @@ func init() {
 				Path:        path,
 				BinRoot:     binroot,
 				BinOverride: binoverride,
+				AppFlags:    app.AppFlags,
 			}, app.Logger)
 		},
 	})

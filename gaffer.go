@@ -11,6 +11,10 @@ package rpc
 
 import (
 	// Frameworks
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/djthorpe/gopi"
@@ -36,8 +40,7 @@ type Gaffer interface {
 	SetServiceNameForName(service string, new string) error
 	SetServiceModeForName(string, GafferServiceMode) error
 	SetServiceInstanceCountForName(service string, count uint) error
-	AddServiceGroupForName(service string, group string, position uint) error
-	RemoveServiceGroupForName(service string, group string) error
+	SetServiceGroupsForName(service string, groups []string) error
 
 	// Groups
 	GetGroupsForNames([]string) []GafferServiceGroup
@@ -46,10 +49,9 @@ type Gaffer interface {
 	RemoveGroupForName(string) error
 
 	// Tuples
-	NewTuples() GafferTuples
-	SetServiceFlagsForName(string, GafferTuples) error
-	SetGroupFlagsForName(string, GafferTuples) error
-	SetGroupEnvForName(string, GafferTuples) error
+	SetServiceFlagsForName(string, Tuples) error
+	SetGroupFlagsForName(string, Tuples) error
+	SetGroupEnvForName(string, Tuples) error
 
 	// Instances
 	GetInstanceForId(id uint32) GafferServiceInstance
@@ -69,29 +71,21 @@ type GafferService interface {
 	InstanceCount() uint
 	RunTime() time.Duration
 	IdleTime() time.Duration
-
-	// Flags
-	Flags() GafferTuples
-
-	// Groups
+	Flags() Tuples
 	IsMemberOfGroup(string) bool
 }
 
 type GafferServiceGroup interface {
 	Name() string
-
-	// Flags
-	Flags() []string
-
-	// Env
-	Env() []string
+	Flags() Tuples
+	Env() Tuples
 }
 
 type GafferServiceInstance interface {
 	Id() uint32
 	Service() GafferService
-	Flags() []string
-	Env() []string
+	Flags() Tuples
+	Env() Tuples
 	Start() time.Time
 	Stop() time.Time
 	ExitCode() int64
@@ -105,14 +99,6 @@ type GafferEvent interface {
 	Group() GafferServiceGroup
 	Instance() GafferServiceInstance
 	Data() []byte
-}
-
-type GafferTuples interface {
-	// Return an array of tuples in string format
-	Strings() []string
-
-	// Add tuples
-	AddString(string, string) error
 }
 
 type GafferClient interface {
@@ -138,23 +124,28 @@ type GafferClient interface {
 	ListInstances() ([]GafferServiceInstance, error)
 
 	// Add services and groups
-	AddServiceForPath(path string) (GafferService, error)
-	AddGroupForName(name string) (GafferServiceGroup, error)
+	AddServiceForPath(path string, groups []string) (GafferService, error)
+	AddGroupForName(string) (GafferServiceGroup, error)
 
 	// Remove services and groups
-	RemoveServiceForName(name string) error
-	RemoveGroupForName(name string) error
+	RemoveServiceForName(string) error
+	RemoveGroupForName(string) error
 
 	// Start instances
 	GetInstanceId() (uint32, error)
 	StartInstance(string, uint32) (GafferServiceInstance, error)
 	StopInstance(uint32) (GafferServiceInstance, error)
 
-	// Tuples
-	NewTuples() GafferTuples
-	SetFlagsForService(string, GafferTuples) (GafferService, error)
-	SetFlagsForGroup(string, GafferTuples) (GafferServiceGroup, error)
-	SetEnvForGroup(string, GafferTuples) (GafferServiceGroup, error)
+	// Set flags and env
+	SetFlagsForService(string, Tuples) (GafferService, error)
+	SetFlagsForGroup(string, Tuples) (GafferServiceGroup, error)
+	SetEnvForGroup(string, Tuples) (GafferServiceGroup, error)
+
+	// Set other service parameters
+	SetServiceGroups(string, []string) (GafferService, error)
+
+	// Stream Events
+	StreamEvents(chan<- GafferEvent) error
 }
 
 type GafferServiceMode uint
@@ -183,7 +174,7 @@ const (
 	GAFFER_EVENT_INSTANCE_RUN
 	GAFFER_EVENT_INSTANCE_STOP_OK
 	GAFFER_EVENT_INSTANCE_STOP_ERROR
-	GAFFER_EVENT_INSTANCE_STOP_ZOMBIE
+	GAFFER_EVENT_INSTANCE_STOP_KILLED
 	GAFFER_EVENT_LOG_STDOUT
 	GAFFER_EVENT_LOG_STDERR
 )
@@ -230,9 +221,39 @@ func (t GafferEventType) String() string {
 		return "GAFFER_EVENT_INSTANCE_STOP_OK"
 	case GAFFER_EVENT_INSTANCE_STOP_ERROR:
 		return "GAFFER_EVENT_INSTANCE_STOP_ERROR"
-	case GAFFER_EVENT_INSTANCE_STOP_ZOMBIE:
-		return "GAFFER_EVENT_INSTANCE_STOP_ZOMBIE"
+	case GAFFER_EVENT_INSTANCE_STOP_KILLED:
+		return "GAFFER_EVENT_INSTANCE_STOP_KILLED"
 	default:
 		return "[?? Invalid GafferEventType value]"
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// JSONIFY
+
+func (m GafferServiceMode) MarshalJSON() ([]byte, error) {
+	switch m {
+	case GAFFER_MODE_MANUAL:
+		return []byte("\"manual\""), nil
+	case GAFFER_MODE_AUTO:
+		return []byte("\"auto\""), nil
+	default:
+		return nil, fmt.Errorf("Syntax error: %v", m)
+	}
+}
+
+func (m *GafferServiceMode) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch strings.ToLower(s) {
+	case "auto":
+		*m = GAFFER_MODE_AUTO
+	case "manual":
+		*m = GAFFER_MODE_MANUAL
+	default:
+		return fmt.Errorf("Syntax error: %v (expecting 'auto' or 'manual')", strconv.Quote(s))
+	}
+	return nil
 }

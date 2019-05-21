@@ -10,13 +10,12 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
 	// Frameworks
+	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
-	tablewriter "github.com/olekukonko/tablewriter"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -25,15 +24,15 @@ func RenderGroupList(groups []string) string {
 	groups_ := ""
 	for i, group := range groups {
 		if i > 0 {
-			groups_ += ","
+			groups_ += " "
 		}
 		groups_ += "@" + group
 	}
 	return groups_
 }
 
-func RenderFlags(flags rpc.GafferTuples) string {
-	flags_ := flags.Strings()
+func RenderFlags(flags rpc.Tuples) string {
+	flags_ := flags.Flags()
 	if len(flags_) == 0 {
 		return "-"
 	} else {
@@ -45,6 +44,22 @@ func RenderFlags(flags rpc.GafferTuples) string {
 			flags__ += flag
 		}
 		return flags__
+	}
+}
+
+func RenderEnv(env rpc.Tuples) string {
+	env_ := env.Env()
+	if len(env_) == 0 {
+		return "-"
+	} else {
+		env__ := ""
+		for i, e := range env_ {
+			if i > 0 {
+				env__ += "\n"
+			}
+			env__ += e
+		}
+		return env__
 	}
 }
 
@@ -81,46 +96,33 @@ func RenderDuration(duration time.Duration) string {
 	return fmt.Sprint(duration.Truncate(time.Second))
 }
 
-func RenderServices(fh io.Writer, services []rpc.GafferService) {
-	output := tablewriter.NewWriter(fh)
-	output.SetHeader([]string{"SERVICE", "GROUPS", "FLAGS", "MODE", "RUN TIME", "IDLE TIME"})
-	for _, service := range services {
-		output.Append([]string{
-			service.Name(),
-			RenderGroupList(service.Groups()),
-			RenderFlags(service.Flags()),
-			RenderMode(service),
-			RenderDuration(service.RunTime()),
-			RenderDuration(service.IdleTime()),
-		})
+func RenderHost(service gopi.RPCServiceRecord) string {
+	if service.Port() == 0 {
+		return service.Host()
+	} else {
+		return fmt.Sprintf("%v:%v", service.Host(), service.Port())
 	}
-	output.Render()
 }
 
-func RenderGroups(fh io.Writer, groups []rpc.GafferServiceGroup) {
-	output := tablewriter.NewWriter(fh)
-	output.SetHeader([]string{"GROUP", "FLAGS", "ENV"})
-	for _, group := range groups {
-		output.Append([]string{
-			"@" + group.Name(),
-			"TODO",
-			"TODO",
-		})
+func RenderService(service gopi.RPCServiceRecord) string {
+	if service.Subtype() == "" {
+		return service.Service()
+	} else {
+		return fmt.Sprintf("%v, %v", service.Subtype(), service.Service())
 	}
-	output.Render()
 }
 
-func RenderInstances(fh io.Writer, instances []rpc.GafferServiceInstance) {
-	output := tablewriter.NewWriter(fh)
-	output.SetHeader([]string{"INSTANCE", "SERVICE", "FLAGS", "ENV", "STATUS"})
-	for _, instance := range instances {
-		output.Append([]string{
-			fmt.Sprint(instance.Id()),
-			fmt.Sprint(instance.Service().Name()),
-			"TODO",
-			"TODO",
-			RenderInstanceStatus(instance),
-		})
+func RenderIP(service gopi.RPCServiceRecord) string {
+	ips := make([]string, 0)
+	for _, ip := range service.IP4() {
+		ips = append(ips, fmt.Sprint(ip))
 	}
-	output.Render()
+	for _, ip := range service.IP6() {
+		ips = append(ips, fmt.Sprint(ip))
+	}
+	return strings.Join(ips, "\n")
+}
+
+func RenderTxt(service gopi.RPCServiceRecord) string {
+	return strings.Join(service.Text(), "\n")
 }

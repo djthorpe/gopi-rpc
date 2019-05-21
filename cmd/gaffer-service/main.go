@@ -16,11 +16,13 @@ import (
 	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
+	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
 	_ "github.com/djthorpe/gopi-rpc/sys/gaffer"
 	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi/sys/logger"
 
 	// Services
+	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/discovery"
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/gaffer"
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
 )
@@ -29,7 +31,7 @@ import (
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/gaffer:service", "rpc/version:service")
+	config := gopi.NewAppConfig("rpc/gaffer:service", "rpc/version:service", "rpc/discovery:service")
 
 	// Run the server and register all the services
 	os.Exit(rpc.Server(config))

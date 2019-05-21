@@ -20,6 +20,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 	event "github.com/djthorpe/gopi/util/event"
 )
 
@@ -422,6 +423,73 @@ func (this *config) RemoveGroup(group *ServiceGroup) error {
 	}
 }
 
+func (this *config) SetServiceFlags(service *Service, tuples rpc.Tuples) error {
+	this.log.Debug2("<gaffer.config>SetServiceFlags{ service=%v tuples=%v }", service, tuples)
+	if service == nil {
+		return gopi.ErrBadParameter
+	}
+	if service.Flags_.Equals(tuples) {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		service.Flags_ = tuples
+		this.modified = true
+		return nil
+	}
+
+}
+
+func (this *config) SetServiceGroups(service *Service, groups []string) error {
+	this.log.Debug2("<gaffer.config>SetServiceGroups{ service=%v groups=%v }", service, groups)
+	if service == nil || groups == nil {
+		return gopi.ErrBadParameter
+	} else if stringArrayEquals(service.Groups_, groups) == true {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		service.Groups_ = make([]string, len(groups))
+		for i, group := range groups {
+			service.Groups_[i] = group
+		}
+		this.modified = true
+		return nil
+	}
+}
+
+func (this *config) SetGroupFlags(group *ServiceGroup, tuples rpc.Tuples) error {
+	this.log.Debug2("<gaffer.config>SetGroupFlags{ group=%v tuples=%v }", group, tuples)
+	if group == nil {
+		return gopi.ErrBadParameter
+	}
+	if group.Flags_.Equals(tuples) {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		group.Flags_ = tuples
+		this.modified = true
+		return nil
+	}
+}
+
+func (this *config) SetGroupEnv(group *ServiceGroup, tuples rpc.Tuples) error {
+	this.log.Debug2("<gaffer.config>SetGroupEnv{ group=%v tuples=%v }", group, tuples)
+	if group == nil {
+		return gopi.ErrBadParameter
+	}
+	if group.Env_.Equals(tuples) {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		group.Env_ = tuples
+		this.modified = true
+		return nil
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // BACKGROUND TASKS
 
@@ -459,4 +527,16 @@ FOR_LOOP:
 
 	// Success
 	return nil
+}
+
+func stringArrayEquals(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, elem := range a {
+		if elem != b[i] {
+			return false
+		}
+	}
+	return true
 }

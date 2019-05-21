@@ -9,17 +9,15 @@
 package gaffer
 
 import (
-	"fmt"
-	"strconv"
 	"time"
 
-	"github.com/golang/protobuf/ptypes"
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/gaffer"
+	ptypes "github.com/golang/protobuf/ptypes"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -37,8 +35,8 @@ type pb_instance struct {
 	pb *pb.Instance
 }
 
-type pb_tuples struct {
-	pb *pb.Tuples
+type pb_event struct {
+	pb *pb.GafferEvent
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,8 +95,8 @@ func toProtoFromGroup(group rpc.GafferServiceGroup) *pb.Group {
 	}
 	return &pb.Group{
 		Name:  group.Name(),
-		Flags: group.Flags(),
-		Env:   group.Env(),
+		Flags: toProtoTuples(group.Flags()),
+		Env:   toProtoTuples(group.Env()),
 	}
 }
 
@@ -145,8 +143,8 @@ func toProtoFromInstance(instance rpc.GafferServiceInstance) *pb.Instance {
 		return &pb.Instance{
 			Id:       instance.Id(),
 			Service:  toProtoFromService(instance.Service()),
-			Flags:    instance.Flags(),
-			Env:      instance.Env(),
+			Flags:    toProtoTuples(instance.Flags()),
+			Env:      toProtoTuples(instance.Env()),
 			StartTs:  start_ts,
 			StopTs:   stop_ts,
 			ExitCode: instance.ExitCode(),
@@ -183,17 +181,60 @@ func fromProtoInstanceArray(instances []*pb.Instance) []rpc.GafferServiceInstanc
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// TUPLES
+// EVENTS
 
-func toProtoTuples(tuples rpc.GafferTuples) *pb.Tuples {
-	if tuples == nil {
+func toProtoEvent(evt rpc.GafferEvent) *pb.GafferEvent {
+	if evt == nil {
 		return nil
 	}
-	return &pb.Tuples{}
+	return &pb.GafferEvent{
+		Type:     pb.GafferEvent_Type(evt.Type()),
+		Service:  toProtoFromService(evt.Service()),
+		Group:    toProtoFromGroup(evt.Group()),
+		Instance: toProtoFromInstance(evt.Instance()),
+		Data:     evt.Data(),
+		Ts:       ptypes.TimestampNow(),
+	}
 }
 
-func fromProtoTuples(tuples *pb.Tuples) rpc.GafferTuples {
-	return &pb_tuples{tuples}
+func fromProtoEvent(evt *pb.GafferEvent) rpc.GafferEvent {
+	if evt == nil {
+		return nil
+	}
+	return &pb_event{evt}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TUPLES
+
+func toProtoTuples(tuples rpc.Tuples) *pb.Tuples {
+	proto := &pb.Tuples{
+		Tuples: make([]*pb.Tuple, tuples.Len()),
+	}
+	for i, key := range tuples.Keys() {
+		proto.Tuples[i] = &pb.Tuple{
+			Key:   key,
+			Value: tuples.StringForKey(key),
+		}
+	}
+	return proto
+}
+
+func fromProtoTuples(proto *pb.Tuples) rpc.Tuples {
+	if proto == nil {
+		return rpc.Tuples{}
+	}
+
+	// Copy over the tuples
+	tuples := rpc.Tuples{}
+	for _, tuple := range proto.Tuples {
+		if err := tuples.SetStringForKey(tuple.Key, tuple.Value); err != nil {
+			return rpc.Tuples{}
+		}
+	}
+
+	// Return tuples
+	return tuples
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -259,13 +300,9 @@ func (this *pb_service) IdleTime() time.Duration {
 	}
 }
 
-func (this *pb_service) SetFlags(map[string]string) error {
-	return gopi.ErrNotImplemented
-}
-
-func (this *pb_service) Flags() rpc.GafferTuples {
+func (this *pb_service) Flags() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
 		return fromProtoTuples(this.pb.Flags)
 	}
@@ -295,19 +332,19 @@ func (this *pb_group) Name() string {
 	}
 }
 
-func (this *pb_group) Flags() []string {
+func (this *pb_group) Flags() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
-		return this.pb.Flags
+		return fromProtoTuples(this.pb.Flags)
 	}
 }
 
-func (this *pb_group) Env() []string {
+func (this *pb_group) Env() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
-		return this.pb.Env
+		return fromProtoTuples(this.pb.Env)
 	}
 }
 
@@ -330,19 +367,19 @@ func (this *pb_instance) Service() rpc.GafferService {
 	}
 }
 
-func (this *pb_instance) Flags() []string {
+func (this *pb_instance) Flags() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
-		return this.pb.Flags
+		return fromProtoTuples(this.pb.Flags)
 	}
 }
 
-func (this *pb_instance) Env() []string {
+func (this *pb_instance) Env() rpc.Tuples {
 	if this.pb == nil {
-		return nil
+		return rpc.Tuples{}
 	} else {
-		return this.pb.Env
+		return fromProtoTuples(this.pb.Env)
 	}
 }
 
@@ -375,32 +412,56 @@ func (this *pb_instance) ExitCode() int64 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// TUPLES IMPLEMENTATION
+// EVENT IMPLEMENTATION
 
-func (this *pb_tuples) Strings() []string {
+func (this *pb_event) Source() gopi.Driver {
+	return nil
+}
+
+func (this *pb_event) Name() string {
+	return "GafferEvent"
+}
+
+func (this *pb_event) Type() rpc.GafferEventType {
 	if this.pb == nil {
-		return nil
+		return rpc.GAFFER_EVENT_NONE
 	} else {
-		reply := make([]string, len(this.pb.Tuples))
-		for i, tuple := range this.pb.Tuples {
-			reply[i] = fmt.Sprintf("%v=%v", tuple.Key, tuple.Value)
-		}
-		return reply
+		return rpc.GafferEventType(this.pb.Type)
 	}
 }
 
-func (this *pb_tuples) AddString(key, value string) error {
+func (this *pb_event) Service() rpc.GafferService {
 	if this.pb == nil {
-		return gopi.ErrAppError
-	} else {
-		// Check to make sure tuple is not added
-		for _, tuple := range this.pb.Tuples {
-			if key == tuple.Key {
-				return fmt.Errorf("Key exists: %v", strconv.Quote(key))
-			}
-		}
-		// Add tuple
-		this.pb.Tuples = append(this.pb.Tuples, &pb.Tuple{Key: key, Value: value})
 		return nil
+	} else if this.pb.Service != nil {
+		return fromProtoService(this.pb.Service)
+	} else if this.pb.Instance.Service != nil {
+		return fromProtoService(this.pb.Instance.Service)
+	} else {
+		return nil
+	}
+}
+
+func (this *pb_event) Group() rpc.GafferServiceGroup {
+	if this.pb == nil {
+		return nil
+	} else {
+		return fromProtoGroup(this.pb.Group)
+	}
+}
+
+func (this *pb_event) Instance() rpc.GafferServiceInstance {
+	if this.pb == nil {
+		return nil
+	} else {
+		return fromProtoInstance(this.pb.Instance)
+	}
+}
+
+func (this *pb_event) Data() []byte {
+	if this.pb == nil {
+		return nil
+	} else {
+		return this.pb.Data
 	}
 }

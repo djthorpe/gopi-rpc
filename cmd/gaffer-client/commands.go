@@ -8,13 +8,13 @@
 
 package main
 
+/*
 import (
-	"fmt"
+	"encoding/json"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -32,14 +32,6 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type Command struct {
-	Name        string
-	Description string
-	Callback    func([]string, rpc.GafferClient) error
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 var (
 	commands = []*Command{
 		&Command{"service", "List available services", ListServices},
@@ -50,7 +42,8 @@ var (
 		&Command{"rm", "Remove a service or group", RemoveServiceGroup},
 		&Command{"start", "Start a service or group", StartServiceGroup},
 		&Command{"stop", "Stop an instance, service or group", StopServiceGroup},
-		&Command{"flags", "Set flags for a service or group", SetFlags},
+		&Command{"flags", "Set flags for instance or group", FlagsServiceGroup},
+		&Command{"groups", "Set groups for a service", SetServiceGroups},
 	}
 
 	reInstanceId  = regexp.MustCompile("^[0-9]+$")
@@ -137,7 +130,7 @@ func AddServiceGroup(args []string, client rpc.GafferClient) error {
 			RenderGroups(os.Stdout, []rpc.GafferServiceGroup{group_})
 		}
 	} else {
-		if service_, err := client.AddServiceForPath(service_group); err != nil {
+		if service_, err := client.AddServiceForPath(service_group, []string{}); err != nil {
 			return err
 		} else {
 			RenderServices(os.Stdout, []rpc.GafferService{service_})
@@ -214,84 +207,77 @@ func StopServiceGroup(args []string, client rpc.GafferClient) error {
 	return nil
 }
 
-func SetFlags(args []string, client rpc.GafferClient) error {
-	if len(args) <= 2 {
+func FlagsServiceGroup(args []string, client rpc.GafferClient) error {
+	if len(args) < 2 {
 		return gopi.ErrBadParameter
 	}
-
-	if service_group := args[1]; reServiceName.MatchString(service_group) {
-		if tuples, err := Tuples(client, args[2:], true); err != nil {
-			return err
-		} else if service, err := client.SetFlagsForService(service_group, tuples); err != nil {
-			return err
-		} else {
-			RenderServices(os.Stdout, []rpc.GafferService{service})
-		}
-	} else if reGroupName.MatchString(service_group) {
+	if service_group := args[1]; reGroupName.MatchString(service_group) {
 		group := strings.TrimPrefix(service_group, "@")
-		if tuples, err := Tuples(client, args[2:], false); err != nil {
+		if tuples, err := DecodeTuples(args[2:]); err != nil {
 			return err
 		} else if group, err := client.SetFlagsForGroup(group, tuples); err != nil {
 			return err
 		} else {
 			RenderGroups(os.Stdout, []rpc.GafferServiceGroup{group})
 		}
+	} else if reServiceName.MatchString(service_group) {
+		if tuples, err := DecodeTuples(args[2:]); err != nil {
+			return err
+		} else if service, err := client.SetFlagsForService(service_group, tuples); err != nil {
+			return err
+		} else {
+			RenderServices(os.Stdout, []rpc.GafferService{service})
+		}
 	} else {
 		return gopi.ErrBadParameter
 	}
 
-	// Success
+	// Return success
 	return nil
 }
 
-func Tuples(client rpc.GafferClient, args []string, flag bool) (rpc.GafferTuples, error) {
-	if len(args) == 0 {
-		// With zero arguments, return bad parameter
-		return nil, gopi.ErrBadParameter
-	} else if len(args) == 1 && args[0] == "-" {
-		// Return empty tuples array
-		return client.NewTuples(), nil
-	} else {
-		tuples := client.NewTuples()
-		for _, tuple := range args {
-			if flag && strings.HasPrefix(tuple, "-") {
-				// Remove initial -
-				tuple = strings.TrimPrefix(tuple, "-")
-			}
-			if reTupleKey.MatchString(tuple) {
-				tuples.AddString(tuple, "true")
-			} else if match := reTuplePair.FindStringSubmatch(tuple); match != nil && len(match) == 3 {
-				if value, err := TupleConv(match[2]); err != nil {
-					return nil, err
-				} else {
-					tuples.AddString(match[1], value)
-				}
+func SetServiceGroups(args []string, client rpc.GafferClient) error {
+	if len(args) < 3 {
+		return gopi.ErrBadParameter
+	}
+	if service_group := args[1]; reServiceName.MatchString(service_group) {
+		groups := make([]string, len(args)-2)
+		for i, group := range args[2:] {
+			if reGroupName.MatchString(group) == false {
+				return gopi.ErrBadParameter
 			} else {
-				return nil, fmt.Errorf("Invalid argument: %v", strconv.Quote(tuple))
+				groups[i] = strings.TrimPrefix(group, "@")
 			}
 		}
-		return tuples, nil
+		if service, err := client.SetServiceGroups(service_group, groups); err != nil {
+			return err
+		} else {
+			RenderServices(os.Stdout, []rpc.GafferService{service})
+		}
+	} else {
+		return gopi.ErrBadParameter
 	}
+	// Return success
+	return nil
 }
 
-func TupleConv(value string) (string, error) {
-	if value_int, err := strconv.ParseInt(value, 10, 64); err == nil {
-		return fmt.Sprint(value_int), nil
+func DecodeTuples(args []string) (rpc.Tuples, error) {
+	var tuples rpc.Tuples
+	// Remove initial minus sign
+	for i, arg := range args {
+		args[i] = strings.TrimPrefix(arg, "-")
 	}
-	if value_uint, err := strconv.ParseUint(value, 10, 64); err == nil {
-		return fmt.Sprint(value_uint), nil
+	// JSON encode and then decode
+	if b, err := json.Marshal(args); err != nil {
+		return tuples, err
+	} else if err := tuples.UnmarshalJSON(b); err != nil {
+		return tuples, err
 	}
-	if value_bool, err := strconv.ParseBool(value); err == nil {
-		return fmt.Sprint(value_bool), nil
-	}
-	if value_duration, err := time.ParseDuration(value); err == nil {
-		return fmt.Sprint(value_duration), nil
-	}
-	// We assume it's a string at this point
-	return value, nil
+	// Return tuples
+	return tuples, nil
 }
 
-func Run(app *gopi.AppInstance, client rpc.GafferClient) error {
+func Run2(app *gopi.AppInstance, client rpc.GafferClient) error {
 	args := app.AppFlags.Args()
 	if cmd, err := GetCommand(args); err != nil {
 		return err
@@ -302,3 +288,4 @@ func Run(app *gopi.AppInstance, client rpc.GafferClient) error {
 	// Success
 	return nil
 }
+*/

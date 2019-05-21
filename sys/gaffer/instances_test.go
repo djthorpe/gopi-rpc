@@ -16,6 +16,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
 	gaffer "github.com/djthorpe/gopi-rpc/sys/gaffer"
 	logger "github.com/djthorpe/gopi/sys/logger"
 )
@@ -155,7 +156,7 @@ func Test_Instances_007(t *testing.T) {
 		t.Fatalf("instances: %v", err)
 	} else {
 		defer instances.Destroy()
-		service := &gaffer.Service{Name_: test_exec, InstanceCount_: 1, Path_: test_exec}
+		service := &gaffer.Service{Name_: test_exec, InstanceCount_: 1, Path_: test_exec, Groups_: []string{}, Flags_: NewTuples(), Env_: NewTuples(), Mode_: rpc.GAFFER_MODE_MANUAL}
 		if _, err := instances.NewInstance(1, service, nil, test_folder); err == nil {
 			t.Error("Expecting err != nil")
 		} else {
@@ -164,7 +165,7 @@ func Test_Instances_007(t *testing.T) {
 
 		if id := instances.GetUnusedIdentifier(); id == 0 {
 			t.Error("Expecting id != 0")
-		} else if instance, err := instances.NewInstance(id, service, nil, tmp_folder); err != nil {
+		} else if instance, err := instances.NewInstance(id, service, []*gaffer.ServiceGroup{}, tmp_folder); err != nil {
 			t.Errorf("Unexpected error=%v", err)
 		} else if instance == nil {
 			t.Errorf("Unexpected instance == nil")
@@ -213,7 +214,7 @@ func Test_Instances_009(t *testing.T) {
 			t.Error("Expecting service != nil")
 		} else if id := instances.GetUnusedIdentifier(); id == 0 {
 			t.Error("Expecting id != 0")
-		} else if instance, err := instances.NewInstance(id, service, nil, ""); err != nil {
+		} else if instance, err := instances.NewInstance(id, service, []*gaffer.ServiceGroup{}, ""); err != nil {
 			t.Errorf("NewInstance: %v", err)
 		} else if instance == nil {
 			t.Error("instance != nil")
@@ -231,4 +232,8 @@ func MakeRegularFile(tmpfolder, tmpfile string, permissions os.FileMode) error {
 	} else {
 		return nil
 	}
+}
+
+func NewTuples() rpc.Tuples {
+	return rpc.Tuples{}
 }

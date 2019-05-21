@@ -29,6 +29,7 @@ type Process struct {
 	cancel         context.CancelFunc
 	stdout, stderr io.ReadCloser
 	start, stop    time.Time
+	wg             sync.WaitGroup
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +46,7 @@ var (
 func NewProcess(instance *ServiceInstance) (*Process, error) {
 	this := new(Process)
 	ctx, cancel := ctxForTimeout(instance.RunTime())
-	this.cmd = exec.CommandContext(ctx, instance.Path(), instance.Flags()...)
+	this.cmd = exec.CommandContext(ctx, instance.Path(), instance.Flags().Flags()...)
 	this.cancel = cancel
 
 	if stdout, err := this.cmd.StdoutPipe(); err != nil {
@@ -61,7 +62,7 @@ func NewProcess(instance *ServiceInstance) (*Process, error) {
 	}
 
 	// Set environment
-	this.cmd.Env = instance.Env()
+	this.cmd.Env = instance.Env().Env()
 
 	// Success
 	return this, nil
@@ -83,7 +84,14 @@ func (this *Process) Start(stdout, stderr chan<- []byte, stop chan<- error) erro
 
 	// Call wait in the background, which then returns the error
 	go func() {
-		if err := this.cmd.Wait(); err != nil {
+		// Wait for processses
+		err := this.cmd.Wait()
+
+		// Wait for loggers to end
+		this.wg.Wait()
+
+		// Send stop signal and close
+		if err != nil {
 			stop <- err
 		} else {
 			stop <- ErrSuccess
@@ -92,8 +100,8 @@ func (this *Process) Start(stdout, stderr chan<- []byte, stop chan<- error) erro
 	}()
 
 	// Start logging to channels
-	go ProcessLogger(this.stdout, stdout)
-	go ProcessLogger(this.stderr, stderr)
+	go this.ProcessLogger(this.stdout, stdout)
+	go this.ProcessLogger(this.stderr, stderr)
 
 	// Success
 	return nil
@@ -159,17 +167,19 @@ func ctxForTimeout(timeout time.Duration) (context.Context, context.CancelFunc) 
 ////////////////////////////////////////////////////////////////////////////////
 // PROCESS LOG FILES
 
-func ProcessLogger(fh io.Reader, c chan<- []byte) error {
+func (this *Process) ProcessLogger(fh io.Reader, c chan<- []byte) error {
 	buf := bufio.NewReader(fh)
+	this.wg.Add(1)
 	for {
 		if line, err := buf.ReadBytes('\n'); err == io.EOF {
+			break
+		} else if err != nil {
 			break
 		} else {
 			c <- line
 		}
 	}
-	// Close channel to quit parent goroutine
-	close(c)
-	// Return after channel closed
+	// Return
+	this.wg.Done()
 	return nil
 }
