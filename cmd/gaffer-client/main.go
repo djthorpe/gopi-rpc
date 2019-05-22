@@ -108,43 +108,28 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 	return nil
 }
 
-/*
-func Events(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) error {
-	// Get the stub
-	if record, err := Conn(app); err != nil {
-		return err
-	} else if client, err := Stub(app, record); err != nil {
-		return err
-	} else {
-		ch := make(chan rpc.GafferEvent)
-		err := make(chan error)
+func Usage(flags *gopi.Flags) {
+	fh := os.Stdout
 
-		start <- gopi.DONE
-		go func() {
-			err <- client.StreamEvents(ch)
-		}()
-	FOR_LOOP:
-		for {
-			select {
-			case evt := <-ch:
-				app.Logger.Info("EVT: %v", evt)
-			case <-stop:
-				close(ch)
-				close(err)
-				break FOR_LOOP
-			}
-		}
+	fmt.Fprintf(fh, "%v: Microservice Manager\n\n", flags.Name())
+	fmt.Fprintf(fh, "Command line arguments:\n\n")
+	for _, command := range root_commands {
+		fmt.Fprintf(fh, "  %v (<flags>) %v\n", flags.Name(), command.Name)
+		fmt.Fprintf(fh, "        %v\n", command.Description)
+		fmt.Fprintf(fh, "\n")
 	}
-
-	// Success
-	return nil
+	fmt.Fprintf(fh, "Command line flags:\n\n")
+	flags.PrintDefaults()
 }
-*/
+
 ////////////////////////////////////////////////////////////////////////////////
 
 func main() {
 	// Create the configuration
 	config := gopi.NewAppConfig("rpc/gaffer:client", "rpc/discovery:client")
+
+	// Set usage
+	config.AppFlags.SetUsageFunc(Usage)
 
 	// Set flags
 	config.AppFlags.FlagString("addr", "", "Service name or gateway address")
