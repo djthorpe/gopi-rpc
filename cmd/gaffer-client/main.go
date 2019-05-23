@@ -111,10 +111,12 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 func Usage(flags *gopi.Flags) {
 	fh := os.Stdout
 
-	fmt.Fprintf(fh, "%v: Microservice Manager\n\n", flags.Name())
-	fmt.Fprintf(fh, "Command line arguments:\n\n")
+	fmt.Fprintf(fh, "%v: Microservice Manager\nhttps://github.com/djthorpe/gopi-rpc/\n\n", flags.Name())
+	fmt.Fprintf(fh, "Syntax:\n\n")
+	fmt.Fprintf(fh, "  %v (<flags>...) <service|type|@group|instance> (<command>) (<argument>...)\n\n", flags.Name())
+	fmt.Fprintf(fh, "Commands:\n\n")
 	for _, command := range root_commands {
-		fmt.Fprintf(fh, "  %v (<flags>) %v\n", flags.Name(), command.Name)
+		fmt.Fprintf(fh, "  %v %v\n", flags.Name(), command.Name)
 		fmt.Fprintf(fh, "        %v\n", command.Description)
 		fmt.Fprintf(fh, "\n")
 	}
