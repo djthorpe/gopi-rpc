@@ -185,15 +185,17 @@ func (this *clientpool) Lookup(ctx context.Context, service, addr string, max in
 			return []gopi.RPCServiceRecord{record}, nil
 		}
 	} else if records, err := this.discovery.Lookup(ctx, service); err != nil {
+		this.log.Debug("A records=%v", records)
 		// TODO: Lookup should end when 'max' is reached
 		// Error from lookup
 		return nil, err
 	} else if len(records) == 0 {
+		this.log.Debug("B records=%v", records)
 		// Return timeout error
 		return nil, gopi.ErrDeadlineExceeded
 	} else {
-		// TODO: filter by address
-		this.log.Debug("records=%v", records)
+		this.log.Debug("C records=%v", records)
+		// TODO: filter by address/name
 		return nil, gopi.ErrNotImplemented
 	}
 }

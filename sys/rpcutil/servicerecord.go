@@ -348,10 +348,15 @@ func (this *record) TXT(zone string, ttl time.Duration) *dns.TXT {
 func (this *record) A(zone string, ttl time.Duration) []*dns.A {
 	ips := this.IP4()
 	sections := make([]*dns.A, len(ips))
+	host := strings.TrimSuffix(this.Host_, ".")
+	zone = "." + strings.Trim(zone, ".")
+	if strings.HasSuffix(host, "."+zone) == false {
+		host = host + zone
+	}
 	for i, ip := range ips {
 		sections[i] = &dns.A{
 			Hdr: dns.RR_Header{
-				Name:   this.Host_ + "." + zone + ".",
+				Name:   host + ".",
 				Rrtype: dns.TypeA,
 				Class:  dns.ClassINET,
 				Ttl:    uint32(ttl.Seconds()),
@@ -365,10 +370,15 @@ func (this *record) A(zone string, ttl time.Duration) []*dns.A {
 func (this *record) AAAA(zone string, ttl time.Duration) []*dns.AAAA {
 	ips := this.IP6()
 	sections := make([]*dns.AAAA, len(ips))
+	host := strings.TrimSuffix(this.Host_, ".")
+	zone = "." + strings.Trim(zone, ".")
+	if strings.HasSuffix(host, "."+zone) == false {
+		host = host + zone
+	}
 	for i, ip := range ips {
 		sections[i] = &dns.AAAA{
 			Hdr: dns.RR_Header{
-				Name:   this.Host_ + "." + zone + ".",
+				Name:   host + ".",
 				Rrtype: dns.TypeAAAA,
 				Class:  dns.ClassINET,
 				Ttl:    uint32(ttl.Seconds()),

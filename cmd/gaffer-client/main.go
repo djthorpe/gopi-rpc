@@ -30,14 +30,21 @@ import (
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/version"
 )
 
+const (
+	DISCOVERY_TIMEOUT = 500 * time.Millisecond
+)
+
 ////////////////////////////////////////////////////////////////////////////////
 
 func Conn(app *gopi.AppInstance) (gopi.RPCServiceRecord, error) {
 	addr, _ := app.AppFlags.GetString("addr")
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	timeout, exists := app.AppFlags.GetDuration("rpc.timeout")
+	if exists == false {
+		timeout = DISCOVERY_TIMEOUT
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
-
 	if addr == "" {
 		if addr_, _, _, err := app.Service(); err != nil {
 			return nil, err
@@ -128,13 +135,14 @@ func Usage(flags *gopi.Flags) {
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/gaffer:client", "rpc/discovery:client")
+	config := gopi.NewAppConfig("rpc/gaffer:client", "rpc/discovery:client", "discovery")
 
 	// Set usage
 	config.AppFlags.SetUsageFunc(Usage)
 
 	// Set flags
 	config.AppFlags.FlagString("addr", "", "Service name or gateway address")
+	config.AppFlags.FlagBool("dns", false, "Use DNS for service discovery")
 
 	// Run the command line tool
 	os.Exit(gopi.CommandLineTool2(config, Main))
