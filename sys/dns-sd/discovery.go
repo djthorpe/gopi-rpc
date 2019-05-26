@@ -214,16 +214,17 @@ func (this *discovery) Lookup(ctx context.Context, service string) ([]gopi.RPCSe
 						}
 					}
 				}
+				// TODO: break loop when enough records have been collected
 			case <-stop:
 				break FOR_LOOP
 			}
 		}
 		this.Unsubscribe(evts)
-		close(stop)
 	}()
 
-	// Perform the query and wait for cancellation
+	// Perform the query and wait for cancellation, then stop background go routine
 	err := this.QueryAll(msg, ctx)
+	close(stop)
 
 	// Retrieve the service records
 	records := make([]gopi.RPCServiceRecord, 0, len(services))
@@ -266,7 +267,6 @@ func (this *discovery) EnumerateServices(ctx context.Context) ([]string, error) 
 			}
 		}
 		this.Unsubscribe(evts)
-		close(stop)
 	}()
 
 	// Perform the query and wait for cancellation
@@ -274,7 +274,7 @@ func (this *discovery) EnumerateServices(ctx context.Context) ([]string, error) 
 
 	// Stop collecting names
 	stop <- gopi.DONE
-	<-stop
+	close(stop)
 
 	// Retrieve the service names
 	keys := make([]string, 0, len(services))

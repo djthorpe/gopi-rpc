@@ -9,6 +9,7 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 
 	gopi "github.com/djthorpe/gopi"
@@ -18,7 +19,8 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 type Command struct {
-	Name        *regexp.Regexp
+	Name        string
+	Re          *regexp.Regexp
 	Description string
 	Callback    func([]string, rpc.GafferClient, rpc.DiscoveryClient) error
 }
@@ -26,37 +28,51 @@ type Command struct {
 ////////////////////////////////////////////////////////////////////////////////
 
 var (
-	reListGroups  = regexp.MustCompile("^@$")
-	reListRecords = regexp.MustCompile("^_$")
-	reListExecs   = regexp.MustCompile("^/$")
-	reGroup       = regexp.MustCompile("^@([A-Za-z][A-Za-z0-9\\.\\-_]*)$")
-	reExecutable  = regexp.MustCompile("^/([A-Za-z][A-Za-z0-9\\/\\.\\-_]*)$")
-	reService     = regexp.MustCompile("^([A-Za-z][A-Za-z0-9\\.\\-_]*)$")
-	reInstance    = regexp.MustCompile("^[1-9][0-9]*$")
-	reRecord      = regexp.MustCompile("^_[A-Za-z][A-Za-z0-9\\.\\-_]*$")
+	reGroup            = regexp.MustCompile("^@([A-Za-z][A-Za-z0-9\\.\\-_]*)$")
+	reExecutable       = regexp.MustCompile("^/([A-Za-z][A-Za-z0-9\\/\\.\\-_]*)$")
+	reService          = regexp.MustCompile("^([A-Za-z][A-Za-z0-9\\.\\-_]*)$")
+	reServiceRemove    = regexp.MustCompile("^([A-Za-z][A-Za-z0-9\\.\\-_]*) rm$")
+	reServiceStartStop = regexp.MustCompile("^([A-Za-z][A-Za-z0-9\\.\\-_]*) (start|stop)$")
+	reServiceFlags     = regexp.MustCompile("^([A-Za-z][A-Za-z0-9\\.\\-_]*) flags$")
+	reInstance         = regexp.MustCompile("^[1-9][0-9]*$")
+	reRecord           = regexp.MustCompile("^_[A-Za-z][A-Za-z0-9\\.\\-_]*$")
 )
 
 var (
-	cmd = []*Command{
+	root_commands = []*Command{
 		// First command is the default one
-		&Command{nil, "List all instances", ListAllInstances},
-		&Command{reListExecs, "List all executables", ListAllExecutables},
-		&Command{reListGroups, "List all groups", ListAllGroups},
-		&Command{reListRecords, "List all service records", ListAllServiceRecords},
-		&Command{reGroup, "Group commands", GroupCommands},
-		&Command{reRecord, "Service record commands", RecordCommands},
-		&Command{reService, "Service commands", ServiceCommands},
+		&Command{"", nil, "List all services & instances", ListAllInstances},
+		&Command{"/", nil, "List all executables", ListAllExecutables},
+		&Command{"@", nil, "List all groups", ListAllGroups},
+		&Command{"_", nil, "List all service records", ListAllServiceRecords},
+		&Command{"_<service-type>._tcp", reRecord, "List service records", RecordCommands},
+		&Command{"/<executable> add name=<service> groups=@<group-list> mode=(manual|auto)", reExecutable, "Add service", AddService},
+		&Command{"<service> rm", reServiceRemove, "Remove Service", ServiceCommands},
+		&Command{"<service> (start|stop)", reServiceStartStop, "Start or stop service instances", ServiceCommands},
+		&Command{"<service> flags (<key>=<value> | <key>)...", reServiceFlags, "Set service flags", ServiceCommands},
+		&Command{"<service> set name=<service> groups=@<group-list>", reServiceFlags, "Set service parameters", ServiceCommands},
+		&Command{"<service> disable", reServiceFlags, "Disable service", ServiceCommands},
+		&Command{"<service> (manual|auto) instance_count=<uint> run_time=<duration> idle_time=<duration>", reServiceFlags, "Enable service", ServiceCommands},
+		&Command{"@<group> add", reGroup, "Add a group", GroupCommands},
+		&Command{"@<group> rm", reGroup, "Remove a group", GroupCommands},
+		&Command{"@<group> flags (<key>=<value> | <key>)...", reGroup, "Set group flags", GroupCommands},
+		&Command{"@<group> env (<key>=<value> | <key>)...", reGroup, "Set group environment", GroupCommands},
+		&Command{"@<group> set name=@<group>", reGroup, "Set group parameters", GroupCommands},
 	}
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func GetCommandForName(name string) *Command {
-	if name == "" {
-		return cmd[0]
+func GetCommandForArgument(commands []*Command, arg string) *Command {
+	if arg == "" {
+		return commands[0]
 	} else {
-		for _, command := range cmd {
-			if command.Name != nil && command.Name.MatchString(name) {
+		for _, command := range commands {
+			if command.Re != nil {
+				if command.Re.MatchString(arg) {
+					return command
+				}
+			} else if command.Name == arg {
 				return command
 			}
 		}
@@ -65,14 +81,20 @@ func GetCommandForName(name string) *Command {
 }
 
 func Run(app *gopi.AppInstance, gaffer rpc.GafferClient, discovery rpc.DiscoveryClient) error {
+	// Get command
 	args := app.AppFlags.Args()
-	if len(args) == 0 {
-		return cmd[0].Callback(args, gaffer, discovery)
+	command := GetCommandForArgument(root_commands, "")
+	if len(args) > 0 {
+		command = GetCommandForArgument(root_commands, args[0])
+	}
+	if command == nil {
+		return gopi.ErrHelp
+	}
+
+	// Call command
+	if err := command.Callback(args, gaffer, discovery); err == gopi.ErrBadParameter {
+		return fmt.Errorf("Usage: %v %v", app.AppFlags.Name(), command.Name)
 	} else {
-		if command := GetCommandForName(args[0]); command == nil {
-			return gopi.ErrHelp
-		} else {
-			return command.Callback(args, gaffer, discovery)
-		}
+		return err
 	}
 }

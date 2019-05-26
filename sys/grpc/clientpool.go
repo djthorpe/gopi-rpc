@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/djthorpe/gopi/util/errors"
@@ -192,9 +193,16 @@ func (this *clientpool) Lookup(ctx context.Context, service, addr string, max in
 		// Return timeout error
 		return nil, gopi.ErrDeadlineExceeded
 	} else {
-		// TODO: filter by address
-		this.log.Debug("records=%v", records)
-		return nil, gopi.ErrNotImplemented
+		capacity := len(records)
+		if max > 0 && max < capacity {
+			capacity = max
+		}
+		if records_, err := lookupFilter("", addr, records, capacity); err != nil {
+			return nil, err
+		} else {
+			this.log.Debug2("<grpc.clientpool>Lookup{ records=%v }", records_)
+			return records_, nil
+		}
 	}
 }
 
@@ -207,6 +215,44 @@ func (this *clientpool) String() string {
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
+
+// lookupFilter filters records by subtype, name and port. The addr can either
+// specify a port using a semi-colon, a name without a semi-colon or both
+// using name:port. It returns up to 'capacity' records
+func lookupFilter(subtype, addr string, records []gopi.RPCServiceRecord, capacity int) ([]gopi.RPCServiceRecord, error) {
+	filtered := make([]gopi.RPCServiceRecord, 0, capacity)
+	if name, port, err := splitHostPort(addr); err != nil {
+		return nil, err
+	} else {
+		for _, record := range records {
+			if subtype != "" && record.Subtype() != subtype {
+				continue
+			}
+			if name != "" && record.Name() != name {
+				continue
+			}
+			if port != 0 && record.Port() != port {
+				continue
+			}
+			filtered = append(filtered, record)
+		}
+	}
+	return filtered, nil
+}
+
+func splitHostPort(addr string) (string, uint, error) {
+	if strings.ContainsAny(addr, ":") == false {
+		return addr, 0, nil
+	} else if addr, port, err := net.SplitHostPort(addr); err != nil {
+		return "", 0, err
+	} else if port_, err := strconv.ParseUint(port, 10, 64); err != nil {
+		return "", 0, err
+	} else if port_ == 0 {
+		return "", 0, gopi.ErrBadParameter
+	} else {
+		return addr, uint(port_), nil
+	}
+}
 
 func (this *clientpool) addressesFor(service gopi.RPCServiceRecord, flags gopi.RPCFlag) ([]net.IP, error) {
 
