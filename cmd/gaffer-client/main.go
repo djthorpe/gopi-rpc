@@ -11,8 +11,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	// Frameworks
@@ -31,7 +32,7 @@ import (
 )
 
 const (
-	DISCOVERY_TIMEOUT = 500 * time.Millisecond
+	DISCOVERY_TIMEOUT = 250 * time.Millisecond
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,25 +45,24 @@ func Conn(app *gopi.AppInstance) (gopi.RPCServiceRecord, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
-	if addr == "" {
-		if addr_, _, _, err := app.Service(); err != nil {
-			return nil, err
-		} else {
-			addr = addr_
-		}
-	}
-
-	if _, _, err := net.SplitHostPort(addr); err == nil {
-		if service, err := pool.Lookup(ctx, "", addr, 1); err != nil {
-			return nil, err
-		} else {
-			return service[0], nil
-		}
-	} else if service, err := pool.Lookup(ctx, fmt.Sprintf("_%v._tcp", addr), "", 1); err != nil {
+	if service, _, _, err := app.Service(); err != nil {
 		return nil, err
 	} else {
-		return service[0], nil
+		service_ := fmt.Sprintf("_%v._tcp", service)
+		pool := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+		if services, err := pool.Lookup(ctx, service_, addr, 0); err != nil {
+			return nil, err
+		} else if len(services) == 0 {
+			return nil, gopi.ErrNotFound
+		} else if len(services) > 1 {
+			var names []string
+			for _, service := range services {
+				names = append(names, strconv.Quote(service.Name()))
+			}
+			return nil, fmt.Errorf("More than one service returned, use -addr to choose between %v", strings.Join(names, ","))
+		} else {
+			return services[0], nil
+		}
 	}
 }
 

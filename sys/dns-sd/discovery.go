@@ -223,7 +223,6 @@ func (this *discovery) Lookup(ctx context.Context, service string) ([]gopi.RPCSe
 	}()
 
 	// Perform the query and wait for cancellation, then stop background go routine
-	fmt.Println(msg)
 	err := this.QueryAll(msg, ctx)
 	close(stop)
 
