@@ -212,7 +212,6 @@ func (this *Listener) AnswerInstanceMulticast(instances []rpc.ServiceRecord, que
 		}
 
 		// Send
-		fmt.Println(r)
 		if err := this.multicast_send(&r, question.IfIndex); err != nil {
 			return err
 		}
