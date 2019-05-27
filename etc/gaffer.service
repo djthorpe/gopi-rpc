@@ -1,0 +1,16 @@
+[Unit]
+Description=Gaffer Microservice Supervisor
+Documentation=https://github.com/djthorpe/gaffer
+After=network-online.target
+
+[Service]
+User=influxdb
+Group=influxdb
+LimitNOFILE=65536
+ExecStart=/opt/gaffer/bin/gaffer-service -gaffer.root /opt/gaffer/sbin -gaffer.config /var/local/gaffer/gaffer.json -log.file /var/local/gaffer/gaffer.log -verbose -rpc.port 8080
+KillMode=control-group
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+Alias=gaffer.service
