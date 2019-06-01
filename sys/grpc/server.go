@@ -244,10 +244,10 @@ func (this *server) Service(service, subtype, name string, text ...string) gopi.
 			this.log.Warn("grpc.Service: SetName: %v", err)
 			return nil
 		} else if hostname, err := this.Hostname(); err != nil {
-			this.log.Warn("grpc.Service: SetAddr: %v", err)
+			this.log.Warn("grpc.Service: SetHostPort: %v", err)
 			return nil
-		} else if err := r.SetAddr(fmt.Sprintf("%v:%v", hostname, this.Port())); err != nil {
-			this.log.Warn("grpc.Service: SetAddr: %v", err)
+		} else if err := r.SetHostPort(fmt.Sprintf("%v:%v", hostname, this.Port())); err != nil {
+			this.log.Warn("grpc.Service: SetHostPort: %v", err)
 			return nil
 		} else if v4, v6, err := addrsForInterfaces(); err != nil {
 			this.log.Warn("grpc.Service: SetAddr: %v", err)

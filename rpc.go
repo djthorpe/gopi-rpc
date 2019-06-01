@@ -10,6 +10,7 @@
 package rpc
 
 import (
+	"context"
 	"io"
 	"net"
 	"time"
@@ -67,6 +68,14 @@ type ServiceRecord interface {
 	// Source returns the source of the record
 	Source() DiscoveryType
 
+	// Set parameters
+	SetService(service, subtype string) error
+	SetName(name string) error
+	SetHostPort(addr string) error
+	SetTTL(time.Duration) error
+	AppendIP(...net.IP) error
+	AppendTXT(...string) error
+
 	// Get DNS answers
 	PTR(zone string, ttl time.Duration) *dns.PTR
 	SRV(zone string, ttl time.Duration) *dns.SRV
@@ -74,15 +83,9 @@ type ServiceRecord interface {
 	A(zone string, ttl time.Duration) []*dns.A
 	AAAA(zone string, ttl time.Duration) []*dns.AAAA
 
-	// Set parameters
-	SetService(service, subtype string) error
-	SetName(name string) error
-	SetAddr(addr string) error
+	// Set parameters from DNS answers
 	SetPTR(zone string, rr *dns.PTR) error
 	SetSRV(zone string, rr *dns.SRV) error
-	SetTTL(time.Duration) error
-	AppendIP(...net.IP) error
-	AppendTXT(...string) error
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -110,11 +113,12 @@ type VersionClient interface {
 
 type DiscoveryClient interface {
 	gopi.RPCClient
+	gopi.Publisher
 
 	// Ping the remote service instance
 	Ping() error
 
-	// Register a service record
+	// Register a service record in database
 	Register(gopi.RPCServiceRecord) error
 
 	// Enumerate service names
@@ -124,7 +128,7 @@ type DiscoveryClient interface {
 	Lookup(string, DiscoveryType, time.Duration) ([]gopi.RPCServiceRecord, error)
 
 	// Stream discovery events. filtering by service name
-	StreamEvents(string, chan<- gopi.RPCEvent) error
+	StreamEvents(ctx context.Context, service string) error
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -154,6 +158,9 @@ type GoogleCastEvent interface {
 }
 
 type GoogleCastClient interface {
+	gopi.RPCClient
+	gopi.Publisher
+
 	// Ping remote service
 	Ping() error
 
@@ -161,5 +168,5 @@ type GoogleCastClient interface {
 	Devices() ([]GoogleCastDevice, error)
 
 	// Stream discovery events
-	StreamEvents(string, chan<- GoogleCastEvent) error
+	StreamEvents(ctx context.Context) error
 }

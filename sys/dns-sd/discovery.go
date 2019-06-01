@@ -138,7 +138,7 @@ func (this *discovery) Register(service gopi.RPCServiceRecord) error {
 	if err := record.SetService(service.Service(), service.Subtype()); err != nil {
 		return err
 	}
-	if err := record.SetAddr(fmt.Sprintf("%v:%v", service.Host(), service.Port())); err != nil {
+	if err := record.SetHostPort(fmt.Sprintf("%v:%v", service.Host(), service.Port())); err != nil {
 		return err
 	}
 	if err := record.AppendTXT(service.Text()...); err != nil {

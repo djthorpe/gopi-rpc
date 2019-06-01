@@ -164,11 +164,11 @@ func (this *record) SetTXT(txt []string) error {
 	return nil
 }
 
-func (this *record) SetAddr(addr string) error {
+func (this *record) SetHostPort(addr string) error {
 	if host, port_, err := net.SplitHostPort(addr); err != nil {
-		return nil
+		return err
 	} else if port, err := strconv.ParseUint(strings.TrimPrefix(port_, ":"), 10, 32); err != nil {
-		return nil
+		return err
 	} else {
 		this.Host_ = host
 		this.Port_ = uint(port)

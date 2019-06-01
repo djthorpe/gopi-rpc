@@ -18,6 +18,7 @@ import (
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 	grpc "github.com/djthorpe/gopi-rpc/sys/grpc"
+	event "github.com/djthorpe/gopi/util/event"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/discovery"
@@ -30,14 +31,25 @@ import (
 type Client struct {
 	pb.DiscoveryClient
 	conn gopi.RPCClientConn
+	event.Publisher
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // NEW
 
 func NewDiscoveryClient(conn gopi.RPCClientConn) gopi.RPCClient {
-	return &Client{pb.NewDiscoveryClient(conn.(grpc.GRPCClientConn).GRPCConn()), conn}
+	return &Client{pb.NewDiscoveryClient(conn.(grpc.GRPCClientConn).GRPCConn()), conn, event.Publisher{}}
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (this *Client) String() string {
+	return fmt.Sprintf("<grpc.service.discovery.Client>{ conn=%v }", this.conn)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PROPERTIES
 
 func (this *Client) NewContext(timeout time.Duration) context.Context {
 	if timeout == 0 {
@@ -50,9 +62,6 @@ func (this *Client) NewContext(timeout time.Duration) context.Context {
 		return ctx
 	}
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// PROPERTIES
 
 func (this *Client) Conn() gopi.RPCClientConn {
 	return this.conn
@@ -128,35 +137,42 @@ func (this *Client) Lookup(service string, t rpc.DiscoveryType, timeout time.Dur
 }
 
 // Stream events
-func (this *Client) StreamEvents(service string, events chan<- gopi.RPCEvent) error {
-	// One request per connection
+func (this *Client) StreamEvents(ctx context.Context, service string) error {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	// Keep reading from stream
-	if stream, err := this.DiscoveryClient.StreamEvents(this.NewContext(0), &pb.StreamEventsRequest{
+	stream, err := this.DiscoveryClient.StreamEvents(ctx, &pb.StreamEventsRequest{
 		Service: service,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
-	} else {
-		for {
-			if msg, err := stream.Recv(); err == io.EOF {
-				break
-			} else if err != nil {
-				return err
-			} else if evt := protoToEvent(msg); evt != nil {
-				events <- evt
-			}
-		}
 	}
 
-	// Success
-	return nil
-}
+	// Errors channel receives errors from recv
+	errors := make(chan error)
 
-////////////////////////////////////////////////////////////////////////////////
-// STRINGIFY
+	// Receive messages in the background
+	go func() {
+	FOR_LOOP:
+		for {
+			if message_, err := stream.Recv(); err == io.EOF {
+				break FOR_LOOP
+			} else if err != nil {
+				errors <- err
+				break FOR_LOOP
+			} else if evt := protoToEvent(message_, this.conn); evt != nil {
+				this.Emit(evt)
+			}
+		}
+	}()
 
-func (this *Client) String() string {
-	return fmt.Sprintf("<rpc.service.discovery.Client>{ conn=%v }", this.conn)
+	// Continue until error or io.EOF is returned
+	for {
+		select {
+		case err := <-errors:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }

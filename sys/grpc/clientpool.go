@@ -180,7 +180,7 @@ func (this *clientpool) Lookup(ctx context.Context, service, addr string, max in
 		// then return the service record with the address only
 		if record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB); record == nil {
 			return nil, gopi.ErrBadParameter
-		} else if err := record.SetAddr(addr); err != nil {
+		} else if err := record.SetHostPort(addr); err != nil {
 			return nil, err
 		} else {
 			return []gopi.RPCServiceRecord{record}, nil

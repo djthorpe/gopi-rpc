@@ -58,6 +58,14 @@ func RenderIP(service gopi.RPCServiceRecord) string {
 	return strings.Join(ips, " ")
 }
 
+func RenderService(service gopi.RPCServiceRecord) string {
+	if subtype := service.Subtype(); subtype != "" {
+		return fmt.Sprintf("%v [%v]", subtype, service.Service())
+	} else {
+		return service.Service()
+	}
+}
+
 func Lookup(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) error {
 	discovery := app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery)
 	start <- gopi.DONE
@@ -119,7 +127,7 @@ func Lookup(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) 
 			table.SetHeader([]string{"Service", "Name", "Host", "IP", "TXT"})
 			for _, service := range services {
 				table.Append([]string{
-					service.Service(),
+					RenderService(service),
 					service.Name(),
 					RenderHost(service),
 					RenderIP(service),

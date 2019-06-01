@@ -115,10 +115,11 @@ func (this *servicerecord) IP6() []net.IP {
 
 type rpcevent struct {
 	r *pb.Event
+	c gopi.RPCClientConn
 }
 
 func (this *rpcevent) Source() gopi.Driver {
-	return nil
+	return this.c
 }
 
 func (this *rpcevent) Name() string {
@@ -253,9 +254,9 @@ func protoFromEvent(event gopi.RPCEvent) *pb.Event {
 	}
 }
 
-func protoToEvent(proto *pb.Event) gopi.RPCEvent {
+func protoToEvent(proto *pb.Event, conn gopi.RPCClientConn) gopi.RPCEvent {
 	if proto == nil {
 		return nil
 	}
-	return &rpcevent{proto}
+	return &rpcevent{proto, conn}
 }
