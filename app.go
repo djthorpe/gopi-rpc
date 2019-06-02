@@ -10,12 +10,18 @@
 package rpc
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"os"
+	"time"
 
 	// Frameworks
 	"github.com/djthorpe/gopi"
 )
+
+////////////////////////////////////////////////////////////////////////////////
+// SERVER
 
 func Server(config gopi.AppConfig, background_tasks ...gopi.BackgroundTask) int {
 	// Append on "rpc/server" onto module configuration
@@ -137,4 +143,110 @@ func ProcessEvent(app *gopi.AppInstance, server gopi.RPCServer, discovery gopi.R
 	}
 	// Success
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// CLIENT
+
+type ClientTask func(app *gopi.AppInstance, services []gopi.RPCServiceRecord, done chan<- struct{}) error
+
+func Client(config gopi.AppConfig, timeout time.Duration, task ClientTask) int {
+	// Add the -addr flag
+	config.AppFlags.FlagString("addr", "", "Service name or address:port")
+
+	// Append on "rpc/clientpool" onto module configuration
+	var err error
+	if config.Modules, err = gopi.AppendModulesByName(config.Modules, "rpc/clientpool"); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return -1
+	}
+
+	// Create the application
+	app, err := gopi.NewAppInstance(config)
+	if err != nil {
+		if err != gopi.ErrHelp {
+			fmt.Fprintln(os.Stderr, err)
+			return -1
+		}
+		return 0
+	}
+	defer app.Close()
+
+	// Lookup service records
+	if err := app.Run2(func(app *gopi.AppInstance, done chan<- struct{}) error {
+		addr, _ := app.AppFlags.GetString("addr")
+		if records, err := LookupServiceRecords(app, addr, timeout); err != nil {
+			return err
+		} else {
+			return task(app, records, done)
+		}
+	}); err == gopi.ErrHelp {
+		config.AppFlags.PrintUsage()
+		return 0
+	} else if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return -1
+	} else {
+		return 0
+	}
+}
+
+// LookupServiceRecords returns a remote service records, or nil if not found
+func LookupServiceRecords(app *gopi.AppInstance, addr string, timeout time.Duration) ([]gopi.RPCServiceRecord, error) {
+	// Get client pool
+	pool, ok := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
+	if ok == false || pool == nil {
+		return nil, fmt.Errorf("Missing rpc/clientpool")
+	}
+
+	// Create context
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if service, subtype, _, err := app.Service(); err != nil {
+		return nil, err
+	} else if HasHostPort(addr) {
+		// Where addr is <host>:<port> return the service record
+		if r, err := pool.Lookup(ctx, "", addr, 1); err != nil {
+			return nil, err
+		} else {
+			return r, nil
+		}
+	} else {
+		// Return "unlimited" service records (parameter 0)
+		if services, err := pool.Lookup(ctx, fmt.Sprintf("_%v._tcp", service), addr, 0); err != nil {
+			return nil, err
+		} else if len(services) == 0 {
+			return nil, gopi.ErrNotFound
+		} else if services = FilterBySubtype(services, subtype); len(services) == 0 {
+			return nil, gopi.ErrNotFound
+		} else {
+			return services, nil
+		}
+	}
+}
+
+// HasHostPort returns true if string is of type <hostname>:<port>
+func HasHostPort(addr string) bool {
+	if host, port, err := net.SplitHostPort(addr); err != nil {
+		return false
+	} else if host != "" && port != "" {
+		return true
+	} else {
+		return false
+	}
+}
+
+// FilterBySubtype returns set of records which match subtype
+func FilterBySubtype(services []gopi.RPCServiceRecord, subtype string) []gopi.RPCServiceRecord {
+	if len(services) == 0 || subtype == "" {
+		return services
+	}
+	services_ := make([]gopi.RPCServiceRecord, 0, len(services))
+	for _, service := range services {
+		if service.Subtype() == subtype {
+			services_ = append(services_, service)
+		}
+	}
+	return services_
 }

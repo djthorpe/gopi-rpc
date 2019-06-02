@@ -12,6 +12,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -145,30 +146,46 @@ func (this *clientpool) Disconnect(conn gopi.RPCClientConn) error {
 	}
 }
 
-func (this *clientpool) RegisterClient(service string, callback gopi.RPCNewClientFunc) error {
-	this.log.Debug2("<grpc.clientpool.RegisterClient>{ service=%v callback=%v }", strconv.Quote(service), callback)
-	if service == "" || callback == nil {
+func (this *clientpool) RegisterClient(stub string, callback gopi.RPCNewClientFunc) error {
+	this.log.Debug2("<grpc.clientpool.RegisterClient>{ stub=%v callback=%v }", strconv.Quote(stub), callback)
+	if stub == "" || callback == nil {
 		return gopi.ErrBadParameter
-	} else if _, exists := this.services[service]; exists {
-		this.log.Warn("<rpc.clientpool>RegisterClient: Duplicate service: %v", service)
+	} else if _, exists := this.services[stub]; exists {
+		this.log.Warn("<rpc.clientpool>RegisterClient: Duplicate stub: %v", strconv.Quote(stub))
 		return gopi.ErrBadParameter
 	} else {
-		this.services[service] = callback
+		this.services[stub] = callback
 		return nil
 	}
 
 	return gopi.ErrNotImplemented
 }
 
-func (this *clientpool) NewClient(service string, conn gopi.RPCClientConn) gopi.RPCClient {
-	this.log.Debug2("<grpc.clientpool.NewClient>{ service=%v conn=%v }", strconv.Quote(service), conn)
+func (this *clientpool) NewClient(stub string, conn gopi.RPCClientConn) gopi.RPCClient {
+	this.log.Debug2("<grpc.clientpool.NewClient>{ stub=%v conn=%v }", strconv.Quote(stub), conn)
 
 	// Obtain the module with which to create a new client
-	if callback, exists := this.services[service]; exists == false {
-		this.log.Warn("<grpc.clientpool>NewClient: Not Found: %v", service)
+	if callback, exists := this.services[stub]; exists == false {
+		this.log.Warn("<grpc.clientpool>NewClient: Not Found: %v", strconv.Quote(stub))
 		return nil
 	} else {
 		return callback(conn)
+	}
+}
+
+func (this *clientpool) NewClientEx(stub string, services []gopi.RPCServiceRecord, flags gopi.RPCFlag) (gopi.RPCClient, error) {
+	this.log.Debug2("<grpc.clientpool.NewClientEx>{ stub=%v services=%v flag=%v }", strconv.Quote(stub), services, flags)
+	if stub == "" {
+		return nil, gopi.ErrBadParameter
+	}
+	if service, err := chooseService(services, flags); err != nil {
+		return nil, err
+	} else if conn, err := this.Connect(service, flags); err != nil {
+		return nil, err
+	} else if stub_ := this.NewClient(stub, conn); stub_ == nil {
+		return nil, fmt.Errorf("Invalid service stub: %v", strconv.Quote(stub))
+	} else {
+		return stub_, nil
 	}
 }
 
@@ -180,6 +197,8 @@ func (this *clientpool) Lookup(ctx context.Context, service, addr string, max in
 		// then return the service record with the address only
 		if record := this.util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB); record == nil {
 			return nil, gopi.ErrBadParameter
+		} else if addr == "" {
+			return nil, fmt.Errorf("Address and port are required to connect")
 		} else if err := record.SetHostPort(addr); err != nil {
 			return nil, err
 		} else {
@@ -215,6 +234,29 @@ func (this *clientpool) String() string {
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
+
+// chooseService returns one service of many, either using FIRST or ANY
+// flag to choose the service, will return ErrNotFound if no services
+// could be selected
+func chooseService(records []gopi.RPCServiceRecord, flags gopi.RPCFlag) (gopi.RPCServiceRecord, error) {
+	if len(records) == 0 {
+		return nil, gopi.ErrNotFound
+	} else if len(records) == 1 {
+		return records[0], nil
+	} else if flags&gopi.RPC_FLAG_SERVICE_ANY != 0 {
+		r := rand.Int() % len(records)
+		return records[r], nil
+	} else {
+		names := ""
+		for i, record := range records {
+			if i > 0 {
+				names += ","
+			}
+			names += strconv.Quote(record.Name())
+		}
+		return nil, fmt.Errorf("Choose between services: %v", names)
+	}
+}
 
 // lookupFilter filters records by subtype, name and port. The addr can either
 // specify a port using a semi-colon, a name without a semi-colon or both
