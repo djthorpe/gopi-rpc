@@ -16,11 +16,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
+	event "github.com/djthorpe/gopi/util/event"
 
 	// Modules
 	_ "github.com/djthorpe/gopi-rpc/rpc/grpc/discovery"
@@ -39,6 +41,13 @@ type Runner struct {
 	log      gopi.Logger
 	services map[string]gopi.RPCServiceRecord
 	commands []*Command
+	stubs    []rpc.DiscoveryClient
+	cancels  []context.CancelFunc
+	errors   chan error
+
+	event.Tasks
+	event.Merger
+	sync.WaitGroup
 }
 
 type Command struct {
@@ -67,7 +76,39 @@ func NewRunner(app *gopi.AppInstance) *Runner {
 	this.log = app.Logger
 	this.services = make(map[string]gopi.RPCServiceRecord)
 	this.commands = make([]*Command, 0)
+	this.stubs = make([]rpc.DiscoveryClient, 0)
+	this.cancels = make([]context.CancelFunc, 0)
+	this.errors = make(chan error)
+
+	// Task to receive messages
+	this.Tasks.Start(this.EventTask)
+
 	return this
+}
+
+func (this *Runner) Close() error {
+	// Call cancels
+	for _, cancel := range this.cancels {
+		cancel()
+	}
+
+	// Wait until all streams are completed
+	this.WaitGroup.Wait()
+
+	// Stop tasks
+	if err := this.Tasks.Close(); err != nil {
+		return err
+	}
+
+	// Release resources
+	close(this.errors)
+	this.services = nil
+	this.commands = nil
+	this.cancels = nil
+	this.stubs = nil
+
+	// return success
+	return nil
 }
 
 // Add commands
@@ -204,6 +245,27 @@ func (this *Runner) Stub(stub string, addr string, timeout time.Duration) (gopi.
 	}
 }
 
+// AddStub adds a stub to watch
+func (this *Runner) AddStub(stub rpc.DiscoveryClient, service string) error {
+	this.stubs = append(this.stubs, stub)
+
+	// Create background task to stream messages
+	ctx, cancel := context.WithCancel(context.Background())
+	this.cancels = append(this.cancels, cancel)
+	go func() {
+		this.WaitGroup.Add(1)
+		this.Merger.Merge(stub)
+		if err := stub.StreamEvents(ctx, service); err != nil && err != context.Canceled {
+			this.errors <- err
+		}
+		this.Merger.Unmerge(stub)
+		this.WaitGroup.Done()
+	}()
+
+	// return success
+	return nil
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 func HasHostPort(addr string) bool {
@@ -242,6 +304,8 @@ func StubExists(stub string, stubs []string) bool {
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 	runner := NewRunner(app)
+	defer runner.Close()
+
 	addr, _ := app.AppFlags.GetString("addr")
 	timeout, _ := app.AppFlags.GetDuration("timeout")
 	if stub, err := runner.Stub("gopi.Discovery", addr, timeout); err != nil {
@@ -269,8 +333,6 @@ func main() {
 	config.AppFlags.FlagBool("dns", false, "Use DNS lookup rather than cache")
 
 	/*
-		config.AppFlags.FlagBool("watch", false, "Watch for discovery changes")
-		config.AppFlags.FlagString("register", "", "Register a service with name")
 		config.AppFlags.FlagString("subtype", "", "Service subtype")
 		config.AppFlags.FlagUint("port", 0, "Service port")
 	*/

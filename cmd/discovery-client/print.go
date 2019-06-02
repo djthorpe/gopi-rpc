@@ -20,6 +20,31 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
+func PrintEvent(fh io.Writer, event gopi.RPCEvent) {
+
+	table := tablewriter.NewWriter(fh)
+	service := event.ServiceRecord()
+	t := strings.ToLower(strings.TrimPrefix(fmt.Sprint(event.Type()), "RPC_EVENT_"))
+
+	if service == nil {
+		table.Append([]string{
+			t,
+		})
+		table.Render()
+	} else {
+		table.Append([]string{
+			t,
+			RenderService(service),
+			service.Name(),
+			RenderHost(service),
+			RenderIP(service),
+			RenderTxt(service),
+		})
+		table.Render()
+
+	}
+}
+
 func PrintServices(fh io.Writer, services []gopi.RPCServiceRecord) {
 	table := tablewriter.NewWriter(fh)
 	table.SetHeader([]string{"Service", "Name", "Host", "Addr", "TXT"})
