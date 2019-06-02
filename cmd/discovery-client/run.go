@@ -1,12 +1,110 @@
 /*
 	Go Language Raspberry Pi Interface
-	(c) Copyright David Thorpe 2018
+	(c) Copyright David Thorpe 2019
 	All Rights Reserved
 	Documentation http://djthorpe.github.io/gopi/
 	For Licensing and Usage information, please see LICENSE.md
 */
 
 package main
+
+import (
+	"fmt"
+	"os"
+	"regexp"
+	"strconv"
+
+	// Frameworks
+	gopi "github.com/djthorpe/gopi"
+	rpc "github.com/djthorpe/gopi-rpc"
+	tablewriter "github.com/olekukonko/tablewriter"
+)
+
+////////////////////////////////////////////////////////////////////////////////
+
+func (this *Runner) Run(stub rpc.DiscoveryClient) error {
+	this.log.Info("Connected to %v", stub.Conn().Addr())
+
+	// By default, enumerate the services
+	this.RegisterCommand(&Command{
+		re:    regexp.MustCompile("^_$"),
+		scope: COMMAND_SCOPE_ROOT,
+		cb:    this.EnumerateServices,
+	})
+	// Watch for discovery events
+	this.RegisterCommand(&Command{
+		re:    regexp.MustCompile("^watch$"),
+		scope: COMMAND_SCOPE_ROOT,
+		cb:    this.Watch,
+	})
+	// Lookup service
+	this.RegisterCommand(&Command{
+		re:    regexp.MustCompile("^_([A-Za-z]\\w+)\\._tcp$"),
+		scope: COMMAND_SCOPE_ROOT,
+		cb:    this.ServiceCommands,
+	})
+	this.RegisterCommand(&Command{
+		re:    regexp.MustCompile("^([A-Za-z]\\w+)$"),
+		scope: COMMAND_SCOPE_ROOT,
+		cb:    this.ServiceCommands,
+	})
+
+	args := this.Args()
+	if len(args) == 0 {
+		// Default command is enumerate services
+		return this.EnumerateServices(stub, nil)
+	} else if command, matches := this.GetCommand(args[0], COMMAND_SCOPE_ROOT); command == nil {
+		return gopi.ErrHelp
+	} else {
+		return command.cb(stub, matches[1:])
+	}
+}
+
+func (this *Runner) Watch(stub rpc.DiscoveryClient, _ []string) error {
+	fmt.Println("WATCH")
+	return nil
+}
+
+func (this *Runner) EnumerateServices(stub rpc.DiscoveryClient, _ []string) error {
+	timeout, _ := this.app.AppFlags.GetDuration("timeout")
+	if services, err := stub.Enumerate(this.DiscoveryType(), this.TimeoutOrDefault(timeout)); err != nil {
+		return err
+	} else {
+		table := tablewriter.NewWriter(os.Stdout)
+		table.SetHeader([]string{"Service"})
+		for _, service := range services {
+			table.Append([]string{service})
+		}
+		table.Render()
+	}
+
+	// Success
+	return nil
+}
+
+func (this *Runner) ServiceCommands(stub rpc.DiscoveryClient, service []string) error {
+	if len(service) == 1 {
+		return this.ServiceLookup(stub, service)
+	} else {
+		return gopi.ErrHelp
+	}
+}
+
+func (this *Runner) ServiceLookup(stub rpc.DiscoveryClient, service []string) error {
+	timeout, _ := this.app.AppFlags.GetDuration("timeout")
+	if len(service) != 1 {
+		return gopi.ErrBadParameter
+	} else if services, err := stub.Lookup(fmt.Sprintf("_%v._tcp", service[0]), this.DiscoveryType(), this.TimeoutOrDefault(timeout)); err != nil {
+		return err
+	} else if len(services) == 0 {
+		return fmt.Errorf("No service records found for %v", strconv.Quote(service[0]))
+	} else {
+		PrintServices(os.Stdout, services)
+	}
+
+	// Success
+	return nil
+}
 
 /*
 

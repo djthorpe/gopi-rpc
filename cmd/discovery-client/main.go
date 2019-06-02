@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -31,30 +32,69 @@ import (
 	_ "github.com/djthorpe/gopi/sys/logger"
 )
 
+////////////////////////////////////////////////////////////////////////////////
+
+type Runner struct {
+	app      *gopi.AppInstance
+	log      gopi.Logger
+	services map[string]gopi.RPCServiceRecord
+	commands []*Command
+}
+
+type Command struct {
+	re    *regexp.Regexp
+	scope CommandScope
+	cb    func(stub rpc.DiscoveryClient, args []string) error
+}
+
+type CommandScope uint
+
+////////////////////////////////////////////////////////////////////////////////
+
 const (
 	DISCOVERY_TIMEOUT = 400 * time.Millisecond
 )
 
-////////////////////////////////////////////////////////////////////////////////
-
-type App struct {
-	app      *gopi.AppInstance
-	log      gopi.Logger
-	services map[string]gopi.RPCServiceRecord
-}
+const (
+	COMMAND_SCOPE_ROOT CommandScope = iota
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func NewApp(app *gopi.AppInstance) *App {
-	this := new(App)
+func NewRunner(app *gopi.AppInstance) *Runner {
+	this := new(Runner)
 	this.app = app
 	this.log = app.Logger
 	this.services = make(map[string]gopi.RPCServiceRecord)
+	this.commands = make([]*Command, 0)
 	return this
 }
 
+// Add commands
+func (this *Runner) RegisterCommand(cmd *Command) {
+	this.commands = append(this.commands, cmd)
+}
+
+// Return command-line args
+func (this *Runner) Args() []string {
+	return this.app.AppFlags.Args()
+}
+
+// Match an argument and return
+func (this *Runner) GetCommand(name string, scope CommandScope) (*Command, []string) {
+	for _, cmd := range this.commands {
+		if scope != cmd.scope {
+			continue
+		}
+		if matches := cmd.re.FindStringSubmatch(name); matches != nil {
+			return cmd, matches
+		}
+	}
+	return nil, nil
+}
+
 // Pool returns the client pool or nil
-func (this *App) Pool() gopi.RPCClientPool {
+func (this *Runner) Pool() gopi.RPCClientPool {
 	if pool, ok := this.app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool); ok == false || pool == nil {
 		return nil
 	} else {
@@ -63,7 +103,7 @@ func (this *App) Pool() gopi.RPCClientPool {
 }
 
 // Return timeout or default
-func (this *App) TimeoutOrDefault(timeout time.Duration) time.Duration {
+func (this *Runner) TimeoutOrDefault(timeout time.Duration) time.Duration {
 	if timeout > 0 {
 		return timeout
 	} else {
@@ -71,40 +111,17 @@ func (this *App) TimeoutOrDefault(timeout time.Duration) time.Duration {
 	}
 }
 
-func HasHostPort(addr string) bool {
-	if host, port, err := net.SplitHostPort(addr); err != nil {
-		return false
-	} else if host != "" && port != "" {
-		return true
+// Return discovery type
+func (this *Runner) DiscoveryType() rpc.DiscoveryType {
+	if dns, _ := this.app.AppFlags.GetBool("dns"); dns {
+		return rpc.DISCOVERY_TYPE_DNS
 	} else {
-		return false
+		return rpc.DISCOVERY_TYPE_DB
 	}
-}
-
-func FilterBySubtype(services []gopi.RPCServiceRecord, subtype string) []gopi.RPCServiceRecord {
-	if len(services) == 0 || subtype == "" {
-		return services
-	}
-	services_ := make([]gopi.RPCServiceRecord, 0, len(services))
-	for _, service := range services {
-		if service.Subtype() == subtype {
-			services_ = append(services_, service)
-		}
-	}
-	return services_
-}
-
-func StubExists(stub string, stubs []string) bool {
-	for _, stub_ := range stubs {
-		if stub == stub_ {
-			return true
-		}
-	}
-	return false
 }
 
 // ServiceRecord returns a remote service record, or nil if not found
-func (this *App) ServiceRecord(addr string, timeout time.Duration) (gopi.RPCServiceRecord, error) {
+func (this *Runner) ServiceRecord(addr string, timeout time.Duration) (gopi.RPCServiceRecord, error) {
 	this.log.Debug("ServiceRecord{ addr=%v timeout=%v }", strconv.Quote(addr), this.TimeoutOrDefault(timeout))
 
 	// If we already have the service record, return it
@@ -154,7 +171,7 @@ func (this *App) ServiceRecord(addr string, timeout time.Duration) (gopi.RPCServ
 }
 
 // Conn returns a connection, or nil if connection cannot be made
-func (this *App) Conn(addr string, timeout time.Duration) (gopi.RPCClientConn, error) {
+func (this *Runner) Conn(addr string, timeout time.Duration) (gopi.RPCClientConn, error) {
 	this.log.Debug("Conn{ addr=%v timeout=%v }", strconv.Quote(addr), this.TimeoutOrDefault(timeout))
 
 	if pool := this.Pool(); pool == nil {
@@ -169,7 +186,7 @@ func (this *App) Conn(addr string, timeout time.Duration) (gopi.RPCClientConn, e
 }
 
 // Client returns a service stub, or nil
-func (this *App) Stub(stub string, addr string, timeout time.Duration) (gopi.RPCClient, error) {
+func (this *Runner) Stub(stub string, addr string, timeout time.Duration) (gopi.RPCClient, error) {
 	this.log.Debug("Stub{ stub=%v addr=%v timeout=%v }", strconv.Quote(stub), strconv.Quote(addr), this.TimeoutOrDefault(timeout))
 
 	if pool := this.Pool(); pool == nil {
@@ -187,14 +204,44 @@ func (this *App) Stub(stub string, addr string, timeout time.Duration) (gopi.RPC
 	}
 }
 
-func (this *App) Run(stub rpc.DiscoveryClient) error {
-	return nil
+////////////////////////////////////////////////////////////////////////////////
+
+func HasHostPort(addr string) bool {
+	if host, port, err := net.SplitHostPort(addr); err != nil {
+		return false
+	} else if host != "" && port != "" {
+		return true
+	} else {
+		return false
+	}
+}
+
+func FilterBySubtype(services []gopi.RPCServiceRecord, subtype string) []gopi.RPCServiceRecord {
+	if len(services) == 0 || subtype == "" {
+		return services
+	}
+	services_ := make([]gopi.RPCServiceRecord, 0, len(services))
+	for _, service := range services {
+		if service.Subtype() == subtype {
+			services_ = append(services_, service)
+		}
+	}
+	return services_
+}
+
+func StubExists(stub string, stubs []string) bool {
+	for _, stub_ := range stubs {
+		if stub == stub_ {
+			return true
+		}
+	}
+	return false
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func Main(app *gopi.AppInstance, done chan<- struct{}) error {
-	runner := NewApp(app)
+	runner := NewRunner(app)
 	addr, _ := app.AppFlags.GetString("addr")
 	timeout, _ := app.AppFlags.GetDuration("timeout")
 	if stub, err := runner.Stub("gopi.Discovery", addr, timeout); err != nil {
@@ -219,9 +266,9 @@ func main() {
 	// Set flags
 	config.AppFlags.FlagString("addr", "", "Gateway address")
 	config.AppFlags.FlagDuration("timeout", 0, "Gateway discovery timeout")
+	config.AppFlags.FlagBool("dns", false, "Use DNS lookup rather than cache")
 
 	/*
-		config.AppFlags.FlagBool("dns", false, "Use DNS lookup rather than cache")
 		config.AppFlags.FlagBool("watch", false, "Watch for discovery changes")
 		config.AppFlags.FlagString("register", "", "Register a service with name")
 		config.AppFlags.FlagString("subtype", "", "Service subtype")
