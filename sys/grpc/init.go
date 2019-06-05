@@ -55,7 +55,7 @@ func init() {
 	// Register GRPC rpc/clientpool module
 	gopi.RegisterModule(gopi.Module{
 		Name:     "rpc/clientpool",
-		Type:     gopi.MODULE_TYPE_OTHER,
+		Type:     gopi.MODULE_TYPE_CLIENTPOOL,
 		Requires: []string{"rpc/util"},
 		Config: func(config *gopi.AppConfig) {
 			config.AppFlags.FlagDuration("rpc.timeout", 5*time.Second, "Connection timeout")

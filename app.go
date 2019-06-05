@@ -154,9 +154,9 @@ func Client(config gopi.AppConfig, timeout time.Duration, task ClientTask) int {
 	// Add the -addr flag
 	config.AppFlags.FlagString("addr", "", "Service name or address:port")
 
-	// Append on "rpc/clientpool" onto module configuration
+	// Append on "clientpool" onto module configuration
 	var err error
-	if config.Modules, err = gopi.AppendModulesByName(config.Modules, "rpc/clientpool"); err != nil {
+	if config.Modules, err = gopi.AppendModulesByName(config.Modules, "clientpool"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return -1
 	}
@@ -193,12 +193,6 @@ func Client(config gopi.AppConfig, timeout time.Duration, task ClientTask) int {
 
 // LookupServiceRecords returns a remote service records, or nil if not found
 func LookupServiceRecords(app *gopi.AppInstance, addr string, timeout time.Duration) ([]gopi.RPCServiceRecord, error) {
-	// Get client pool
-	pool, ok := app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool)
-	if ok == false || pool == nil {
-		return nil, fmt.Errorf("Missing rpc/clientpool")
-	}
-
 	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -207,14 +201,14 @@ func LookupServiceRecords(app *gopi.AppInstance, addr string, timeout time.Durat
 		return nil, err
 	} else if HasHostPort(addr) {
 		// Where addr is <host>:<port> return the service record
-		if r, err := pool.Lookup(ctx, "", addr, 1); err != nil {
+		if r, err := app.ClientPool.Lookup(ctx, "", addr, 1); err != nil {
 			return nil, err
 		} else {
 			return r, nil
 		}
 	} else {
 		// Return "unlimited" service records (parameter 0)
-		if services, err := pool.Lookup(ctx, fmt.Sprintf("_%v._tcp", service), addr, 0); err != nil {
+		if services, err := app.ClientPool.Lookup(ctx, fmt.Sprintf("_%v._tcp", service), addr, 0); err != nil {
 			return nil, err
 		} else if len(services) == 0 {
 			return nil, gopi.ErrNotFound
