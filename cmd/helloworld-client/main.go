@@ -39,9 +39,7 @@ func Main(app *gopi.AppInstance, services []gopi.RPCServiceRecord, done chan<- s
 	if stub, err := app.ClientPool.NewClientEx("gopi.Greeter", services, gopi.RPC_FLAG_SERVICE_ANY); err != nil {
 		return err
 	} else if stub_ := stub.(rpc.GreeterClient); stub_ != nil {
-		if err := stub_.Ping(); err != nil {
-			return err
-		} else if reply, err := stub_.SayHello(name); err != nil {
+		if reply, err := stub_.SayHello(name); err != nil {
 			return err
 		} else {
 			fmt.Println("Service says:", strconv.Quote(reply))

@@ -100,7 +100,7 @@ func (this *record) SetService(service, subtype string) error {
 	// Set key
 	this.Key_ = this.Name_
 	if this.Service() != "" {
-		this.Key_ += "." + this.Service()
+		this.Key_ += "." + this.Service_
 	}
 	return nil
 }

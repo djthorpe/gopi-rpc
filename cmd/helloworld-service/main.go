@@ -17,7 +17,7 @@ import (
 	rpc "github.com/djthorpe/gopi-rpc"
 
 	// Modules
-	_ "github.com/djthorpe/gopi-rpc/sys/gaffer-sd"
+	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
 	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi/sys/logger"
 
@@ -31,6 +31,9 @@ import (
 func main() {
 	// Create the configuration - include discovery module for registering
 	config := gopi.NewAppConfig("rpc/helloworld:service", "rpc/version:service", "discovery")
+
+	// Subtype
+	config.AppFlags.SetParam(gopi.PARAM_SERVICE_SUBTYPE, "helloworld")
 
 	// Run the server and register all the services
 	os.Exit(rpc.Server(config))

@@ -57,7 +57,7 @@ const (
 )
 
 var (
-	reService = regexp.MustCompile("[A-za-z][A-Za-z0-9\\-]*")
+	reService = regexp.MustCompile("^[A-za-z][A-Za-z0-9\\-]*")
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -186,6 +186,7 @@ func (this *server) Port() uint {
 	}
 }
 
+// Hostname returns the fully-qualified hostname
 func (this *server) Hostname() (string, error) {
 	if hostname, err := os.Hostname(); err != nil {
 		return "", err
@@ -201,9 +202,7 @@ func (this *server) GRPCServer() *grpc.Server {
 	return this.server
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// SERVICE
-
+// Service returns the service record for the server
 func (this *server) Service(service, subtype, name string, text ...string) gopi.RPCServiceRecord {
 	this.log.Debug2("<grpc.Service>{ service=%v subtype=%v name=%v text=%v }", strconv.Quote(service), strconv.Quote(subtype), strconv.Quote(name), text)
 
@@ -219,15 +218,27 @@ func (this *server) Service(service, subtype, name string, text ...string) gopi.
 		return nil
 	}
 
-	// Check service name
-	if matched, err := regexp.MatchString("^[A-Za-z][A-Za-z0-9\\-]*$", service); err != nil {
-		this.log.Warn("grpc.Service: SetService: %v", err)
-		return nil
-	} else if matched == false {
-		this.log.Warn("grpc.Service: SetService: Invalid service type")
+	// Check service
+	if matched := reService.MatchString(service); matched == false {
+		this.log.Warn("grpc.Service: SetService: Invalid service, %v", strconv.Quote(service))
 		return nil
 	} else {
 		service = fmt.Sprintf("_%v._%v", service, this.Addr().Network())
+	}
+
+	// Check subtype name
+	if subtype == "" {
+		// Ignore, no subtype
+	} else if matched := reService.MatchString(subtype); matched == false {
+		this.log.Warn("grpc.Service: SetService: Invalid subtype, %v", strconv.Quote(subtype))
+		return nil
+	} else {
+		name = subtype + ":" + name
+	}
+
+	// Append port to name
+	if port := this.Port(); port != 0 {
+		name = name + "@" + fmt.Sprint(port)
 	}
 
 	// Return service

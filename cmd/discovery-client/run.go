@@ -75,8 +75,7 @@ func (this *Runner) Watch(stub rpc.DiscoveryClient, services []string) error {
 }
 
 func (this *Runner) EnumerateServices(stub rpc.DiscoveryClient, _ []string) error {
-	timeout, _ := this.app.AppFlags.GetDuration("timeout")
-	if services, err := stub.Enumerate(this.DiscoveryType(), this.TimeoutOrDefault(timeout)); err != nil {
+	if services, err := stub.Enumerate(this.DiscoveryType(), DISCOVERY_TIMEOUT); err != nil {
 		return err
 	} else {
 		table := tablewriter.NewWriter(os.Stdout)
@@ -100,10 +99,9 @@ func (this *Runner) ServiceCommands(stub rpc.DiscoveryClient, service []string) 
 }
 
 func (this *Runner) ServiceLookup(stub rpc.DiscoveryClient, service []string) error {
-	timeout, _ := this.app.AppFlags.GetDuration("timeout")
 	if len(service) != 1 {
 		return gopi.ErrBadParameter
-	} else if services, err := stub.Lookup(fmt.Sprintf("_%v._tcp", service[0]), this.DiscoveryType(), this.TimeoutOrDefault(timeout)); err != nil {
+	} else if services, err := stub.Lookup(fmt.Sprintf("_%v._tcp", service[0]), this.DiscoveryType(), DISCOVERY_TIMEOUT); err != nil {
 		return err
 	} else if len(services) == 0 {
 		return fmt.Errorf("No service records found for %v", strconv.Quote(service[0]))
@@ -190,37 +188,3 @@ func EventEquals(this, other gopi.RPCEvent) bool {
 	// Return true
 	return true
 }
-
-/*
-func Register(app *gopi.AppInstance, client rpc.DiscoveryClient, name, service, subtype string, port uint) error {
-	util := app.ModuleInstance("rpc/util").(rpc.Util)
-	record := util.NewServiceRecord(rpc.DISCOVERY_TYPE_DB)
-
-	if err := record.SetName(name); err != nil {
-		return err
-	} else if hostname, err := os.Hostname(); err != nil {
-		return err
-	} else if addrs, err := net.LookupHost(hostname); err != nil {
-		return err
-	} else if len(addrs) == 0 {
-		return fmt.Errorf("No addresses found for host %v", strconv.Quote(hostname))
-	} else if err := record.SetHostPort(hostname + ":" + fmt.Sprint(port)); err != nil {
-		return err
-	} else {
-		for _, addr := range addrs {
-			if ip := net.ParseIP(addr); ip == nil {
-				return fmt.Errorf("Cannot parse %v", strconv.Quote(addr))
-			} else if err := record.AppendIP(ip); err != nil {
-				return err
-			}
-		}
-	}
-	if err := record.SetService(service, subtype); err != nil {
-		return err
-	}
-
-	fmt.Println(record)
-
-	return client.Register(record)
-}
-*/

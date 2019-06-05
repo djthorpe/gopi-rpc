@@ -130,15 +130,6 @@ func (this *Runner) GetCommand(name string, scope CommandScope) (*Command, []str
 	return nil, nil
 }
 
-// Pool returns the client pool or nil
-func (this *Runner) Pool() gopi.RPCClientPool {
-	if pool, ok := this.app.ModuleInstance("rpc/clientpool").(gopi.RPCClientPool); ok == false || pool == nil {
-		return nil
-	} else {
-		return pool
-	}
-}
-
 // Return discovery type
 func (this *Runner) DiscoveryType() rpc.DiscoveryType {
 	if dns, _ := this.app.AppFlags.GetBool("dns"); dns {
@@ -175,7 +166,8 @@ func Main(app *gopi.AppInstance, services []gopi.RPCServiceRecord, done chan<- s
 	runner := NewRunner(app)
 	defer runner.Close()
 
-	if stub, err := runner.Pool().NewClientEx("gopi.Discovery", services, gopi.RPC_FLAG_NONE); err != nil {
+	// Run the RPC for greeter
+	if stub, err := app.ClientPool.NewClientEx("gopi.Discovery", services, gopi.RPC_FLAG_SERVICE_ANY); err != nil {
 		return err
 	} else if err := runner.Run(stub.(rpc.DiscoveryClient)); err != nil {
 		return err
@@ -189,14 +181,11 @@ func Main(app *gopi.AppInstance, services []gopi.RPCServiceRecord, done chan<- s
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/discovery:client", "rpc/version:client", "googlecast:client", "discovery")
-
-	// Set subtype as "discovery"
-	//config.AppFlags.SetParam(gopi.PARAM_SERVICE_SUBTYPE, "discovery")
+	config := gopi.NewAppConfig("rpc/discovery:client", "discovery")
 
 	// Set flags
 	config.AppFlags.FlagBool("dns", false, "Use DNS lookup rather than cache")
 
-	// Run the command line tool - look for services for 400ms
-	os.Exit(rpc.Client(config, DISCOVERY_TIMEOUT, Main))
+	// Run the command line tool
+	os.Exit(rpc.Client(config, 200*time.Millisecond, Main))
 }
