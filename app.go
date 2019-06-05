@@ -43,7 +43,7 @@ func Server(config gopi.AppConfig, background_tasks ...gopi.BackgroundTask) int 
 	defer app.Close()
 
 	// Run the application with a main task and background tasks
-	if err := app.Run2(MainTask, ServerTask, RegisterTask); err == gopi.ErrHelp {
+	if err := app.Run2(MainTask, RegisterTask); err == gopi.ErrHelp {
 		config.AppFlags.PrintUsage()
 		return 0
 	} else if err != nil {
@@ -55,73 +55,64 @@ func Server(config gopi.AppConfig, background_tasks ...gopi.BackgroundTask) int 
 }
 
 func MainTask(app *gopi.AppInstance, done chan<- struct{}) error {
+	server := app.ModuleInstance("rpc/server").(gopi.RPCServer)
+
+	// Start the server in the background
+	go func() {
+		if err := server.Start(); err != nil {
+			app.Logger.Error("Error: %v", err)
+		}
+	}()
+
 	// Wait for CTRL+C or SIGTERM
 	app.Logger.Info("Waiting for CTRL+C or SIGTERM to stop server")
 	app.WaitForSignal()
+
+	// Cancel on-going requests for all services
+	for _, module := range gopi.ModulesByType(gopi.MODULE_TYPE_SERVICE) {
+		app.Logger.Debug("CancelRequests: %v", module.Name)
+		if instance, ok := app.ModuleInstance(module.Name).(gopi.RPCService); ok {
+			if err := instance.CancelRequests(); err != nil {
+				app.Logger.Warn("CancelRequests: %v: %v", module.Name, err)
+			}
+		}
+	}
+
+	// Stop the server
+	if err := server.Stop(false); err != nil {
+		return err
+	}
+
 	done <- gopi.DONE
 	return nil
 }
 
-func ServerTask(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) error {
-	if server, ok := app.ModuleInstance("rpc/server").(gopi.RPCServer); ok == false {
-		return fmt.Errorf("rpc/server missing")
-	} else {
-		go func() {
-			<-stop
-
-			// Cancel on-going requests for all services
-			for _, module := range gopi.ModulesByType(gopi.MODULE_TYPE_SERVICE) {
-				app.Logger.Debug("CancelRequests: %v", module.Name)
-				if instance, ok := app.ModuleInstance(module.Name).(gopi.RPCService); ok {
-					if err := instance.CancelRequests(); err != nil {
-						app.Logger.Warn("CancelRequests: %v: %v", module.Name, err)
-					}
-				}
-			}
-
-			// Stop the server
-			if err := server.Stop(false); err != nil {
-				app.Logger.Error("Stop: %v", err)
-			}
-		}()
-		start <- gopi.DONE
-		app.Logger.Debug("Server starting")
-		if err_ := server.Start(); err_ != nil {
-			return err_
-		}
-		app.Logger.Debug("Server stopped")
-	}
-
-	// Success
-	return nil
-}
-
 func RegisterTask(app *gopi.AppInstance, start chan<- struct{}, stop <-chan struct{}) error {
+	app.Logger.Debug("<rpc/app>RegisterTask started")
+	server := app.ModuleInstance("rpc/server").(gopi.RPCServer)
 	discovery := app.ModuleInstance("discovery")
-	if server, ok := app.ModuleInstance("rpc/server").(gopi.RPCServer); ok == false {
-		return fmt.Errorf("rpc/server missing")
-	} else {
-		discovery_, _ := discovery.(gopi.RPCServiceDiscovery)
-		if discovery_ == nil {
-			app.Logger.Info("Service Discovery not enabled")
-		}
-		start <- gopi.DONE
-		evts := server.Subscribe()
-	FOR_LOOP:
-		for {
-			select {
-			case <-stop:
-				break FOR_LOOP
-			case evt := <-evts:
-				if evt_, ok := evt.(gopi.RPCEvent); ok == false {
-					app.Logger.Warn("Not processing: %v", evt)
-				} else if err := ProcessEvent(app, server, discovery_, evt_); err != nil {
-					app.Logger.Warn("%v", err)
-				}
+	if discovery == nil {
+		app.Logger.Info("Service Discovery not enabled")
+	}
+	start <- gopi.DONE
+	evts := server.Subscribe()
+FOR_LOOP:
+	for {
+		select {
+		case <-stop:
+			break FOR_LOOP
+		case evt := <-evts:
+			app.Logger.Debug("<rpc/app>Event: %v", evt)
+			if evt_, ok := evt.(gopi.RPCEvent); ok == false {
+				app.Logger.Warn("Not processing: %v", evt)
+			} else if err := ProcessEvent(app, server, discovery.(gopi.RPCServiceDiscovery), evt_); err != nil {
+				app.Logger.Warn("%v", err)
 			}
 		}
-		server.Unsubscribe(evts)
 	}
+	server.Unsubscribe(evts)
+
+	app.Logger.Debug("<rpc/app>RegisterTask stopped")
 
 	// Success
 	return nil

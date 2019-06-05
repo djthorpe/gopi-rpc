@@ -140,9 +140,10 @@ func (this *server) Start() error {
 		// Start server
 		this.addr = lis.Addr()
 		this.Emit(this.util.NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED, nil))
-		this.log.Info("Listening on addresss: %v", this.addr)
+		this.log.Info("<grpc.Server> Listening on addresss: %v", this.addr)
 		err := this.server.Serve(lis) // blocking call
 		this.Emit(this.util.NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED, nil))
+		this.log.Debug("<grpc.Server> Stopped")
 		this.addr = nil
 		return err
 	}
