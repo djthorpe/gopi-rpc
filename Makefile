@@ -18,6 +18,8 @@ all: test install
 
 install: helloworld-client helloworld-service discovery-service discovery-client gaffer-service gaffer-client dns-discovery googlecast
 
+gaffer: helloworld-service gaffer-service gaffer-client
+
 protobuf:
 	$(GOGEN) -x ./rpc/...
 
@@ -38,6 +40,7 @@ gaffer-service: protobuf
 
 gaffer-client:
 	$(GOINSTALL) $(GOFLAGS) ./cmd/gaffer-client/...
+
 
 dns-discovery:
 	$(GOINSTALL) $(GOFLAGS) ./cmd/dns-discovery/...

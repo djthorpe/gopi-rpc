@@ -7,7 +7,12 @@ After=network-online.target
 User=influxdb
 Group=influxdb
 LimitNOFILE=65536
-ExecStart=/opt/gaffer/bin/gaffer-service -gaffer.root /opt/gaffer/sbin -gaffer.config /var/local/gaffer/gaffer.json -log.file /var/local/gaffer/gaffer.log -verbose -rpc.port 8080
+ExecStart=/opt/gaffer/bin/gaffer-service \
+  -verbose \
+  -gaffer.root=ROOT \
+  -gaffer.path=PATH \
+  -rpc.sslkey=KEY \
+  -rpc.sslcert=CERT
 KillMode=control-group
 Restart=on-failure
 
