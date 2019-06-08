@@ -117,6 +117,7 @@ install "${CURRENT_PATH}/../etc/gaffer.service" "${PREFIX}/etc"
 if [ ! "${SERVICE_LOADED}" = "" ] ; then
   echo "Existing ${SERVICE_NAME} service loaded, stopping"
   sudo systemctl stop ${SERVICE_NAME} || exit -1
+  sudo systemctl disable ${SERVICE_NAME} || exit -1
 fi
 
 if [ ! -e "${SERVICE_FILE}" ] ; then
