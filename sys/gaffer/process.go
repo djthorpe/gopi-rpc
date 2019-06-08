@@ -84,11 +84,11 @@ func (this *Process) Start(stdout, stderr chan<- []byte, stop chan<- error) erro
 
 	// Call wait in the background, which then returns the error
 	go func() {
-		// Wait for processses
-		err := this.cmd.Wait()
-
 		// Wait for loggers to end
 		this.wg.Wait()
+
+		// Wait for process to end
+		err := this.cmd.Wait()
 
 		// Send stop signal and close
 		if err != nil {
