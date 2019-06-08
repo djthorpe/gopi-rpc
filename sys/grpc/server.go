@@ -234,7 +234,7 @@ func (this *server) Service(service, subtype, name string, text ...string) gopi.
 		this.log.Warn("grpc.Service: SetService: Invalid subtype, %v", strconv.Quote(subtype))
 		return nil
 	} else {
-		name = subtype + ":" + name
+		name = subtype + "/" + name
 	}
 
 	// Append port to name
