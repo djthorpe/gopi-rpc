@@ -17,6 +17,7 @@ import (
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
 	grpc "github.com/djthorpe/gopi-rpc/sys/grpc"
+	event "github.com/djthorpe/gopi/util/event"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/rpc/protobuf/gaffer"
@@ -29,13 +30,14 @@ import (
 type Client struct {
 	pb.GafferClient
 	conn gopi.RPCClientConn
+	event.Publisher
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // NEW
 
 func NewGafferClient(conn gopi.RPCClientConn) gopi.RPCClient {
-	return &Client{pb.NewGafferClient(conn.(grpc.GRPCClientConn).GRPCConn()), conn}
+	return &Client{pb.NewGafferClient(conn.(grpc.GRPCClientConn).GRPCConn()), conn, event.Publisher{}}
 }
 
 func (this *Client) NewContext() context.Context {
@@ -324,21 +326,22 @@ func (this *Client) SetServiceGroups(service string, groups []string) (rpc.Gaffe
 	}
 }
 
-func (this *Client) StreamEvents(events chan<- rpc.GafferEvent) error {
+func (this *Client) StreamEvents(ctx context.Context) error {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
 	// Keep reading from stream
-	if stream, err := this.GafferClient.StreamEvents(this.NewContext(), &empty.Empty{}); err != nil {
+	if stream, err := this.GafferClient.StreamEvents(ctx, &empty.Empty{}); err != nil {
 		return err
 	} else {
+	FOR_LOOP:
 		for {
 			if msg, err := stream.Recv(); err == io.EOF {
-				break
+				break FOR_LOOP
 			} else if err != nil {
 				return err
 			} else if evt := fromProtoEvent(msg); evt != nil {
-				events <- evt
+				this.Emit(evt)
 			}
 		}
 	}

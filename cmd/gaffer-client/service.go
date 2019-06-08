@@ -13,7 +13,7 @@ import (
 	"os"
 
 	// Frameworks
-	gopi "github.com/djthorpe/gopi"
+
 	rpc "github.com/djthorpe/gopi-rpc"
 	tablewriter "github.com/olekukonko/tablewriter"
 )
@@ -94,10 +94,6 @@ func (this *Runner) ListAllServiceRecords(cmd *Cmd, args []string) error {
 
 	// Success
 	return nil
-}
-
-func (this *Runner) LookupServiceRecords(cmd *Cmd, args []string) error {
-	return gopi.ErrNotImplemented
 }
 
 func (this *Runner) AddService(cmd *Cmd, args []string) error {
@@ -201,8 +197,31 @@ func (this *Runner) StartService(cmd *Cmd, args []string) error {
 		OutputInstances(os.Stdout, []rpc.GafferServiceInstance{
 			instance,
 		})
+		// Wait until done
+		this.wait = true
 	}
 
 	// Success
 	return nil
+}
+
+func (this *Runner) LookupServiceRecords(cmd *Cmd, args []string) error {
+	// No arguments allowed
+	if len(args) != 1 {
+		return this.SyntaxError(cmd)
+	}
+	discovery_type := rpc.DISCOVERY_TYPE_DB
+	if dns, _ := this.flags.GetBool("dns"); dns {
+		discovery_type = rpc.DISCOVERY_TYPE_DNS
+	}
+	// List service records
+	if list, err := this.discovery.Lookup("_"+args[0]+"._tcp", discovery_type, DISCOVERY_TIMEOUT); err != nil {
+		return err
+	} else {
+		OutputRecords(os.Stdout, list)
+	}
+
+	// Success
+	return nil
+
 }

@@ -11,6 +11,7 @@ package rpc
 
 import (
 	// Frameworks
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -103,6 +104,7 @@ type GafferEvent interface {
 
 type GafferClient interface {
 	gopi.RPCClient
+	gopi.Publisher
 
 	// Ping remote microservice
 	Ping() error
@@ -145,7 +147,7 @@ type GafferClient interface {
 	SetServiceGroups(string, []string) (GafferService, error)
 
 	// Stream Events
-	StreamEvents(chan<- GafferEvent) error
+	StreamEvents(ctx context.Context) error
 }
 
 type GafferServiceMode uint

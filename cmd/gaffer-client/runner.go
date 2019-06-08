@@ -9,6 +9,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
+	event "github.com/djthorpe/gopi/util/event"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -25,6 +27,11 @@ type Runner struct {
 	discovery rpc.DiscoveryClient
 	flags     *gopi.Flags
 	commands  map[Scope][]*Cmd
+	cancels   []context.CancelFunc
+	wait      bool
+
+	event.Merger
+	event.Tasks
 }
 
 type Cmd struct {
@@ -77,7 +84,7 @@ func NewRunner() *Runner {
 				this.ListAllServiceRecords,
 			},
 			&Cmd{
-				regexp.MustCompile("^_([a-zA-Z][a-zA-Z0-9\\-\\_\\.]*)$"),
+				regexp.MustCompile("^_([a-zA-Z][a-zA-Z0-9\\-]*)$"),
 				"_<type>",
 				"Lookup service records",
 				this.LookupServiceRecords,
@@ -131,6 +138,10 @@ func NewRunner() *Runner {
 		},
 		SCOPE_RECORD: []*Cmd{},
 	}
+
+	this.cancels = make([]context.CancelFunc, 0)
+	this.Tasks.Start(this.EventTask)
+
 	return this
 }
 
@@ -189,6 +200,99 @@ func (this *Runner) Run(gaffer rpc.GafferClient, discovery rpc.DiscoveryClient, 
 	} else {
 		return cmd.f(cmd, params)
 	}
+}
+
+func (this *Runner) Close() error {
+	// Cancel streams
+	for _, cancel := range this.cancels {
+		cancel()
+	}
+
+	// End tasks
+	if err := this.Tasks.Close(); err != nil {
+		return err
+	}
+
+	// Close merger
+	this.Merger.Close()
+
+	// Success
+	return nil
+}
+
+func (this *Runner) Wait() bool {
+	return this.wait
+}
+
+func (this *Runner) AddGaffer(gaffer rpc.GafferClient) {
+	ctx, cancel := context.WithCancel(context.Background())
+	this.cancels = append(this.cancels, cancel)
+
+	// Add gaffer to the merger
+	this.Merger.Merge(gaffer)
+
+	go func() {
+		fmt.Println("STREAM STARTS")
+		if err := gaffer.StreamEvents(ctx); err != nil && err != context.Canceled {
+			fmt.Println(err)
+		}
+		fmt.Println("STREAM ENDS")
+	}()
+
+}
+
+func (this *Runner) EventTask(start chan<- event.Signal, stop <-chan event.Signal) error {
+	start <- gopi.DONE
+	events := this.Merger.Subscribe()
+FOR_LOOP:
+	for {
+		select {
+		case evt := <-events:
+			if evt_, ok := evt.(rpc.GafferEvent); ok {
+				this.PrintEvent(evt_)
+			}
+		case <-stop:
+			break FOR_LOOP
+		}
+	}
+
+	// Unsubscribe, return success
+	this.Merger.Unsubscribe(events)
+	return nil
+}
+
+func (this *Runner) PrintEvent(evt rpc.GafferEvent) {
+	switch evt.Type() {
+	case rpc.GAFFER_EVENT_NONE:
+		// Ping event
+		return
+	case rpc.GAFFER_EVENT_INSTANCE_RUN:
+		// Ignore run messages
+		return
+	case rpc.GAFFER_EVENT_LOG_STDOUT:
+		fmt.Print(string(evt.Data()))
+	case rpc.GAFFER_EVENT_LOG_STDERR:
+		fmt.Print(string(evt.Data()))
+	case rpc.GAFFER_EVENT_INSTANCE_STOP_OK:
+		fmt.Printf("%v[%v] Stopped OK\n", evt.Service().Name(), evt.Instance().Id())
+	case rpc.GAFFER_EVENT_INSTANCE_STOP_ERROR:
+		fmt.Printf("%v[%v] Stopped with exit code %v\n", evt.Service().Name(), evt.Instance().Id(), evt.Instance().ExitCode())
+	case rpc.GAFFER_EVENT_INSTANCE_STOP_KILLED:
+		fmt.Printf("%v[%v] Killed\n", evt.Service().Name(), evt.Instance().Id())
+		/*
+			case GAFFER_EVENT_SERVICE_ADD:
+			case GAFFER_EVENT_SERVICE_CHANGE:
+			case GAFFER_EVENT_SERVICE_REMOVE:
+			case GAFFER_EVENT_GROUP_ADD:
+			case GAFFER_EVENT_GROUP_CHANGE:
+			case GAFFER_EVENT_GROUP_REMOVE:
+			case GAFFER_EVENT_INSTANCE_ADD:
+			case GAFFER_EVENT_INSTANCE_START:
+		*/
+	default:
+		fmt.Println("Unhandled:", evt.Type())
+	}
+
 }
 
 /*

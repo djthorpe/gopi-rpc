@@ -9,6 +9,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -44,8 +45,23 @@ func Main(app *gopi.AppInstance, records []gopi.RPCServiceRecord, done chan<- st
 		return err
 	} else if discovery, err := app.ClientPool.NewClientEx("gopi.Discovery", records, gopi.RPC_FLAG_NONE); err != nil {
 		return err
+	} else if gaffer2, err := app.ClientPool.NewClientEx("gopi.Gaffer", records, gopi.RPC_FLAG_NONE); err != nil {
+		return err
 	} else {
-		return runner.Run(gaffer.(rpc.GafferClient), discovery.(rpc.DiscoveryClient), app.AppFlags)
+		// Add an event watcher
+		runner.AddGaffer(gaffer2.(rpc.GafferClient))
+
+		// Run
+		defer runner.Close()
+		if err := runner.Run(gaffer.(rpc.GafferClient), discovery.(rpc.DiscoveryClient), app.AppFlags); err != nil {
+			return err
+		}
+
+		// If we should wait until interrupted...
+		if runner.Wait() {
+			fmt.Println("Press CTRL+C to exit")
+			app.WaitForSignal()
+		}
 	}
 
 	// Success
