@@ -200,7 +200,11 @@ func LookupServiceRecords(app *gopi.AppInstance, addr string, timeout time.Durat
 	} else {
 		// Return "unlimited" service records (parameter 0)
 		if services, err := app.ClientPool.Lookup(ctx, fmt.Sprintf("_%v._tcp", service), addr, 0); err != nil {
-			return nil, err
+			if err == gopi.ErrDeadlineExceeded {
+				return nil, gopi.ErrNotFound
+			} else {
+				return nil, err
+			}
 		} else if len(services) == 0 {
 			return nil, gopi.ErrNotFound
 		} else if services = FilterBySubtype(services, subtype); len(services) == 0 {

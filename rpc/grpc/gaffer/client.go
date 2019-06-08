@@ -338,6 +338,8 @@ func (this *Client) StreamEvents(ctx context.Context) error {
 		for {
 			if msg, err := stream.Recv(); err == io.EOF {
 				break FOR_LOOP
+			} else if grpc.IsErrCanceled(err) || grpc.IsErrDeadlineExceeded(err) {
+				break FOR_LOOP
 			} else if err != nil {
 				return err
 			} else if evt := fromProtoEvent(msg); evt != nil {

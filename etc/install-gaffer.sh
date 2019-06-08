@@ -69,7 +69,7 @@ echo "Installing gaffer under ${PREFIX}"
 install -d "${PREFIX}" || exit -1
 install -d "${PREFIX}/bin"
 install ${TEMP_DIR}/gaffer-service "${PREFIX}/bin"
-install ${TEMP_DIR}/gaffer-client "${PREFIX}/bin"
+install ${TEMP_DIR}/gaffer-client "${PREFIX}/bin/gaffer"
 
 # Install service executables under sbin
 install -d ${PREFIX}/sbin
@@ -116,7 +116,7 @@ install "${CURRENT_PATH}/../etc/gaffer.service" "${PREFIX}/etc"
 
 if [ ! "${SERVICE_LOADED}" = "" ] ; then
   echo "Existing ${SERVICE_NAME} service loaded, stopping"
-  systemctl stop ${SERVICE_NAME} || exit -1
+  sudo systemctl stop ${SERVICE_NAME} || exit -1
 fi
 
 if [ ! -e "${SERVICE_FILE}" ] ; then
@@ -142,5 +142,5 @@ cat "${SERVICE_FILE}" \
 
 # Enable service
 echo "Enabling and reloading gaffer service"
-systemctl enable gaffer
+sudo systemctl enable gaffer
 

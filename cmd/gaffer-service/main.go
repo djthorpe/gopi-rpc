@@ -33,8 +33,8 @@ func main() {
 	// Create the configuration
 	config := gopi.NewAppConfig("rpc/gaffer:service", "rpc/version:service", "rpc/discovery:service")
 
-	// Subtype
-	config.AppFlags.SetParam(gopi.PARAM_SERVICE_SUBTYPE, "gaffer")
+	// Service
+	config.AppFlags.SetParam(gopi.PARAM_SERVICE_TYPE, "gaffer")
 
 	// Run the server and register all the services
 	os.Exit(rpc.Server(config))

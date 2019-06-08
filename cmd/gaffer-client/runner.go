@@ -232,11 +232,9 @@ func (this *Runner) AddGaffer(gaffer rpc.GafferClient) {
 	this.Merger.Merge(gaffer)
 
 	go func() {
-		fmt.Println("STREAM STARTS")
 		if err := gaffer.StreamEvents(ctx); err != nil && err != context.Canceled {
 			fmt.Println(err)
 		}
-		fmt.Println("STREAM ENDS")
 	}()
 
 }

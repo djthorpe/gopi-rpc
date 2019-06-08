@@ -74,8 +74,8 @@ func main() {
 	// Create the configuration
 	config := gopi.NewAppConfig("rpc/gaffer:client", "rpc/discovery:client", "discovery")
 
-	// Subtype
-	config.AppFlags.SetParam(gopi.PARAM_SERVICE_SUBTYPE, "gaffer")
+	// Service
+	config.AppFlags.SetParam(gopi.PARAM_SERVICE_TYPE, "gaffer")
 
 	// Create the runner
 	runner = NewRunner()
