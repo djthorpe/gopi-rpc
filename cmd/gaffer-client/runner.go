@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -53,6 +55,10 @@ const (
 	SCOPE_GROUP
 	SCOPE_RECORD
 	SCOPE_SERVICE_PARAM
+)
+
+var (
+	reGroupKey = regexp.MustCompile("^@([A-Za-z][A-Za-z0-9\\-\\_]*)$")
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -276,6 +282,22 @@ func (this *Runner) Close() error {
 
 func (this *Runner) Wait() bool {
 	return this.wait
+}
+
+func (this *Runner) ParseGroups(groups string) ([]string, error) {
+	if groups_ := strings.Split(groups, ","); len(groups_) == 0 {
+		return nil, gopi.ErrBadParameter
+	} else {
+		g := make([]string, 0, len(groups_))
+		for _, group := range groups_ {
+			if matched := reGroupKey.FindStringSubmatch(group); len(matched) != 2 {
+				return nil, fmt.Errorf("Invalid group: %v", strconv.Quote(group))
+			} else {
+				g = append(g, matched[1])
+			}
+		}
+		return g, nil
+	}
 }
 
 func (this *Runner) AddGaffer(gaffer rpc.GafferClient) {

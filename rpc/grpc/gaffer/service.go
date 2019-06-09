@@ -234,7 +234,7 @@ func (this *service) ListInstances(_ context.Context, req *pb.RequestFilter) (*p
 	}
 
 	// Obtain instances for services in a particular group
-	if req.Type == pb.RequestFilter_SERVICE {
+	if req.Type == pb.RequestFilter_GROUP {
 		return &pb.ListInstancesReply{
 			Instance: toProtoFromInstanceArray(instances, func(i rpc.GafferServiceInstance) bool {
 				return i.Service().IsMemberOfGroup(req.Value)
