@@ -332,7 +332,11 @@ func (this *Client) StreamEvents(ctx context.Context) error {
 
 	// Keep reading from stream
 	if stream, err := this.GafferClient.StreamEvents(ctx, &empty.Empty{}); err != nil {
-		return err
+		if grpc.IsErrCanceled(err) || grpc.IsErrDeadlineExceeded(err) {
+			return nil
+		} else {
+			return err
+		}
 	} else {
 	FOR_LOOP:
 		for {

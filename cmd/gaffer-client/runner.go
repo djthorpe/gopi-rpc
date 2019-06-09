@@ -49,8 +49,10 @@ type Func func(cmd *Cmd, args []string) error
 const (
 	SCOPE_ROOT Scope = iota
 	SCOPE_SERVICE
+	SCOPE_INSTANCE
 	SCOPE_GROUP
 	SCOPE_RECORD
+	SCOPE_SERVICE_PARAM
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +86,12 @@ func NewRunner() *Runner {
 				this.ListAllServiceRecords,
 			},
 			&Cmd{
+				regexp.MustCompile("^([1-9][0-9]*)$"),
+				"<instance> (stop)",
+				"List or remove a service instance",
+				this.InstanceCommands,
+			},
+			&Cmd{
 				regexp.MustCompile("^_([a-zA-Z][a-zA-Z0-9\\-]*)$"),
 				"_<type>",
 				"Lookup service records",
@@ -97,13 +105,13 @@ func NewRunner() *Runner {
 			},
 			&Cmd{
 				regexp.MustCompile("^([a-zA-Z][a-zA-Z0-9\\-\\_\\.]*)$"),
-				"<service> (start|rm)",
+				"<service> (start|rm|flags|set)",
 				"List service instances, remove or start a service",
 				this.ServiceCommands,
 			},
 			&Cmd{
 				regexp.MustCompile("^@([a-zA-Z][a-zA-Z0-9\\-\\_\\.]*)$"),
-				"(<flag>...) <@group> (add|rm)",
+				"(<flag>...) <@group> (add|rm|flags|env)",
 				"Add or remove a group",
 				this.GroupCommands,
 			},
@@ -121,6 +129,18 @@ func NewRunner() *Runner {
 				"Start a service",
 				this.StartService,
 			},
+			&Cmd{
+				regexp.MustCompile("^flags$"),
+				"<service> flags (<key>|<key>=<value>...)",
+				"Set service flags",
+				this.SetServiceFlags,
+			},
+			&Cmd{
+				regexp.MustCompile("^set$"),
+				"<service> set (name=<value>|groups=@<group>,@<group>,...)",
+				"Set service parameters",
+				this.SetServiceParams,
+			},
 		},
 		SCOPE_GROUP: []*Cmd{
 			&Cmd{
@@ -135,8 +155,42 @@ func NewRunner() *Runner {
 				"Remove a group",
 				this.RemoveGroup,
 			},
+			&Cmd{
+				regexp.MustCompile("^flags$"),
+				"<service> flags (<key>|<key>=<value>...)",
+				"Set group flags",
+				this.SetGroupFlags,
+			},
+			&Cmd{
+				regexp.MustCompile("^env$"),
+				"<service> env (<key>|<key>=<value>...)",
+				"Set group environment",
+				this.SetGroupEnv,
+			},
+		},
+		SCOPE_INSTANCE: []*Cmd{
+			&Cmd{
+				regexp.MustCompile("^stop$"),
+				"<instance> stop",
+				"Stop an instance",
+				this.StopInstance,
+			},
 		},
 		SCOPE_RECORD: []*Cmd{},
+		SCOPE_SERVICE_PARAM: []*Cmd{
+			&Cmd{
+				regexp.MustCompile("^name=([a-zA-Z][a-zA-Z0-9\\-\\_\\.]*)$"),
+				"<service> set name=<service>",
+				"Rename service",
+				this.SetServiceName,
+			},
+			&Cmd{
+				regexp.MustCompile("^groups=(@[a-zA-Z][a-zA-Z0-9\\-\\_\\.\\@\\,]*)$"),
+				"<service> set groups=@<group>,@<group>,...",
+				"Set service groups",
+				this.SetServiceGroups,
+			},
+		},
 	}
 
 	this.cancels = make([]context.CancelFunc, 0)

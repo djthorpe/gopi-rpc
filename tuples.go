@@ -43,6 +43,20 @@ var (
 ////////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
+// NewTuples returns a tuples method from a string array
+func NewTuples(kv_array []string) (Tuples, error) {
+	var this Tuples
+	for _, kv := range kv_array {
+		kv = strings.TrimPrefix(kv, "-")
+		if k, v, err := this.split(kv); err != nil {
+			return this, err
+		} else if err := this.SetStringForKey(k, v); err != nil {
+			return this, err
+		}
+	}
+	return this, nil
+}
+
 // Len returns the number of tuples
 func (this *Tuples) Len() int {
 	return len(this.tuples)
@@ -170,6 +184,17 @@ func (this *Tuples) indexForKey(k string) int {
 		}
 	}
 	return -1
+}
+
+func (this *Tuples) split(kv string) (string, string, error) {
+	if reTupleKey.MatchString(kv) {
+		return kv, "", nil
+	}
+	if kv_array := strings.SplitN(kv, "=", 2); len(kv_array) != 2 {
+		return "", "", fmt.Errorf("Syntax error: %v", strconv.Quote(kv))
+	} else {
+		return kv_array[0], kv_array[1], nil
+	}
 }
 
 func (this *tuple) String() string {

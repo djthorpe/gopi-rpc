@@ -11,6 +11,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	// Frameworks
 
@@ -137,6 +138,38 @@ func (this *Runner) ServiceCommands(cmd *Cmd, args []string) error {
 	return nil
 }
 
+func (this *Runner) InstanceCommands(cmd *Cmd, args []string) error {
+	// Check for arguments
+	if len(args) != 2 {
+		return runner.SyntaxError(cmd)
+	}
+	if cmd_, _ := this.CommandForScope(SCOPE_INSTANCE, args[1]); cmd_ == nil {
+		return runner.SyntaxError(cmd)
+	} else {
+		return cmd_.f(cmd_, args)
+	}
+}
+
+func (this *Runner) StopInstance(cmd *Cmd, args []string) error {
+	// Check for arguments
+	if len(args) != 2 {
+		return runner.SyntaxError(cmd)
+	} else if instance_, err := strconv.ParseUint(args[0], 10, 32); err != nil {
+		return err
+	} else if instance, err := this.gaffer.StopInstance(uint32(instance_)); err != nil {
+		return err
+	} else {
+		OutputInstances(os.Stdout, []rpc.GafferServiceInstance{
+			instance,
+		})
+		// Wait until done
+		this.wait = true
+	}
+
+	// Return success
+	return nil
+}
+
 func (this *Runner) GroupCommands(cmd *Cmd, args []string) error {
 	// Check for arguments
 	if len(args) < 2 {
@@ -153,8 +186,12 @@ func (this *Runner) GroupCommands(cmd *Cmd, args []string) error {
 }
 
 func (this *Runner) AddGroup(cmd *Cmd, args []string) error {
-	if group, err := this.gaffer.AddGroupForName(args[0]); err != nil {
+	group, err := this.gaffer.AddGroupForName(args[0])
+	if err != nil {
 		return err
+	}
+	if len(args) >= 3 {
+		return this.SetGroupFlags(cmd, args)
 	} else {
 		OutputGroups(os.Stdout, []rpc.GafferServiceGroup{
 			group,
@@ -166,13 +203,45 @@ func (this *Runner) AddGroup(cmd *Cmd, args []string) error {
 }
 
 func (this *Runner) RemoveGroup(cmd *Cmd, args []string) error {
-	if err := this.gaffer.RemoveGroupForName(args[0]); err != nil {
+	if len(args) != 2 {
+		return this.SyntaxError(cmd)
+	} else if err := this.gaffer.RemoveGroupForName(args[0]); err != nil {
 		return err
 	} else {
 		return this.ListAllGroups(cmd, []string{})
 	}
 
 	// Return success
+	return nil
+}
+
+func (this *Runner) SetGroupFlags(cmd *Cmd, args []string) error {
+	if len(args) < 3 {
+		return this.SyntaxError(cmd)
+	} else if tuples, err := rpc.NewTuples(args[2:]); err != nil {
+		return err
+	} else if group, err := this.gaffer.SetFlagsForGroup(args[0], tuples); err != nil {
+		return err
+	} else {
+		return OutputGroups(os.Stdout, []rpc.GafferServiceGroup{group})
+	}
+
+	// Success
+	return nil
+}
+
+func (this *Runner) SetGroupEnv(cmd *Cmd, args []string) error {
+	if len(args) < 3 {
+		return this.SyntaxError(cmd)
+	} else if tuples, err := rpc.NewTuples(args[2:]); err != nil {
+		return err
+	} else if group, err := this.gaffer.SetEnvForGroup(args[0], tuples); err != nil {
+		return err
+	} else {
+		return OutputGroups(os.Stdout, []rpc.GafferServiceGroup{group})
+	}
+
+	// Success
 	return nil
 }
 
@@ -185,6 +254,57 @@ func (this *Runner) RemoveService(cmd *Cmd, args []string) error {
 		// List services
 		return this.ListAllServices(cmd, []string{})
 	}
+}
+
+func (this *Runner) SetServiceFlags(cmd *Cmd, args []string) error {
+	if len(args) < 3 {
+		return this.SyntaxError(cmd)
+	} else if tuples, err := rpc.NewTuples(args[2:]); err != nil {
+		return err
+	} else if service, err := this.gaffer.SetFlagsForService(args[0], tuples); err != nil {
+		return err
+	} else {
+		return OutputServices(os.Stdout, []rpc.GafferService{service})
+	}
+
+	// Success
+	return nil
+}
+
+func (this *Runner) SetServiceParams(cmd *Cmd, args []string) error {
+	if len(args) < 3 {
+		return this.SyntaxError(cmd)
+	}
+	for _, arg := range args[2:] {
+		if cmd_, param := this.CommandForScope(SCOPE_SERVICE_PARAM, arg); cmd_ == nil {
+			return this.SyntaxError(cmd)
+		} else if err := cmd_.f(cmd_, append(args[0:1], param...)); err != nil {
+			return err
+		}
+	}
+
+	// Success
+	return nil
+}
+
+func (this *Runner) SetServiceName(cmd *Cmd, args []string) error {
+	if len(args) != 2 {
+		return this.SyntaxError(cmd)
+	} else {
+		// TODO
+		fmt.Println("TODO: SetServiceName", args)
+	}
+	return nil
+}
+
+func (this *Runner) SetServiceGroups(cmd *Cmd, args []string) error {
+	if len(args) != 2 {
+		return this.SyntaxError(cmd)
+	} else {
+		// TODO
+		fmt.Println("TODO: SetServiceGroups", args)
+	}
+	return nil
 }
 
 func (this *Runner) StartService(cmd *Cmd, args []string) error {
