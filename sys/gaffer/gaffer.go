@@ -456,6 +456,7 @@ func (this *gaffer) StopInstanceForId(id uint32) error {
 	if instance := this.Instances.GetInstanceForId(id); instance == nil {
 		return gopi.ErrNotFound
 	} else if instance.IsRunning() == false {
+		this.log.Warn("StopInstanceForId: Instance %v is not running", id)
 		return gopi.ErrOutOfOrder
 	} else if err := this.Instances.Stop(instance); err != nil {
 		return err
@@ -531,6 +532,7 @@ func (this *gaffer) EmitInstance(t rpc.GafferEventType, instance rpc.GafferServi
 func (this *gaffer) InstanceTask(start chan<- event.Signal, stop <-chan event.Signal) error {
 	start <- gopi.DONE
 	events := this.Subscribe()
+	timer := time.NewTicker(1 * time.Second)
 FOR_LOOP:
 	for {
 		select {
@@ -542,12 +544,30 @@ FOR_LOOP:
 			} else if err := this.InstanceTaskHandler(evt_); err != nil {
 				this.log.Error("InstanceTask: %v: %v", evt, err)
 			}
+		case <-timer.C:
+			if err := this.InstanceStartHandler(); err != nil {
+				this.log.Error("InstanceStartHandler: %v", err)
+			}
 		case <-stop:
 			break FOR_LOOP
 		}
 	}
 
+	timer.Stop()
 	this.Unsubscribe(events)
+
+	// Success
+	return nil
+}
+
+func (this *gaffer) InstanceStartHandler() error {
+	for _, service := range this.config.Services {
+		if service.Mode() != rpc.GAFFER_MODE_AUTO {
+			continue
+		} else {
+			fmt.Println("TODO: Check instances for %v", service)
+		}
+	}
 
 	// Success
 	return nil

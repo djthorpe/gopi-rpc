@@ -226,6 +226,19 @@ func (this *Instances) GetInstances() []rpc.GafferServiceInstance {
 	return instances
 }
 
+func (this *Instances) GetInstancesForServiceName(service string) []rpc.GafferServiceInstance {
+	this.Lock()
+	defer this.Unlock()
+
+	instances := make([]rpc.GafferServiceInstance, 0, len(this.instances))
+	for _, instance := range this.instances {
+		if instance.Service_.Name_ == service {
+			instances = append(instances, instance)
+		}
+	}
+	return instances
+}
+
 func (this *Instances) GetInstanceForId(id uint32) *ServiceInstance {
 	this.Lock()
 	defer this.Unlock()
