@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	// Frameworks
 
@@ -204,6 +205,80 @@ func (this *Runner) SetServiceName(cmd *Cmd, args []string) error {
 		// TODO
 		fmt.Println("TODO: SetServiceName", args)
 	}
+	return nil
+}
+
+func (this *Runner) DisableService(cmd *Cmd, args []string) error {
+	if len(args) != 2 {
+		return this.SyntaxError(cmd)
+	} else if service, err := this.gaffer.SetServiceDisabled(args[0]); err != nil {
+		return err
+	} else {
+		return OutputServices(os.Stdout, []rpc.GafferService{service})
+	}
+
+	// Success
+	return nil
+}
+
+func (this *Runner) EnableService(cmd *Cmd, args []string) error {
+	if len(args) < 2 {
+		return this.SyntaxError(cmd)
+	}
+
+	instance_count := uint(1)
+	idle_time := time.Duration(0)
+	run_time := time.Duration(0)
+
+	if len(args) > 2 {
+		if tuples, err := rpc.NewTuples(args[2:]); err != nil {
+			return err
+		} else {
+			for _, key := range tuples.Keys() {
+				switch key {
+				case "instance_count":
+					if value, err := strconv.ParseUint(tuples.StringForKey(key), 10, 32); err != nil {
+						return fmt.Errorf("Invalid parameter: %v", strconv.Quote(key))
+					} else {
+						instance_count = uint(value)
+					}
+				case "run", "run_time":
+					if value, err := time.ParseDuration(tuples.StringForKey(key)); err != nil {
+						return fmt.Errorf("Invalid parameter: %v", strconv.Quote(key))
+					} else {
+						run_time = value
+					}
+				case "idle", "idle_time":
+					if value, err := time.ParseDuration(tuples.StringForKey(key)); err != nil {
+						return fmt.Errorf("Invalid parameter: %v", strconv.Quote(key))
+					} else {
+						idle_time = value
+					}
+				default:
+					return fmt.Errorf("Unknown parameter: %v", strconv.Quote(key))
+				}
+			}
+		}
+	}
+
+	switch args[1] {
+	case "manual":
+		if service, err := this.gaffer.SetServiceManual(args[0], instance_count, run_time, idle_time); err != nil {
+			return err
+		} else {
+			return OutputServices(os.Stdout, []rpc.GafferService{service})
+		}
+	case "auto":
+		if service, err := this.gaffer.SetServiceAuto(args[0], instance_count, run_time, idle_time); err != nil {
+			return err
+		} else {
+			return OutputServices(os.Stdout, []rpc.GafferService{service})
+		}
+	default:
+		return this.SyntaxError(cmd)
+	}
+
+	// Success
 	return nil
 }
 

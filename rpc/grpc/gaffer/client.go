@@ -12,6 +12,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
+
+	"github.com/golang/protobuf/ptypes"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -32,6 +35,10 @@ type Client struct {
 	conn gopi.RPCClientConn
 	event.Publisher
 }
+
+const (
+	MAX_INSTANCE_COUNT = 10
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // NEW
@@ -184,8 +191,25 @@ func (this *Client) AddServiceForPath(path string, groups []string) (rpc.GafferS
 	defer this.conn.Unlock()
 
 	if reply, err := this.GafferClient.AddService(this.NewContext(), &pb.ServiceRequest{
-		Name:   path,
-		Groups: groups,
+		Service: path,
+		Groups:  groups,
+		Flags:   pb.ServiceRequest_GROUPS,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
+	}
+}
+
+func (this *Client) AddServiceForPathWithName(path, name string, groups []string) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.AddService(this.NewContext(), &pb.ServiceRequest{
+		Service: path,
+		Name:    name,
+		Groups:  groups,
+		Flags:   pb.ServiceRequest_NAME | pb.ServiceRequest_GROUPS,
 	}); err != nil {
 		return nil, err
 	} else {
@@ -312,13 +336,85 @@ func (this *Client) SetEnvForGroup(group string, tuples rpc.Tuples) (rpc.GafferS
 	}
 }
 
+func (this *Client) SetServiceName(service, name string) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.SetServiceParameters(this.NewContext(), &pb.ServiceRequest{
+		Service: service,
+		Name:    name,
+		Flags:   pb.ServiceRequest_NAME,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
+	}
+}
+
 func (this *Client) SetServiceGroups(service string, groups []string) (rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
 	if reply, err := this.GafferClient.SetServiceParameters(this.NewContext(), &pb.ServiceRequest{
-		Name:   service,
-		Groups: groups,
+		Service: service,
+		Groups:  groups,
+		Flags:   pb.ServiceRequest_GROUPS,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
+	}
+}
+
+func (this *Client) SetServiceDisabled(service string) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if reply, err := this.GafferClient.SetServiceParameters(this.NewContext(), &pb.ServiceRequest{
+		Service:       service,
+		InstanceCount: 0,
+		Mode:          pb.Service_MANUAL,
+		Flags:         pb.ServiceRequest_INSTANCE_COUNT | pb.ServiceRequest_MODE,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
+	}
+}
+
+func (this *Client) SetServiceManual(service string, instance_count uint, run_time, idle_time time.Duration) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if instance_count == 0 || instance_count > MAX_INSTANCE_COUNT {
+		return nil, gopi.ErrBadParameter
+	} else if reply, err := this.GafferClient.SetServiceParameters(this.NewContext(), &pb.ServiceRequest{
+		Service:       service,
+		InstanceCount: uint32(instance_count),
+		Mode:          pb.Service_MANUAL,
+		RunTime:       ptypes.DurationProto(run_time),
+		IdleTime:      ptypes.DurationProto(idle_time),
+		Flags:         pb.ServiceRequest_INSTANCE_COUNT | pb.ServiceRequest_MODE | pb.ServiceRequest_RUN_TIME | pb.ServiceRequest_IDLE_TIME,
+	}); err != nil {
+		return nil, err
+	} else {
+		return fromProtoService(reply), nil
+	}
+}
+
+func (this *Client) SetServiceAuto(service string, instance_count uint, run_time, idle_time time.Duration) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if instance_count == 0 || instance_count > MAX_INSTANCE_COUNT {
+		return nil, gopi.ErrBadParameter
+	} else if reply, err := this.GafferClient.SetServiceParameters(this.NewContext(), &pb.ServiceRequest{
+		Service:       service,
+		InstanceCount: uint32(instance_count),
+		Mode:          pb.Service_AUTO,
+		RunTime:       ptypes.DurationProto(run_time),
+		IdleTime:      ptypes.DurationProto(idle_time),
+		Flags:         pb.ServiceRequest_INSTANCE_COUNT | pb.ServiceRequest_MODE | pb.ServiceRequest_RUN_TIME | pb.ServiceRequest_IDLE_TIME,
 	}); err != nil {
 		return nil, err
 	} else {

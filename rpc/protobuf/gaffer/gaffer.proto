@@ -26,14 +26,13 @@ service Gaffer {
     rpc AddService(ServiceRequest) returns (Service);
     rpc RemoveService(NameRequest) returns (google.protobuf.Empty);
     rpc SetServiceParameters(ServiceRequest) returns (Service);
+    rpc SetServiceFlags(SetTuplesRequest) returns (Service);
 
     // Edit group
     rpc AddGroup(NameRequest) returns (Group);
     rpc RemoveGroup(NameRequest) returns (google.protobuf.Empty);
-
     rpc SetGroupFlags(SetTuplesRequest) returns (Group);
     rpc SetGroupEnv(SetTuplesRequest) returns (Group);
-    rpc SetServiceFlags(SetTuplesRequest) returns (Service);
 
     // Get an Instance ID, used when starting a service instance
     rpc GetInstanceId(google.protobuf.Empty) returns (InstanceId);
@@ -79,8 +78,25 @@ message ListInstancesReply {
 }
 
 message ServiceRequest {
-    string name = 1;
-    repeated string groups = 2;
+    string service = 1;
+    string name = 2;
+    repeated string groups = 3;
+    Service.ServiceMode mode = 4; 
+    uint32 instance_count = 5;
+    google.protobuf.Duration run_time = 6;
+    google.protobuf.Duration idle_time = 7; 
+    ModifyFlag flags = 8;
+
+    // What should be modified
+    enum ModifyFlag {
+        NONE = 0;
+        NAME = 1;
+        GROUPS = 2;
+        MODE = 4;
+        INSTANCE_COUNT = 8;
+        RUN_TIME = 16;
+        IDLE_TIME = 32;
+    }
 }
 
 message NameRequest {

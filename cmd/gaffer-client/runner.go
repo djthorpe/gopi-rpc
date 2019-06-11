@@ -111,7 +111,7 @@ func NewRunner() *Runner {
 			},
 			&Cmd{
 				regexp.MustCompile("^([a-zA-Z][a-zA-Z0-9\\-\\_\\.]*)$"),
-				"<service> (start|rm|flags|set)",
+				"<service> (start|rm|flags|set|disable|auto|manual)",
 				"List service instances, remove or start a service",
 				this.ServiceCommands,
 			},
@@ -146,6 +146,18 @@ func NewRunner() *Runner {
 				"<service> set (name=<value>|groups=@<group>,@<group>,...)",
 				"Set service parameters",
 				this.SetServiceParams,
+			},
+			&Cmd{
+				regexp.MustCompile("^disable$"),
+				"<service> disable",
+				"Disable",
+				this.DisableService,
+			},
+			&Cmd{
+				regexp.MustCompile("^(manual|auto)$"),
+				"<service> (manual|auto) (instance_count=<uint>|run=<duration>|idle=<duration>)",
+				"Enable a service for manual or auto startup",
+				this.EnableService,
 			},
 		},
 		SCOPE_GROUP: []*Cmd{

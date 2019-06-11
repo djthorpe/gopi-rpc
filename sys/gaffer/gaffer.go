@@ -169,8 +169,8 @@ func (this *gaffer) GetExecutables(recursive bool) []string {
 // AddServiceForPath returns a new default service based on the executable
 // or returns an error if the executable was not found or invalid. On success,
 // the service is added to the configuration
-func (this *gaffer) AddServiceForPath(executable string) (rpc.GafferService, error) {
-	this.log.Debug2("<gaffer>AddServiceForPath{ executable=%v }", strconv.Quote(executable))
+func (this *gaffer) AddServiceForPath(executable, service string) (rpc.GafferService, error) {
+	this.log.Debug2("<gaffer>AddServiceForPath{ executable=%v service=%v }", strconv.Quote(executable), strconv.Quote(service))
 
 	// Check incoming parameters
 	if executable == "" {
@@ -193,7 +193,10 @@ func (this *gaffer) AddServiceForPath(executable string) (rpc.GafferService, err
 		}
 
 		// Find a name which doesn't clash
-		if name, err := this.config.GenerateNameFromExecutable(executable); err != nil {
+		if service == "" {
+			service = executable
+		}
+		if name, err := this.config.GenerateNameFromExecutable(service); err != nil {
 			return nil, err
 		} else if reServiceGroupName.MatchString(name) == false {
 			this.log.Warn("AddServiceForPath: %v is not a valid service name", strconv.Quote(name))
@@ -330,8 +333,10 @@ func (this *gaffer) SetServiceNameForName(service string, new string) error {
 		return gopi.ErrNotFound
 	} else if new_ := this.config.GetServiceByName(new); new_ != nil {
 		return fmt.Errorf("SetServiceNameForName: %v Exists", strconv.Quote(new))
+	} else if err := this.config.SetServiceName(service_, new); err != nil {
+		return err
 	} else {
-		return gopi.ErrNotImplemented
+		return nil
 	}
 }
 
@@ -342,12 +347,54 @@ func (this *gaffer) SetGroupNameForName(group string, new string) error {
 
 func (this *gaffer) SetServiceModeForName(service string, mode rpc.GafferServiceMode) error {
 	this.log.Debug2("<gaffer>SetServiceModeForName{ service=%v mode=%v }", strconv.Quote(service), mode)
-	return gopi.ErrNotImplemented
+	if service == "" || mode == rpc.GAFFER_MODE_NONE {
+		return gopi.ErrBadParameter
+	} else if service_ := this.GetServiceByName(service); service_ == nil {
+		return gopi.ErrNotFound
+	} else if err := this.config.SetServiceMode(service_, mode); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (this *gaffer) SetServiceRunTimeForName(service string, run_time time.Duration) error {
+	this.log.Debug2("<gaffer>SetServiceRunTimeForName{ service=%v run_time=%v }", strconv.Quote(service), run_time)
+	if service == "" || run_time < 0 {
+		return gopi.ErrBadParameter
+	} else if service_ := this.GetServiceByName(service); service_ == nil {
+		return gopi.ErrNotFound
+	} else if err := this.config.SetServiceRunTime(service_, run_time); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (this *gaffer) SetServiceIdleTimeForName(service string, idle_time time.Duration) error {
+	this.log.Debug2("<gaffer>SetServiceIdleTimeForName{ service=%v idle_time=%v }", strconv.Quote(service), idle_time)
+	if service == "" || idle_time < 0 {
+		return gopi.ErrBadParameter
+	} else if service_ := this.GetServiceByName(service); service_ == nil {
+		return gopi.ErrNotFound
+	} else if err := this.config.SetServiceIdleTime(service_, idle_time); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 func (this *gaffer) SetServiceInstanceCountForName(service string, count uint) error {
 	this.log.Debug2("<gaffer>SetServiceInstanceCountForName{ service=%v count=%v }", strconv.Quote(service), count)
-	return gopi.ErrNotImplemented
+	if service == "" {
+		return gopi.ErrBadParameter
+	} else if service_ := this.GetServiceByName(service); service_ == nil {
+		return gopi.ErrNotFound
+	} else if err := this.config.SetServiceInstanceCount(service_, count); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 func (this *gaffer) SetServiceGroupsForName(service string, groups []string) error {

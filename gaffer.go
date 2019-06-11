@@ -35,12 +35,14 @@ type Gaffer interface {
 	GetExecutables(recursive bool) []string
 
 	// Services
-	AddServiceForPath(string) (GafferService, error)
+	AddServiceForPath(string, string) (GafferService, error)
 	GetServiceForName(string) GafferService
 	RemoveServiceForName(string) error
 	SetServiceNameForName(service string, new string) error
 	SetServiceModeForName(string, GafferServiceMode) error
 	SetServiceInstanceCountForName(service string, count uint) error
+	SetServiceRunTimeForName(string, time.Duration) error
+	SetServiceIdleTimeForName(string, time.Duration) error
 	SetServiceGroupsForName(service string, groups []string) error
 
 	// Groups
@@ -127,6 +129,7 @@ type GafferClient interface {
 
 	// Add services and groups
 	AddServiceForPath(path string, groups []string) (GafferService, error)
+	AddServiceForPathWithName(path, name string, groups []string) (GafferService, error)
 	AddGroupForName(string) (GafferServiceGroup, error)
 
 	// Remove services and groups
@@ -144,7 +147,11 @@ type GafferClient interface {
 	SetEnvForGroup(string, Tuples) (GafferServiceGroup, error)
 
 	// Set other service parameters
+	SetServiceName(string, string) (GafferService, error)
 	SetServiceGroups(string, []string) (GafferService, error)
+	SetServiceDisabled(string) (GafferService, error)
+	SetServiceManual(string, uint, time.Duration, time.Duration) (GafferService, error)
+	SetServiceAuto(string, uint, time.Duration, time.Duration) (GafferService, error)
 
 	// Stream Events
 	StreamEvents(ctx context.Context) error
