@@ -547,6 +547,8 @@ FOR_LOOP:
 		case <-timer.C:
 			if err := this.InstanceStartHandler(); err != nil {
 				this.log.Error("InstanceStartHandler: %v", err)
+			} else if err := this.InstanceStopHandler(); err != nil {
+				this.log.Error("InstanceStopHandler: %v", err)
 			}
 		case <-stop:
 			break FOR_LOOP
@@ -565,8 +567,17 @@ func (this *gaffer) InstanceStartHandler() error {
 		if service.Mode() != rpc.GAFFER_MODE_AUTO {
 			continue
 		} else {
-			fmt.Println("TODO: Check instances for %v", service)
+			fmt.Println("TODO: Check to see if we should start instances for %v", service)
 		}
+	}
+
+	// Success
+	return nil
+}
+
+func (this *gaffer) InstanceStopHandler() error {
+	for _, service := range this.config.Services {
+		fmt.Println("TODO: Check to see if we should stop instances for %v", service)
 	}
 
 	// Success
