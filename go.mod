@@ -13,6 +13,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/miekg/dns v1.1.14
 	github.com/olekukonko/tablewriter v0.0.1
+	github.com/twitchtv/twirp v5.7.0+incompatible
 	go.opencensus.io v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20190510132918-efd6b22b2522 // indirect
 	golang.org/x/image v0.0.0-20190523035834-f03afa92d3ff // indirect
