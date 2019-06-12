@@ -19,7 +19,7 @@ service Gaffer {
     // List groups, filtering by service or group
     rpc ListGroups(RequestFilter) returns (ListGroupsReply);
 
-    // List instances, filtering by service or group
+    // List instances, filtering by service, group and status
     rpc ListInstances(RequestFilter) returns (ListInstancesReply);
 
     // Edit service
@@ -151,6 +151,17 @@ message Instance {
     google.protobuf.Timestamp start_ts = 5;
     google.protobuf.Timestamp stop_ts = 6;
     int64 exit_code = 7;
+    InstanceStatus status = 8;
+
+    enum InstanceStatus {
+        NONE = 0;
+        STARTING = 1;
+        RUNNING = 2;
+        STOPPING = 4;
+        STOP_OK = 8;
+        STOP_ERROR = 16;
+        STOP_KILLED = 32;
+    }    
 }
 
 message GafferEvent {

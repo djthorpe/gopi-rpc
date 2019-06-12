@@ -126,7 +126,15 @@ func (this *Process) IsRunning() bool {
 	if this.cmd == nil || this.cmd.ProcessState == nil {
 		return false
 	} else {
-		return this.cmd.ProcessState.Exited() == false
+		return this.cmd.ProcessState.Pid() != 0
+	}
+}
+
+func (this *Process) IsStopped() bool {
+	if this.cmd == nil || this.cmd.ProcessState == nil {
+		return false
+	} else {
+		return this.cmd.ProcessState.Exited() == true
 	}
 }
 

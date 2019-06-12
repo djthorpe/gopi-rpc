@@ -455,7 +455,7 @@ func (this *gaffer) StopInstanceForId(id uint32) error {
 
 	if instance := this.Instances.GetInstanceForId(id); instance == nil {
 		return gopi.ErrNotFound
-	} else if instance.IsRunning() == false {
+	} else if instance.Status() == rpc.GAFFER_INSTANCE_RUNNING {
 		this.log.Warn("StopInstanceForId: Instance %v is not running", id)
 		return gopi.ErrOutOfOrder
 	} else if err := this.Instances.Stop(instance); err != nil {
@@ -566,9 +566,8 @@ func (this *gaffer) InstanceStartHandler() error {
 	for _, service := range this.config.Services {
 		if service.Mode() != rpc.GAFFER_MODE_AUTO {
 			continue
-		} else {
-			fmt.Println("TODO: Check to see if we should start instances for %v", service)
 		}
+		fmt.Println("TODO: Check to see if we should start instances for %v", service)
 	}
 
 	// Success

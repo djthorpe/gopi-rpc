@@ -214,7 +214,7 @@ func (this *service) ListInstances(_ context.Context, req *pb.RequestFilter) (*p
 	this.log.Debug("<grpc.service.gaffer.ListInstances>{ req=%v }", req)
 
 	// Get instances
-	instances := this.gaffer.GetInstances()
+	instances := this.gaffer.GetInstances(rpc.GAFFER_INSTANCE_ANY)
 
 	// Obtain all instances
 	if req.Type == pb.RequestFilter_NONE {
