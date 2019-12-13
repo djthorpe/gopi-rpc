@@ -31,7 +31,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 const (
-	DISCOVERY_TIMEOUT = 250 * time.Millisecond
+	DISCOVERY_TIMEOUT = 750 * time.Millisecond
 )
 
 var (
