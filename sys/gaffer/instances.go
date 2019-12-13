@@ -80,7 +80,7 @@ func (this *Instances) Init(config Gaffer, logger gopi.Logger) error {
 }
 
 func (this *Instances) Destroy() error {
-	this.log.Debug("<gaffer.instances.Destroy>{ instances=%v }", this.GetInstances())
+	this.log.Debug("<gaffer.instances.Destroy>{ instances=%v }", this.GetInstances(rpc.GAFFER_INSTANCE_ANY))
 
 	// TODO: Stop instances
 
@@ -215,13 +215,30 @@ func (this *Instances) Stop(instance *ServiceInstance) error {
 ////////////////////////////////////////////////////////////////////////////////
 // RETURN INSTANCES
 
-func (this *Instances) GetInstances() []rpc.GafferServiceInstance {
+func (this *Instances) GetInstances(flags rpc.GafferInstanceStatus) []rpc.GafferServiceInstance {
 	this.Lock()
 	defer this.Unlock()
 
 	instances := make([]rpc.GafferServiceInstance, 0, len(this.instances))
 	for _, instance := range this.instances {
-		instances = append(instances, instance)
+		if flags == rpc.GAFFER_INSTANCE_ANY {
+			instances = append(instances, instance)
+		} else if flags&instance.Status() != 0 {
+			instances = append(instances, instance)
+		}
+	}
+	return instances
+}
+
+func (this *Instances) GetInstancesForServiceName(service string) []rpc.GafferServiceInstance {
+	this.Lock()
+	defer this.Unlock()
+
+	instances := make([]rpc.GafferServiceInstance, 0, len(this.instances))
+	for _, instance := range this.instances {
+		if instance.Service_.Name_ == service {
+			instances = append(instances, instance)
+		}
 	}
 	return instances
 }
@@ -365,7 +382,7 @@ func (this *Instances) processStop(instance *ServiceInstance, in <-chan error, o
 // STRINGIFY
 
 func (this *Instances) String() string {
-	return fmt.Sprintf("<instances>{ instances=%v }", this.GetInstances())
+	return fmt.Sprintf("<instances>{ instances=%v }", this.GetInstances(rpc.GAFFER_INSTANCE_ANY))
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -348,14 +348,22 @@ func (this *ServiceInstance) ExitCode() int64 {
 	}
 }
 
-func (this *ServiceInstance) IsRunning() bool {
+func (this *ServiceInstance) Status() rpc.GafferInstanceStatus {
 	if this.process == nil {
-		return false
+		return rpc.GAFFER_INSTANCE_NONE
+	} else if this.process.IsStopped() {
+		if this.process.ExitCode() == 0 {
+			return rpc.GAFFER_INSTANCE_STOP_OK
+		} else {
+			return rpc.GAFFER_INSTANCE_STOP_ERROR
+		}
+	} else if this.process.IsRunning() {
+		return rpc.GAFFER_INSTANCE_RUNNING
 	} else {
-		return this.process.IsRunning()
+		return rpc.GAFFER_INSTANCE_STARTING
 	}
 }
 
 func (this *ServiceInstance) String() string {
-	return fmt.Sprintf("<gaffer.ServiceInstance>{ id=%v service=%v flags=%v env=%v exit_code=%v %v }", this.Id_, strconv.Quote(this.Service_.Name()), this.Flags(), this.Env(), this.ExitCode(), this.process)
+	return fmt.Sprintf("<gaffer.ServiceInstance>{ id=%v service=%v flags=%v env=%v exit_code=%v status=%v %v }", this.Id_, strconv.Quote(this.Service_.Name()), this.Flags(), this.Env(), this.ExitCode(), this.Status(), this.process)
 }

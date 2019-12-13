@@ -10,6 +10,7 @@ package gaffer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -52,8 +53,13 @@ type config struct {
 // CONSTANTS
 
 const (
-	FILENAME_DEFAULT = "gaffer.json"
-	WRITE_DELTA      = 5 * time.Second
+	FILENAME_DEFAULT   = "gaffer.json"
+	WRITE_DELTA        = 5 * time.Second
+	INSTANCE_COUNT_MAX = 10
+)
+
+var (
+	ErrDuplicateName = errors.New("Duplicate name")
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -442,7 +448,7 @@ func (this *config) SetServiceFlags(service *Service, tuples rpc.Tuples) error {
 
 func (this *config) SetServiceGroups(service *Service, groups []string) error {
 	this.log.Debug2("<gaffer.config>SetServiceGroups{ service=%v groups=%v }", service, groups)
-	if service == nil || groups == nil {
+	if service == nil {
 		return gopi.ErrBadParameter
 	} else if stringArrayEquals(service.Groups_, groups) == true {
 		return gopi.ErrNotModified
@@ -453,6 +459,92 @@ func (this *config) SetServiceGroups(service *Service, groups []string) error {
 		for i, group := range groups {
 			service.Groups_[i] = group
 		}
+		this.modified = true
+		return nil
+	}
+}
+
+func (this *config) SetServiceName(service *Service, name string) error {
+	this.log.Debug2("<gaffer.config>SetServiceGroups{ service=%v name=%v }", service, strconv.Quote(name))
+	if service == nil || name == "" {
+		return gopi.ErrBadParameter
+	} else if service.Name_ == name {
+		return gopi.ErrNotModified
+	} else if reServiceGroupName.MatchString(name) == false {
+		return gopi.ErrBadParameter
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		if other := this.GetServiceByName(name); other != nil {
+			return ErrDuplicateName
+		} else {
+			service.Name_ = name
+			this.modified = true
+		}
+		return nil
+	}
+}
+
+func (this *config) SetServiceMode(service *Service, mode rpc.GafferServiceMode) error {
+	this.log.Debug2("<gaffer.config>SetServiceMode{ service=%v mode=%v }", service, mode)
+	if service == nil {
+		return gopi.ErrBadParameter
+	} else if mode != rpc.GAFFER_MODE_AUTO && mode != rpc.GAFFER_MODE_MANUAL {
+		return gopi.ErrBadParameter
+	} else if service.Mode_ == mode {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		service.Mode_ = mode
+		this.modified = true
+		return nil
+	}
+}
+
+func (this *config) SetServiceIdleTime(service *Service, idle_time time.Duration) error {
+	this.log.Debug2("<gaffer.config>SetServiceIdleTime{ service=%v idle_time=%v }", service, idle_time)
+	if service == nil || idle_time < 0 {
+		return gopi.ErrBadParameter
+	} else if service.IdleTime_ == idle_time {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		service.IdleTime_ = idle_time
+		this.modified = true
+		return nil
+	}
+}
+
+func (this *config) SetServiceRunTime(service *Service, run_time time.Duration) error {
+	this.log.Debug2("<gaffer.config>SetServiceRunTime{ service=%v run_time=%v }", service, run_time)
+	if service == nil || run_time < 0 {
+		return gopi.ErrBadParameter
+	} else if service.RunTime_ == run_time {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		service.RunTime_ = run_time
+		this.modified = true
+		return nil
+	}
+}
+
+func (this *config) SetServiceInstanceCount(service *Service, instance_count uint) error {
+	this.log.Debug2("<gaffer.config>SetServiceInstanceCount{ service=%v instance_count=%v }", service, instance_count)
+	if service == nil {
+		return gopi.ErrBadParameter
+	} else if instance_count > INSTANCE_COUNT_MAX {
+		this.log.Warn("<gaffer.config>SetServiceInstanceCount: Instance count exceeds maximum (%v)", INSTANCE_COUNT_MAX)
+		return gopi.ErrBadParameter
+	} else if service.InstanceCount_ == instance_count {
+		return gopi.ErrNotModified
+	} else {
+		this.Lock()
+		defer this.Unlock()
+		service.InstanceCount_ = instance_count
 		this.modified = true
 		return nil
 	}
@@ -532,6 +624,9 @@ FOR_LOOP:
 func stringArrayEquals(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
+	}
+	if len(a) == 0 && len(b) == 0 {
+		return true
 	}
 	for i, elem := range a {
 		if elem != b[i] {

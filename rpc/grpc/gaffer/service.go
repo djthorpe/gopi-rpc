@@ -11,8 +11,11 @@ package gaffer
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang/protobuf/ptypes"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -211,7 +214,7 @@ func (this *service) ListInstances(_ context.Context, req *pb.RequestFilter) (*p
 	this.log.Debug("<grpc.service.gaffer.ListInstances>{ req=%v }", req)
 
 	// Get instances
-	instances := this.gaffer.GetInstances()
+	instances := this.gaffer.GetInstances(rpc.GAFFER_INSTANCE_ANY)
 
 	// Obtain all instances
 	if req.Type == pb.RequestFilter_NONE {
@@ -234,7 +237,7 @@ func (this *service) ListInstances(_ context.Context, req *pb.RequestFilter) (*p
 	}
 
 	// Obtain instances for services in a particular group
-	if req.Type == pb.RequestFilter_SERVICE {
+	if req.Type == pb.RequestFilter_GROUP {
 		return &pb.ListInstancesReply{
 			Instance: toProtoFromInstanceArray(instances, func(i rpc.GafferServiceInstance) bool {
 				return i.Service().IsMemberOfGroup(req.Value)
@@ -250,13 +253,33 @@ func (this *service) ListInstances(_ context.Context, req *pb.RequestFilter) (*p
 func (this *service) AddService(ctx context.Context, req *pb.ServiceRequest) (*pb.Service, error) {
 	this.log.Debug("<grpc.service.gaffer.AddService>{ req=%v }", req)
 
+	if req.Service == "" {
+		return nil, gopi.ErrBadParameter
+	}
+	if req.Mode == pb.Service_NONE {
+		req.Mode = pb.Service_MANUAL
+	}
+	// Check groups
 	if groups := this.gaffer.GetGroupsForNames(req.Groups); len(groups) != len(req.Groups) {
 		return nil, gopi.ErrBadParameter
-	} else if service, err := this.gaffer.AddServiceForPath(req.Name); err != nil {
+	}
+	// Check name
+	if req.Name != "" {
+		if service := this.gaffer.GetServiceForName(req.Name); service != nil {
+			return nil, fmt.Errorf("Duplicate service: %v", strconv.Quote(req.Name))
+		}
+	}
+	// Add the service
+	if service, err := this.gaffer.AddServiceForPath(req.Service, req.Name); err != nil {
 		return nil, err
 	} else {
-		req.Name = service.Name()
-		return this.SetServiceParameters(ctx, req)
+		req.Service = service.Name()
+	}
+	// Set parameters, ignoring not modified
+	if service, err := this.SetServiceParameters(ctx, req); err != nil && err != gopi.ErrNotModified {
+		return nil, err
+	} else {
+		return service, nil
 	}
 }
 
@@ -264,17 +287,61 @@ func (this *service) AddService(ctx context.Context, req *pb.ServiceRequest) (*p
 func (this *service) SetServiceParameters(_ context.Context, req *pb.ServiceRequest) (*pb.Service, error) {
 	this.log.Debug("<grpc.service.gaffer.SetServiceParameters>{ req=%v }", req)
 
-	if service := this.gaffer.GetServiceForName(req.Name); service == nil {
+	if service := this.gaffer.GetServiceForName(req.Service); service == nil {
 		return nil, gopi.ErrNotFound
+	} else if req.Flags == pb.ServiceRequest_NONE {
+		// Nothing modified
+		return toProtoFromService(service), nil
 	} else {
-		// Set Groups
-		if len(req.Groups) > 0 {
-			if err := this.gaffer.SetServiceGroupsForName(req.Name, req.Groups); err != nil {
+		var err error
+		// Name
+		if req.Flags&pb.ServiceRequest_NAME != 0 {
+			if err = this.gaffer.SetServiceNameForName(req.Service, req.Name); err != nil && err != gopi.ErrNotModified {
 				return nil, err
 			}
 		}
+
+		// Groups
+		if req.Flags&pb.ServiceRequest_GROUPS != 0 {
+			if err = this.gaffer.SetServiceGroupsForName(req.Service, req.Groups); err != nil && err != gopi.ErrNotModified {
+				return nil, err
+			}
+		}
+
+		// Mode
+		if req.Flags&pb.ServiceRequest_MODE != 0 {
+			if err = this.gaffer.SetServiceModeForName(req.Service, rpc.GafferServiceMode(req.Mode)); err != nil && err != gopi.ErrNotModified {
+				return nil, err
+			}
+		}
+
+		// Instance Count
+		if req.Flags&pb.ServiceRequest_INSTANCE_COUNT != 0 {
+			if err = this.gaffer.SetServiceInstanceCountForName(req.Service, uint(req.InstanceCount)); err != nil && err != gopi.ErrNotModified {
+				return nil, err
+			}
+		}
+
+		// Idle time
+		if req.Flags&pb.ServiceRequest_IDLE_TIME != 0 {
+			if idle_time, err_ := ptypes.Duration(req.IdleTime); err_ != nil {
+				return nil, err_
+			} else if err = this.gaffer.SetServiceIdleTimeForName(req.Service, idle_time); err != nil && err != gopi.ErrNotModified {
+				return nil, err
+			}
+		}
+
+		// Run time
+		if req.Flags&pb.ServiceRequest_RUN_TIME != 0 {
+			if run_time, err_ := ptypes.Duration(req.RunTime); err_ != nil {
+				return nil, err_
+			} else if err = this.gaffer.SetServiceRunTimeForName(req.Service, run_time); err != nil && err != gopi.ErrNotModified {
+				return nil, err
+			}
+		}
+
 		// Return service
-		return toProtoFromService(service), nil
+		return toProtoFromService(service), err
 	}
 }
 
@@ -409,7 +476,9 @@ FOR_LOOP:
 				break FOR_LOOP
 			} else if evt_, ok := evt.(rpc.GafferEvent); ok {
 				if err := stream.Send(toProtoEvent(evt_)); err != nil {
-					this.log.Warn("StreamEvents: %v", err)
+					if grpc.IsErrUnavailable(err) == false {
+						this.log.Warn("StreamEvents: %v", err)
+					}
 					break FOR_LOOP
 				}
 			} else {
@@ -417,7 +486,9 @@ FOR_LOOP:
 			}
 		case <-ticker.C:
 			if err := stream.Send(&pb.GafferEvent{}); err != nil {
-				this.log.Warn("StreamEvents: %v", err)
+				if grpc.IsErrUnavailable(err) == false {
+					this.log.Warn("StreamEvents: %v", err)
+				}
 				break FOR_LOOP
 			}
 		case <-cancel:

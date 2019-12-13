@@ -9,28 +9,28 @@
 
 package protobuf
 
-//go:generate protoc helloworld/helloworld.proto --go_out=plugins=grpc:.
-//go:generate protoc version/version.proto --go_out=plugins=grpc:.
-//go:generate protoc discovery/discovery.proto --go_out=plugins=grpc:.
-//go:generate protoc googlecast/googlecast.proto --go_out=plugins=grpc:.
-//go:generate protoc gaffer/gaffer.proto --go_out=plugins=grpc:.
+//go:generate protoc helloworld/helloworld.proto --twirp_out=.
+//go:generate protoc version/version.proto --twirp_out=.
+//go:generate protoc discovery/discovery.proto --twirp_out=.
+//go:generate protoc googlecast/googlecast.proto --twirp_out=.
+//go:generate protoc gaffer/gaffer.proto --twirp_out=.
 
 /*
-	This folder contains all the protocol buffer definitions including
+	This file contains all the protocol buffer definitions including
 	the RPC Service definitions. You generate golang code by running:
 
-	go generate -x github.com/djthorpe/gopi-rpc/rpc/protobuf
+	go generate -x github.com/djthorpe/gopi-rpc/rpc/protobuf/twerp.go
 
 	where you have installed the protoc compiler and the GRPC plugin for
 	golang. In order to do that on a Mac:
 
 	mac# brew install protobuf
-	mac# go get -u github.com/golang/protobuf/protoc-gen-go
+	mac# go get -u github.com/twitchtv/twirp/protoc-gen-twirp
 
 	On Debian Linux (including Raspian Linux) use the following commands
 	instead:
 
 	rpi# sudo apt install protobuf-compiler
 	rpi# sudo apt install libprotobuf-dev
-	rpi# go get -u github.com/golang/protobuf/protoc-gen-go
+	rpi# go get -u github.com/twitchtv/twirp/protoc-gen-twirp
 */

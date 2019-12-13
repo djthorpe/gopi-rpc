@@ -19,21 +19,20 @@ service Gaffer {
     // List groups, filtering by service or group
     rpc ListGroups(RequestFilter) returns (ListGroupsReply);
 
-    // List instances, filtering by service or group
+    // List instances, filtering by service, group and status
     rpc ListInstances(RequestFilter) returns (ListInstancesReply);
 
     // Edit service
     rpc AddService(ServiceRequest) returns (Service);
     rpc RemoveService(NameRequest) returns (google.protobuf.Empty);
     rpc SetServiceParameters(ServiceRequest) returns (Service);
+    rpc SetServiceFlags(SetTuplesRequest) returns (Service);
 
     // Edit group
     rpc AddGroup(NameRequest) returns (Group);
     rpc RemoveGroup(NameRequest) returns (google.protobuf.Empty);
-
     rpc SetGroupFlags(SetTuplesRequest) returns (Group);
     rpc SetGroupEnv(SetTuplesRequest) returns (Group);
-    rpc SetServiceFlags(SetTuplesRequest) returns (Service);
 
     // Get an Instance ID, used when starting a service instance
     rpc GetInstanceId(google.protobuf.Empty) returns (InstanceId);
@@ -79,8 +78,25 @@ message ListInstancesReply {
 }
 
 message ServiceRequest {
-    string name = 1;
-    repeated string groups = 2;
+    string service = 1;
+    string name = 2;
+    repeated string groups = 3;
+    Service.ServiceMode mode = 4; 
+    uint32 instance_count = 5;
+    google.protobuf.Duration run_time = 6;
+    google.protobuf.Duration idle_time = 7; 
+    ModifyFlag flags = 8;
+
+    // What should be modified
+    enum ModifyFlag {
+        NONE = 0;
+        NAME = 1;
+        GROUPS = 2;
+        MODE = 4;
+        INSTANCE_COUNT = 8;
+        RUN_TIME = 16;
+        IDLE_TIME = 32;
+    }
 }
 
 message NameRequest {
@@ -135,6 +151,17 @@ message Instance {
     google.protobuf.Timestamp start_ts = 5;
     google.protobuf.Timestamp stop_ts = 6;
     int64 exit_code = 7;
+    InstanceStatus status = 8;
+
+    enum InstanceStatus {
+        NONE = 0;
+        STARTING = 1;
+        RUNNING = 2;
+        STOPPING = 4;
+        STOP_OK = 8;
+        STOP_ERROR = 16;
+        STOP_KILLED = 32;
+    }    
 }
 
 message GafferEvent {

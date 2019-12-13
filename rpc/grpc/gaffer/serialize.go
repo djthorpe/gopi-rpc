@@ -148,7 +148,27 @@ func toProtoFromInstance(instance rpc.GafferServiceInstance) *pb.Instance {
 			StartTs:  start_ts,
 			StopTs:   stop_ts,
 			ExitCode: instance.ExitCode(),
+			Status:   toProtoInstanceStatus(instance.Status()),
 		}
+	}
+}
+
+func toProtoInstanceStatus(status rpc.GafferInstanceStatus) pb.Instance_InstanceStatus {
+	switch status {
+	case rpc.GAFFER_INSTANCE_STARTING:
+		return pb.Instance_STARTING
+	case rpc.GAFFER_INSTANCE_RUNNING:
+		return pb.Instance_RUNNING
+	case rpc.GAFFER_INSTANCE_STOPPING:
+		return pb.Instance_STOPPING
+	case rpc.GAFFER_INSTANCE_STOP_OK:
+		return pb.Instance_STOP_OK
+	case rpc.GAFFER_INSTANCE_STOP_ERROR:
+		return pb.Instance_STOP_ERROR
+	case rpc.GAFFER_INSTANCE_STOP_KILLED:
+		return pb.Instance_STOP_KILLED
+	default:
+		return pb.Instance_NONE
 	}
 }
 
@@ -408,6 +428,29 @@ func (this *pb_instance) ExitCode() int64 {
 		return 0
 	} else {
 		return this.pb.ExitCode
+	}
+}
+
+func (this *pb_instance) Status() rpc.GafferInstanceStatus {
+	if this.pb == nil {
+		return rpc.GAFFER_INSTANCE_NONE
+	}
+	switch this.pb.Status {
+	case pb.Instance_STARTING:
+		return rpc.GAFFER_INSTANCE_STARTING
+	case pb.Instance_RUNNING:
+		return rpc.GAFFER_INSTANCE_RUNNING
+	case pb.Instance_STOPPING:
+		return rpc.GAFFER_INSTANCE_STOPPING
+	case pb.Instance_STOP_OK:
+		return rpc.GAFFER_INSTANCE_STOP_OK
+	case pb.Instance_STOP_ERROR:
+		return rpc.GAFFER_INSTANCE_STOP_ERROR
+	case pb.Instance_STOP_KILLED:
+		return rpc.GAFFER_INSTANCE_STOP_KILLED
+	default:
+		return rpc.GAFFER_INSTANCE_NONE
+
 	}
 }
 

@@ -31,16 +31,18 @@ type Gaffer interface {
 	// Return all services, groups, instances and executables
 	GetServices() []GafferService
 	GetGroups() []GafferServiceGroup
-	GetInstances() []GafferServiceInstance
+	GetInstances(GafferInstanceStatus) []GafferServiceInstance
 	GetExecutables(recursive bool) []string
 
 	// Services
-	AddServiceForPath(string) (GafferService, error)
+	AddServiceForPath(string, string) (GafferService, error)
 	GetServiceForName(string) GafferService
 	RemoveServiceForName(string) error
 	SetServiceNameForName(service string, new string) error
 	SetServiceModeForName(string, GafferServiceMode) error
 	SetServiceInstanceCountForName(service string, count uint) error
+	SetServiceRunTimeForName(string, time.Duration) error
+	SetServiceIdleTimeForName(string, time.Duration) error
 	SetServiceGroupsForName(service string, groups []string) error
 
 	// Groups
@@ -90,6 +92,7 @@ type GafferServiceInstance interface {
 	Start() time.Time
 	Stop() time.Time
 	ExitCode() int64
+	Status() GafferInstanceStatus
 }
 
 type GafferEvent interface {
@@ -127,6 +130,7 @@ type GafferClient interface {
 
 	// Add services and groups
 	AddServiceForPath(path string, groups []string) (GafferService, error)
+	AddServiceForPathWithName(path, name string, groups []string) (GafferService, error)
 	AddGroupForName(string) (GafferServiceGroup, error)
 
 	// Remove services and groups
@@ -144,15 +148,19 @@ type GafferClient interface {
 	SetEnvForGroup(string, Tuples) (GafferServiceGroup, error)
 
 	// Set other service parameters
+	SetServiceName(string, string) (GafferService, error)
 	SetServiceGroups(string, []string) (GafferService, error)
+	SetServiceDisabled(string) (GafferService, error)
+	SetServiceManual(string, uint, time.Duration, time.Duration) (GafferService, error)
+	SetServiceAuto(string, uint, time.Duration, time.Duration) (GafferService, error)
 
 	// Stream Events
 	StreamEvents(ctx context.Context) error
 }
 
 type GafferServiceMode uint
-
 type GafferEventType uint
+type GafferInstanceStatus uint
 
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
@@ -179,6 +187,17 @@ const (
 	GAFFER_EVENT_INSTANCE_STOP_KILLED
 	GAFFER_EVENT_LOG_STDOUT
 	GAFFER_EVENT_LOG_STDERR
+)
+
+const (
+	GAFFER_INSTANCE_NONE        GafferInstanceStatus = 0
+	GAFFER_INSTANCE_STARTING    GafferInstanceStatus = (1 << iota)
+	GAFFER_INSTANCE_RUNNING     GafferInstanceStatus = (1 << iota)
+	GAFFER_INSTANCE_STOPPING    GafferInstanceStatus = (1 << iota)
+	GAFFER_INSTANCE_STOP_OK     GafferInstanceStatus = (1 << iota)
+	GAFFER_INSTANCE_STOP_ERROR  GafferInstanceStatus = (1 << iota)
+	GAFFER_INSTANCE_STOP_KILLED GafferInstanceStatus = (1 << iota)
+	GAFFER_INSTANCE_ANY                              = GAFFER_INSTANCE_NONE
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -228,6 +247,32 @@ func (t GafferEventType) String() string {
 	default:
 		return "[?? Invalid GafferEventType value]"
 	}
+}
+
+func (s GafferInstanceStatus) String() string {
+	value := ""
+	if s == GAFFER_INSTANCE_NONE {
+		return "GAFFER_INSTANCE_NONE"
+	}
+	if s&GAFFER_INSTANCE_STARTING > 0 {
+		value += "|GAFFER_INSTANCE_STARTING"
+	}
+	if s&GAFFER_INSTANCE_RUNNING > 0 {
+		value += "|GAFFER_INSTANCE_RUNNING"
+	}
+	if s&GAFFER_INSTANCE_STOPPING > 0 {
+		value += "|GAFFER_INSTANCE_STOPPING"
+	}
+	if s&GAFFER_INSTANCE_STOP_OK > 0 {
+		value += "|GAFFER_INSTANCE_STOP_OK"
+	}
+	if s&GAFFER_INSTANCE_STOP_ERROR > 0 {
+		value += "|GAFFER_INSTANCE_STOP_ERROR"
+	}
+	if s&GAFFER_INSTANCE_STOP_KILLED > 0 {
+		value += "|GAFFER_INSTANCE_STOP_KILLED"
+	}
+	return strings.TrimLeft(value, "|")
 }
 
 ////////////////////////////////////////////////////////////////////////////////

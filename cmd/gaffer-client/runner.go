@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
@@ -49,8 +51,14 @@ type Func func(cmd *Cmd, args []string) error
 const (
 	SCOPE_ROOT Scope = iota
 	SCOPE_SERVICE
+	SCOPE_INSTANCE
 	SCOPE_GROUP
 	SCOPE_RECORD
+	SCOPE_SERVICE_PARAM
+)
+
+var (
+	reGroupKey = regexp.MustCompile("^@([A-Za-z][A-Za-z0-9\\-\\_]*)$")
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +92,12 @@ func NewRunner() *Runner {
 				this.ListAllServiceRecords,
 			},
 			&Cmd{
+				regexp.MustCompile("^([1-9][0-9]*)$"),
+				"<instance> (stop)",
+				"List or remove a service instance",
+				this.InstanceCommands,
+			},
+			&Cmd{
 				regexp.MustCompile("^_([a-zA-Z][a-zA-Z0-9\\-]*)$"),
 				"_<type>",
 				"Lookup service records",
@@ -97,13 +111,13 @@ func NewRunner() *Runner {
 			},
 			&Cmd{
 				regexp.MustCompile("^([a-zA-Z][a-zA-Z0-9\\-\\_\\.]*)$"),
-				"<service> (start|rm)",
+				"<service> (start|rm|flags|set|disable|auto|manual)",
 				"List service instances, remove or start a service",
 				this.ServiceCommands,
 			},
 			&Cmd{
 				regexp.MustCompile("^@([a-zA-Z][a-zA-Z0-9\\-\\_\\.]*)$"),
-				"(<flag>...) <@group> (add|rm)",
+				"(<flag>...) <@group> (add|rm|flags|env)",
 				"Add or remove a group",
 				this.GroupCommands,
 			},
@@ -121,6 +135,30 @@ func NewRunner() *Runner {
 				"Start a service",
 				this.StartService,
 			},
+			&Cmd{
+				regexp.MustCompile("^flags$"),
+				"<service> flags (<key>|<key>=<value>...)",
+				"Set service flags",
+				this.SetServiceFlags,
+			},
+			&Cmd{
+				regexp.MustCompile("^set$"),
+				"<service> set (name=<value>|groups=@<group>,@<group>,...)",
+				"Set service parameters",
+				this.SetServiceParams,
+			},
+			&Cmd{
+				regexp.MustCompile("^disable$"),
+				"<service> disable",
+				"Disable",
+				this.DisableService,
+			},
+			&Cmd{
+				regexp.MustCompile("^(manual|auto)$"),
+				"<service> (manual|auto) (instance_count=<uint>|run=<duration>|idle=<duration>)",
+				"Enable a service for manual or auto startup",
+				this.EnableService,
+			},
 		},
 		SCOPE_GROUP: []*Cmd{
 			&Cmd{
@@ -135,8 +173,42 @@ func NewRunner() *Runner {
 				"Remove a group",
 				this.RemoveGroup,
 			},
+			&Cmd{
+				regexp.MustCompile("^flags$"),
+				"<service> flags (<key>|<key>=<value>...)",
+				"Set group flags",
+				this.SetGroupFlags,
+			},
+			&Cmd{
+				regexp.MustCompile("^env$"),
+				"<service> env (<key>|<key>=<value>...)",
+				"Set group environment",
+				this.SetGroupEnv,
+			},
+		},
+		SCOPE_INSTANCE: []*Cmd{
+			&Cmd{
+				regexp.MustCompile("^stop$"),
+				"<instance> stop",
+				"Stop an instance",
+				this.StopInstance,
+			},
 		},
 		SCOPE_RECORD: []*Cmd{},
+		SCOPE_SERVICE_PARAM: []*Cmd{
+			&Cmd{
+				regexp.MustCompile("^name=([a-zA-Z][a-zA-Z0-9\\-\\_\\.]*)$"),
+				"<service> set name=<service>",
+				"Rename service",
+				this.SetServiceName,
+			},
+			&Cmd{
+				regexp.MustCompile("^groups=(@[a-zA-Z][a-zA-Z0-9\\-\\_\\.\\@\\,]*)$"),
+				"<service> set groups=@<group>,@<group>,...",
+				"Set service groups",
+				this.SetServiceGroups,
+			},
+		},
 	}
 
 	this.cancels = make([]context.CancelFunc, 0)
@@ -222,6 +294,22 @@ func (this *Runner) Close() error {
 
 func (this *Runner) Wait() bool {
 	return this.wait
+}
+
+func (this *Runner) ParseGroups(groups string) ([]string, error) {
+	if groups_ := strings.Split(groups, ","); len(groups_) == 0 {
+		return nil, gopi.ErrBadParameter
+	} else {
+		g := make([]string, 0, len(groups_))
+		for _, group := range groups_ {
+			if matched := reGroupKey.FindStringSubmatch(group); len(matched) != 2 {
+				return nil, fmt.Errorf("Invalid group: %v", strconv.Quote(group))
+			} else {
+				g = append(g, matched[1])
+			}
+		}
+		return g, nil
+	}
 }
 
 func (this *Runner) AddGaffer(gaffer rpc.GafferClient) {
