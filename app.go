@@ -131,9 +131,11 @@ func ProcessEvent(app *gopi.AppInstance, server gopi.RPCServer, discovery gopi.R
 	// Obtain discovery unit
 	switch evt.Type() {
 	case gopi.RPC_EVENT_SERVER_STARTED:
-		if service, subtype, name, err := app.Service(); err != nil {
+		if service, subtype, _, err := app.Service(); err != nil {
 			return err
-		} else if service_ := server.Service(service, subtype, name); service_ == nil {
+		} else if hostname, err := os.Hostname(); err != nil {
+			return err
+		} else if service_ := server.Service(service, subtype, hostname); service_ == nil {
 			return fmt.Errorf("Unable to create service record")
 		} else if discovery == nil {
 			return nil
@@ -197,18 +199,25 @@ func LookupServiceRecords(app *gopi.AppInstance, addr string, timeout time.Durat
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	if service, subtype, _, err := app.Service(); err != nil {
-		return nil, err
-	} else if HasHostPort(addr) {
+	if HasHostPort(addr) {
 		// Where addr is <host>:<port> return the service record
 		if r, err := app.ClientPool.Lookup(ctx, "", addr, 1); err != nil {
 			return nil, err
 		} else {
 			return r, nil
 		}
+	} else if service, subtype, flags, err := app.Service(); err != nil {
+		return nil, err
 	} else {
+		var service_ string
+		switch flags & gopi.RPC_FLAG_INET_UDP {
+		case gopi.RPC_FLAG_INET_UDP:
+			service_ = fmt.Sprintf("_%v._udp", service)
+		default:
+			service_ = fmt.Sprintf("_%v._tcp", service)
+		}
 		// Return "unlimited" service records (parameter 0)
-		if services, err := app.ClientPool.Lookup(ctx, fmt.Sprintf("_%v._tcp", service), addr, 0); err != nil {
+		if services, err := app.ClientPool.Lookup(ctx, service_, addr, 0); err != nil {
 			return nil, err
 		} else if len(services) == 0 {
 			return nil, gopi.ErrNotFound

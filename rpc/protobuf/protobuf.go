@@ -1,7 +1,6 @@
 package protobuf
 
 //go:generate protoc discovery/discovery.proto --go_out=plugins=grpc:.
-//go:generate protoc gaffer/gaffer.proto --go_out=plugins=grpc:.
 //go:generate protoc googlecast/googlecast.proto --go_out=plugins=grpc:.
 //go:generate protoc helloworld/helloworld.proto --go_out=plugins=grpc:.
 //go:generate protoc version/version.proto --go_out=plugins=grpc:.

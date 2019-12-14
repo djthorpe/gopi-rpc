@@ -16,9 +16,7 @@ GOFLAGS = -ldflags "-s -w $(GOLDFLAGS)"
 
 all: test install clean
 
-install: helloworld-client helloworld-service discovery-service discovery-client gaffer-service gaffer-client dns-discovery googlecast
-
-gaffer: helloworld-service gaffer-service gaffer-client
+install: helloworld-client helloworld-service discovery-service discovery-client dns-discovery googlecast
 
 protobuf:
 	$(GOGEN) -x ./rpc/...
@@ -34,13 +32,6 @@ discovery-service: protobuf
 
 discovery-client: protobuf
 	$(GOINSTALL) $(GOFLAGS) ./cmd/discovery-client/...
-
-gaffer-service: protobuf
-	$(GOINSTALL) $(GOFLAGS) ./cmd/gaffer-service/...
-
-gaffer-client:
-	$(GOINSTALL) $(GOFLAGS) ./cmd/gaffer-client/...
-
 
 dns-discovery:
 	$(GOINSTALL) $(GOFLAGS) ./cmd/dns-discovery/...
