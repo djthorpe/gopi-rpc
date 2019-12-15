@@ -23,8 +23,11 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-// DiscoveryType is either DNS (using DNS-SD) or DB (using internal database)
-type DiscoveryType uint
+type (
+	// DiscoveryType is either DNS (using DNS-SD) or DB (using internal database)
+	DiscoveryType       uint
+	GoogleCastEventType uint
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
@@ -37,6 +40,16 @@ const (
 
 const (
 	DISCOVERY_SERVICE_QUERY = "_services._dns-sd._udp"
+)
+
+const (
+	GOOGLE_CAST_EVENT_NONE    GoogleCastEventType = 0
+	GOOGLE_CAST_EVENT_CONNECT GoogleCastEventType = iota
+	GOOGLE_CAST_EVENT_DISCONNECT
+	GOOGLE_CAST_EVENT_DEVICE
+	GOOGLE_CAST_EVENT_VOLUME
+	GOOGLE_CAST_EVENT_APPLICATION
+	GOOGLE_CAST_EVENT_MEDIA
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -139,6 +152,10 @@ type GoogleCast interface {
 	gopi.Publisher
 
 	Devices() []GoogleCastDevice
+
+	// Connect to the comms channel for a device
+	Connect(GoogleCastDevice, gopi.RPCFlag, time.Duration) (GoogleCastChannel, error)
+	Disconnect(GoogleCastChannel) error
 }
 
 type GoogleCastDevice interface {
@@ -149,12 +166,52 @@ type GoogleCastDevice interface {
 	State() uint
 }
 
+type GoogleCastChannel interface {
+	RemoteAddr() string
+
+	// Get Properties
+	Applications() []GoogleCastApplication
+	Volume() GoogleCastVolume
+	Media() GoogleCastMedia
+
+	// Set Properties
+	SetApplication(GoogleCastApplication) error // Application to watch or nil
+	SetPlay(bool) (int, error)                  // Play or stop
+	SetPause(bool) (int, error)                 // Pause or play
+	/*
+		SetVolume()
+		SetMuted(bool) (int, error)
+		SetTrackNext() (int, error)
+		SetTrackPrev() (int, error)
+	*/
+}
+
+type GoogleCastApplication interface {
+	ID() string
+	Name() string
+	Status() string
+}
+
+type GoogleCastVolume interface {
+	Level() float32
+	Muted() bool
+}
+
+type GoogleCastMedia interface {
+}
+
 type GoogleCastEvent interface {
 	gopi.Event
 
 	Type() gopi.RPCEventType
 	Device() GoogleCastDevice
-	Timestamp() time.Time
+}
+
+type GoogleChannelEvent interface {
+	gopi.Event
+
+	Type() GoogleCastEventType
+	Channel() GoogleCastChannel
 }
 
 type GoogleCastClient interface {
@@ -169,4 +226,28 @@ type GoogleCastClient interface {
 
 	// Stream discovery events
 	StreamEvents(ctx context.Context) error
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (t GoogleCastEventType) String() string {
+	switch t {
+	case GOOGLE_CAST_EVENT_NONE:
+		return "GOOGLE_CAST_EVENT_NONE"
+	case GOOGLE_CAST_EVENT_CONNECT:
+		return "GOOGLE_CAST_EVENT_CONNECT"
+	case GOOGLE_CAST_EVENT_DISCONNECT:
+		return "GOOGLE_CAST_EVENT_DISCONNECT"
+	case GOOGLE_CAST_EVENT_DEVICE:
+		return "GOOGLE_CAST_EVENT_DEVICE"
+	case GOOGLE_CAST_EVENT_VOLUME:
+		return "GOOGLE_CAST_EVENT_VOLUME"
+	case GOOGLE_CAST_EVENT_APPLICATION:
+		return "GOOGLE_CAST_EVENT_APPLICATION"
+	case GOOGLE_CAST_EVENT_MEDIA:
+		return "GOOGLE_CAST_EVENT_MEDIA"
+	default:
+		return "[?? Invalid GoogleCastEventType value]"
+	}
 }

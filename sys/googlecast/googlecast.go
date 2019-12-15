@@ -12,11 +12,15 @@ package googlecast
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"net"
+	"sync"
 	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	rpc "github.com/djthorpe/gopi-rpc"
+	"github.com/djthorpe/gopi/util/errors"
 	event "github.com/djthorpe/gopi/util/event"
 )
 
@@ -31,8 +35,10 @@ type googlecast struct {
 	log       gopi.Logger
 	discovery gopi.RPCServiceDiscovery
 	devices   map[string]*castdevice
+	channels  map[*castconn]*castdevice
 	event.Publisher
 	event.Tasks
+	sync.WaitGroup
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +59,7 @@ func (config GoogleCast) Open(logger gopi.Logger) (gopi.Driver, error) {
 	this.log = logger
 	this.discovery = config.Discovery
 	this.devices = make(map[string]*castdevice)
+	this.channels = make(map[*castconn]*castdevice)
 
 	if this.discovery == nil {
 		return nil, gopi.ErrBadParameter
@@ -68,19 +75,30 @@ func (config GoogleCast) Open(logger gopi.Logger) (gopi.Driver, error) {
 func (this *googlecast) Close() error {
 	this.log.Debug("<googlecast.Close>{ }")
 
+	errs := errors.CompoundError{}
+
+	// Close channels
+	for channel := range this.channels {
+		errs.Add(this.Disconnect(channel))
+	}
+
+	// Waitgroup
+	this.WaitGroup.Wait()
+
 	// Stop background tasks
 	if err := this.Tasks.Close(); err != nil {
-		return err
+		errs.Add(err)
 	}
 
 	// Unsubscribe
 	this.Publisher.Close()
 
 	// Release resources
+	this.channels = nil
 	this.devices = nil
 
-	// Return success
-	return nil
+	// Return any errors caught
+	return errs.ErrorOrSelf()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -92,6 +110,84 @@ func (this *googlecast) Devices() []rpc.GoogleCastDevice {
 		devices = append(devices, device)
 	}
 	return devices
+}
+
+func (this *googlecast) Connect(device rpc.GoogleCastDevice, flag gopi.RPCFlag, timeout time.Duration) (rpc.GoogleCastChannel, error) {
+	this.log.Debug("<googlecast.Connect>{ device=%v flag=%v timeout=%v }", device, flag, timeout)
+
+	if device_, ok := device.(*castdevice); device_ == nil || ok == false {
+		return nil, gopi.ErrBadParameter
+	} else if ip, err := getAddr(device_, flag); err != nil {
+		return nil, err
+	} else if channel, err := gopi.Open(CastConn{
+		Addr:    ip.String(),
+		Port:    uint16(device_.port),
+		Timeout: timeout,
+	}, this.log); err != nil {
+		return nil, fmt.Errorf("Connect: %w", err)
+	} else if channel_, ok := channel.(*castconn); ok == false {
+		return nil, gopi.ErrAppError
+	} else {
+		// Watch channel for messages
+		evt := channel_.Subscribe()
+		// Connect for messages
+		if err := channel_.Connect(); err != nil {
+			channel.Close()
+			return nil, err
+		}
+		go this.watchEvents(evt)
+
+		// Add channel
+		this.channels[channel.(*castconn)] = device_
+
+		// Return channel
+		return channel_, nil
+	}
+}
+
+func (this *googlecast) Disconnect(channel rpc.GoogleCastChannel) error {
+	this.log.Debug("<googlecast.Disconnect>{ channel=%v }", channel)
+
+	if channel_, ok := channel.(*castconn); channel_ == nil || ok == false {
+		return gopi.ErrBadParameter
+	} else if err := channel_.Disconnect(); err != nil {
+		return err
+	} else {
+		// Remove channel from list of channels
+		for chan_ := range this.channels {
+			if chan_ == channel_ {
+				delete(this.channels, chan_)
+				return channel_.Close()
+			}
+		}
+		// Channel not found, return error
+		return gopi.ErrBadParameter
+	}
+}
+
+func (this *googlecast) watchEvents(evts <-chan gopi.Event) {
+	this.WaitGroup.Add(1)
+FOR_LOOP:
+	for {
+		select {
+		case evt := <-evts:
+			if evt == nil {
+				continue
+			}
+
+			evt_ := evt.(rpc.GoogleChannelEvent)
+
+			// re-emit event
+			this.Emit(NewChannelEvent(this, evt_.Type(), evt_.Channel()))
+
+			// End loop if disconnect
+			if evt_.Type() == rpc.GOOGLE_CAST_EVENT_DISCONNECT {
+				//emit and break
+				break FOR_LOOP
+			}
+		}
+	}
+	this.WaitGroup.Done()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -168,4 +264,44 @@ func (this *googlecast) WatchEvent(evt gopi.RPCEvent) error {
 		this.devices[name] = cast
 	}
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PRIVATE METHODS
+
+func getAddr(device *castdevice, flag gopi.RPCFlag) (net.IP, error) {
+	switch flag & (gopi.RPC_FLAG_INET_V4 | gopi.RPC_FLAG_INET_V6) {
+	case gopi.RPC_FLAG_INET_V4:
+		if len(device.ip4) == 0 {
+			return nil, gopi.ErrNotFound
+		} else if flag&gopi.RPC_FLAG_SERVICE_ANY != 0 {
+			// Return any
+			index := rand.Intn(len(device.ip4) - 1)
+			return device.ip4[index], nil
+		} else {
+			// Return first
+			return device.ip4[0], nil
+		}
+	case gopi.RPC_FLAG_INET_V6:
+		if len(device.ip6) == 0 {
+			return nil, gopi.ErrNotFound
+		} else if flag&gopi.RPC_FLAG_SERVICE_ANY != 0 {
+			// Return any
+			index := rand.Intn(len(device.ip6) - 1)
+			return device.ip6[index], nil
+		} else {
+			// Return first
+			return device.ip6[0], nil
+		}
+	case (gopi.RPC_FLAG_INET_V6 | gopi.RPC_FLAG_INET_V4):
+		if addr, err := getAddr(device, gopi.RPC_FLAG_INET_V4); err == nil {
+			return addr, nil
+		} else if addr, err := getAddr(device, gopi.RPC_FLAG_INET_V6); err == nil {
+			return addr, nil
+		} else {
+			return nil, gopi.ErrNotFound
+		}
+	default:
+		return nil, gopi.ErrBadParameter
+	}
 }

@@ -45,11 +45,13 @@ func NewCastDevice(service gopi.RPCServiceRecord) *castdevice {
 			this.txt[pair[0]] = pair[1]
 		}
 	}
+
 	if this.Id() == "" {
 		return nil
-	} else {
-		return this
 	}
+
+	// Success
+	return this
 }
 
 ////////////////////////////////////////////////////////////////////////////////
