@@ -153,7 +153,7 @@ type GoogleCast interface {
 
 	Devices() []GoogleCastDevice
 
-	// Connect to the comms channel for a device
+	// Connect to the control channel for a device, with timeout
 	Connect(GoogleCastDevice, gopi.RPCFlag, time.Duration) (GoogleCastChannel, error)
 	Disconnect(GoogleCastChannel) error
 }
@@ -167,6 +167,7 @@ type GoogleCastDevice interface {
 }
 
 type GoogleCastChannel interface {
+	// Address of channel
 	RemoteAddr() string
 
 	// Get Properties
@@ -178,12 +179,11 @@ type GoogleCastChannel interface {
 	SetApplication(GoogleCastApplication) error // Application to watch or nil
 	SetPlay(bool) (int, error)                  // Play or stop
 	SetPause(bool) (int, error)                 // Pause or play
-	/*
-		SetVolume()
-		SetMuted(bool) (int, error)
-		SetTrackNext() (int, error)
-		SetTrackPrev() (int, error)
-	*/
+	SetVolume(float32) (int, error)             // Set volume level
+	SetMuted(bool) (int, error)                 // Set muted
+	//SetTrackNext() (int, error)
+	//SetTrackPrev() (int, error)
+	//StreamUrl(string)
 }
 
 type GoogleCastApplication interface {

@@ -4,10 +4,12 @@ go 1.13
 
 require (
 	github.com/djthorpe/gopi v1.0.86
+	github.com/docker/docker v1.13.1
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/miekg/dns v1.1.25
 	github.com/olekukonko/tablewriter v0.0.4
+	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/pkg/errors v0.8.1
 	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413 // indirect
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553

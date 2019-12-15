@@ -303,56 +303,87 @@ func (this *castconn) SetApplication(app rpc.GoogleCastApplication) error {
 	return nil
 }
 
-/*
-func (this *castconn) Play(bool) (int, error) {
-	this.log.Debug2("<googlecast.conn.SetApplication>{ app=%v }", app)
-
-	payload := &PayloadHeader{Type: "STOP"}
-	if err := this.send(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_CONN, payload.WithId(this.nextMessageId())); err != nil {
-		return 0, err
-	} else {
-		return payload.RequestId, nil
-	}
-}
-*/
-
 func (this *castconn) SetPause(state bool) (int, error) {
 	this.log.Debug2("<googlecast.conn.SetPause>{ state=%v }", state)
-	payload := &PayloadHeader{Type: "PLAY"}
 
-	// Play and pause work with current application
-	if this.current == nil {
+	if this.media == nil || this.current == nil {
 		return 0, gopi.ErrOutOfOrder
 	}
-	if state {
-		payload = &PayloadHeader{Type: "PAUSE"}
+	payload := MediaHeader{
+		PayloadHeader:  PayloadHeader{Type: "PAUSE"},
+		MediaSessionId: this.media.MediaSessionId,
 	}
-	if err := this.send(CAST_DEFAULT_SENDER, this.current.SessionId, CAST_NS_RECV, payload.WithId(this.nextMessageId())); err != nil {
+	if state == false {
+		payload.PayloadHeader.Type = "PLAY"
+	}
+	if err := this.send(CAST_DEFAULT_SENDER, this.current.TransportId, CAST_NS_MEDIA, payload.WithId(this.nextMessageId())); err != nil {
 		return 0, err
 	} else {
-		return payload.RequestId, nil
+		return payload.PayloadHeader.RequestId, nil
 	}
 }
 
 func (this *castconn) SetPlay(state bool) (int, error) {
 	this.log.Debug2("<googlecast.conn.SetPlay>{ state=%v }", state)
-	payload := &PayloadHeader{Type: "STOP"}
-	ns := CAST_NS_RECV
-	dest := CAST_DEFAULT_RECEIVER
 
-	if this.current == nil && state == true {
-		return 0, gopi.ErrOutOfOrder
-	} else {
-		ns = CAST_NS_MEDIA
-		dest = this.current.SessionId
-		if this.current != nil && state == true {
-			payload.Type = "PLAY"
+	if this.media != nil && this.current != nil {
+		payload := MediaHeader{
+			PayloadHeader:  PayloadHeader{Type: "PLAY"},
+			MediaSessionId: this.media.MediaSessionId,
 		}
+		if state == false {
+			payload.PayloadHeader.Type = "STOP"
+		}
+		if err := this.send(CAST_DEFAULT_SENDER, this.current.TransportId, CAST_NS_MEDIA, payload.WithId(this.nextMessageId())); err != nil {
+			return 0, err
+		} else {
+			return payload.PayloadHeader.RequestId, nil
+		}
+	} else if state == false {
+		payload := PayloadHeader{Type: "STOP"}
+		if err := this.send(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(this.nextMessageId())); err != nil {
+			return 0, err
+		} else {
+			return payload.RequestId, nil
+		}
+	} else {
+		return 0, gopi.ErrOutOfOrder
 	}
-	if err := this.send(CAST_DEFAULT_SENDER, dest, ns, payload.WithId(this.nextMessageId())); err != nil {
+}
+
+func (this *castconn) SetVolume(level float32) (int, error) {
+	this.log.Debug2("<googlecast.conn.SetVolume>{ level=%v }", level)
+
+	if level > 1.0 || level < 0 {
+		return 0, gopi.ErrBadParameter
+	}
+
+	payload := &VolumeHeader{
+		PayloadHeader: PayloadHeader{Type: "SET_VOLUME"},
+		Volume: volume{
+			Level_: level,
+		},
+	}
+	if err := this.send(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(this.nextMessageId())); err != nil {
 		return 0, err
 	} else {
-		return payload.RequestId, nil
+		return payload.PayloadHeader.RequestId, nil
+	}
+}
+
+func (this *castconn) SetMuted(state bool) (int, error) {
+	this.log.Debug2("<googlecast.conn.SetMuted>{ state=%v }", state)
+
+	payload := &VolumeHeader{
+		PayloadHeader: PayloadHeader{Type: "SET_VOLUME"},
+		Volume: volume{
+			Muted_: state,
+		},
+	}
+	if err := this.send(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(this.nextMessageId())); err != nil {
+		return 0, err
+	} else {
+		return payload.PayloadHeader.RequestId, nil
 	}
 }
 
@@ -392,7 +423,7 @@ func (this *castconn) send(source, dest, ns string, payload Payload) error {
 // BACKGROUND TASKS
 
 func (this *castconn) ReceiveTask(start chan<- event.Signal, stop <-chan event.Signal) error {
-	status := time.NewTicker(STATUS_INTERVAL)
+	status := time.NewTimer(500 * time.Millisecond)
 	start <- gopi.DONE
 FOR_LOOP:
 	for {
@@ -408,6 +439,7 @@ FOR_LOOP:
 					this.log.Error("ReceiveTask: %v", err)
 				}
 			}
+			status.Reset(STATUS_INTERVAL)
 		case <-stop:
 			status.Stop()
 			break FOR_LOOP
@@ -532,7 +564,7 @@ func (this *castconn) emit(data []byte) error {
 			}
 		}
 	} else {
-		fmt.Printf("%v=%v\n", header.Type, message)
+		this.log.Debug("ReceiveTask: Ignoring: %v: %v", header.Type, message)
 	}
 
 	// Success

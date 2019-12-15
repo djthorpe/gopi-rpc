@@ -22,6 +22,19 @@ type PayloadHeader struct {
 	RequestId int    `json:"requestId,omitempty"`
 }
 
+type MediaHeader struct {
+	PayloadHeader
+	MediaSessionId int     `json:"mediaSessionId"`
+	CurrentTime    float32 `json:"currentTime"`
+	RelativeTime   float32 `json:"relativeTime,omitempty"`
+	ResumeState    string  `json:"resumeState"`
+}
+
+type VolumeHeader struct {
+	PayloadHeader
+	Volume volume `json:"volume"`
+}
+
 type ReceiverStatusResponse struct {
 	PayloadHeader
 	Status struct {
@@ -51,7 +64,6 @@ var (
 	// Known Payload headers
 	LaunchHeader      = PayloadHeader{Type: "LAUNCH"}       // Launches a new chromecast app
 	SeekHeader        = PayloadHeader{Type: "SEEK"}         // Seek into the running app
-	VolumeHeader      = PayloadHeader{Type: "SET_VOLUME"}   // Sets the volume
 	LoadHeader        = PayloadHeader{Type: "LOAD"}         // Loads an application onto the chromecast
 	QueueLoadHeader   = PayloadHeader{Type: "QUEUE_LOAD"}   // Loads an application onto the chromecast
 	QueueUpdateHeader = PayloadHeader{Type: "QUEUE_UPDATE"} // Loads an application onto the chromecast
@@ -62,5 +74,15 @@ var (
 
 func (this *PayloadHeader) WithId(id int) Payload {
 	this.RequestId = id
+	return this
+}
+
+func (this *MediaHeader) WithId(id int) Payload {
+	this.PayloadHeader.RequestId = id
+	return this
+}
+
+func (this *VolumeHeader) WithId(id int) Payload {
+	this.PayloadHeader.RequestId = id
 	return this
 }
