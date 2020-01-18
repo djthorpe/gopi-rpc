@@ -16,7 +16,7 @@ func init() {
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     "rpc/helloworld/service",
 		Type:     gopi.UNIT_RPC_SERVICE,
-		Requires: []string{"gopi/grpc/server"},
+		Requires: []string{"server"},
 		New: func(app gopi.App) (gopi.Unit, error) {
 			return gopi.New(Service{}, app.Log().Clone("rpc/helloworld/service"))
 		},

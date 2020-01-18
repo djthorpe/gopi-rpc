@@ -11,7 +11,7 @@ import (
 	"context"
 
 	// Frameworks
-	rpc "github.com/djthorpe/gopi-rpc/v2"
+	gopi "github.com/djthorpe/gopi/v2"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 )
@@ -22,7 +22,7 @@ import (
 // GRPCServer interface is an RPCServer which also
 // returns gRPC-specific properties
 type GRPCServer interface {
-	rpc.Server
+	gopi.RPCServer
 
 	// Return the gRPC Server object
 	GRPCServer() *grpc.Server

@@ -14,7 +14,7 @@ import (
 
 func init() {
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name: "gopi/grpc/server",
+		Type: gopi.UNIT_RPC_SERVER,
 		Config: func(app gopi.App) error {
 			app.Flags().FlagUint("rpc.port", 0, "Server Port")
 			app.Flags().FlagString("rpc.sslcert", "", "SSL Certificate Path")
@@ -22,7 +22,7 @@ func init() {
 			return nil
 		},
 		New: func(app gopi.App) (gopi.Unit, error) {
-			return gopi.New(Server{}, app.Log().Clone("gopi/grpc/server"))
+			return gopi.New(Server{}, app.Log().Clone("grpc/server"))
 		},
 	})
 }

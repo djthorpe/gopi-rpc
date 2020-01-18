@@ -17,6 +17,7 @@ import (
 	// Units
 	_ "github.com/djthorpe/gopi-rpc/v2/rpc/grpc/helloworld"
 	_ "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
+	_ "github.com/djthorpe/gopi/v2/unit/bus"
 	_ "github.com/djthorpe/gopi/v2/unit/logger"
 )
 
@@ -24,7 +25,7 @@ import (
 // BOOTSTRAP
 
 func main() {
-	if app, err := app.NewCommandLineTool(Main, nil, "rpc/helloworld/service"); err != nil {
+	if app, err := app.NewServer("rpc/helloworld/service"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
 		// Run and exit
