@@ -8,13 +8,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
 	// Frameworks
 	app "github.com/djthorpe/gopi-rpc/v2/app"
-	gopi "github.com/djthorpe/gopi/v2"
 
 	// Units
 	_ "github.com/djthorpe/gopi-rpc/v2/grpc/helloworld"
@@ -22,17 +20,6 @@ import (
 	_ "github.com/djthorpe/gopi/v2/unit/bus"
 	_ "github.com/djthorpe/gopi/v2/unit/logger"
 )
-
-////////////////////////////////////////////////////////////////////////////////
-// MAIN
-
-func Main(app gopi.App, args []string) error {
-	fmt.Println("Press CTRL+C to exit")
-	app.WaitForSignal(context.Background(), os.Interrupt)
-
-	// Success
-	return nil
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // BOOTSTRAP
