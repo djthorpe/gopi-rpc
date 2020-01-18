@@ -8,6 +8,7 @@
 package grpc
 
 import (
+	"fmt"
 	"time"
 
 	// Frameworks
@@ -32,6 +33,9 @@ func NewEvent(source_ gopi.Unit, type_ gopi.RPCEventType) gopi.RPCEvent {
 	}
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION gopi.Event
+
 func (*event) NS() gopi.EventNS {
 	return gopi.EVENT_NS_DEFAULT
 }
@@ -40,22 +44,35 @@ func (*event) Name() string {
 	return "gopi.RPCEvent"
 }
 
-func (this *event) Type() gopi.RPCEventType {
-	return this.type_
+func (this *event) Source() gopi.Unit {
+	return this.source_
 }
+
+func (this *event) Value() interface{} {
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION gopi.RPCEvent
 
 func (*event) Service() gopi.RPCServiceRecord {
 	return gopi.RPCServiceRecord{}
 }
 
-func (this *event) Source() gopi.Unit {
-	return this.source_
+func (this *event) Type() gopi.RPCEventType {
+	return this.type_
 }
 
 func (this *event) TTL() time.Duration {
 	return 0
 }
 
-func (this *event) Value() interface{} {
-	return nil
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (this *event) String() string {
+	return "<" + this.Name() +
+		" type=" + fmt.Sprint(this.type_) +
+		" service=" + fmt.Sprint(this.Service()) +
+		">"
 }

@@ -126,9 +126,6 @@ func (this *server) String() string {
 // SERVE AND STOP
 
 func (this *server) Start() error {
-	this.Mutex.Lock()
-	defer this.Mutex.Unlock()
-
 	// Check for serving
 	if this.Addr() != nil {
 		return gopi.ErrInternalAppError.WithPrefix("Start")
