@@ -18,7 +18,16 @@ func init() {
 		Type:     gopi.UNIT_RPC_SERVICE,
 		Requires: []string{"server"},
 		New: func(app gopi.App) (gopi.Unit, error) {
-			return gopi.New(Service{}, app.Log().Clone("rpc/helloworld/service"))
+			return gopi.New(Service{
+				Server: app.UnitInstance("server").(gopi.RPCServer),
+			}, app.Log().Clone("rpc/helloworld/service"))
+		},
+	})
+	gopi.UnitRegister(gopi.UnitConfig{
+		Name:     "gopi.Helloworld",
+		Type:     gopi.UNIT_RPC_CLIENT,
+		New: func(app gopi.App) (gopi.Unit, error) {
+			return gopi.New(Client{}, app.Log().Clone("rpc/helloworld/client"))
 		},
 	})
 }

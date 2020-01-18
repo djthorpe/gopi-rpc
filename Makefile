@@ -10,10 +10,13 @@ GOLDFLAGS += -X $(GOPI).GoBuildTime=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GOFLAGS = -ldflags "-s -w $(GOLDFLAGS)" 
 
 all:
-	@echo "Synax: make protogen|test|clean"
+	@echo "Synax: make protogen|install|test|clean"
 
 protogen:
-	$(GO) generate -x ./rpc/...
+	$(GO) generate -x ./protobuf/...
+
+install: protogen
+	$(GO) install $(GOFLAGS) ./cmd/...
 
 test: 
 	$(GO) clean -testcache

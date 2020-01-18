@@ -8,29 +8,31 @@
 package helloworld
 
 import (
+
 	// Frameworks
+
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
+	// Protocol buffers
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-type Service struct {
-	Server gopi.RPCServer
+type Client struct {
 }
 
-type service struct {
+type client struct {
 	base.Unit
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION gopi.Unit
 
-func (Service) Name() string { return "rpc/helloworld/service" }
+func (Client) Name() string { return "rpc/helloworld/client" }
 
-func (config Service) New(log gopi.Logger) (gopi.Unit, error) {
-	this := new(service)
+func (config Client) New(log gopi.Logger) (gopi.Unit, error) {
+	this := new(client)
 	if err := this.Unit.Init(log); err != nil {
 		return nil, err
 	} else if err := this.Init(config); err != nil {
@@ -41,10 +43,11 @@ func (config Service) New(log gopi.Logger) (gopi.Unit, error) {
 	return this, nil
 }
 
-func (this *service) Init(config Service) error {
+func (this *client) Init(config Client) error {
+	// Success
 	return nil
 }
 
-func (this *service) Close() error {
+func (this *client) Close() error {
 	return this.Unit.Close()
 }

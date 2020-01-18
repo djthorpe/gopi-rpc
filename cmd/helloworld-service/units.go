@@ -8,24 +8,37 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	// Frameworks
-	"github.com/djthorpe/gopi/v2/app"
+	app "github.com/djthorpe/gopi-rpc/v2/app"
+	gopi "github.com/djthorpe/gopi/v2"
 
 	// Units
-	_ "github.com/djthorpe/gopi-rpc/v2/rpc/grpc/helloworld"
+	_ "github.com/djthorpe/gopi-rpc/v2/grpc/helloworld"
 	_ "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
 	_ "github.com/djthorpe/gopi/v2/unit/bus"
 	_ "github.com/djthorpe/gopi/v2/unit/logger"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
+// MAIN
+
+func Main(app gopi.App, args []string) error {
+	fmt.Println("Press CTRL+C to exit")
+	app.WaitForSignal(context.Background(), os.Interrupt)
+
+	// Success
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BOOTSTRAP
 
 func main() {
-	if app, err := app.NewServer("rpc/helloworld/service"); err != nil {
+	if app, err := app.NewServer(Main, "rpc/helloworld/service"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
 		// Run and exit
