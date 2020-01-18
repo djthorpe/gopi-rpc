@@ -28,9 +28,11 @@ type Server struct {
 	SSLCertificate string
 	Port           uint
 	ServerOption   []grpc.ServerOption
+	Bus            gopi.Bus
 }
 
 type server struct {
+	bus    gopi.Bus
 	port   uint
 	server *grpc.Server
 	addr   net.Addr
@@ -61,6 +63,12 @@ func (this *server) Init(config Server) error {
 	this.port = config.Port
 	this.ssl = false
 	this.addr = nil
+
+	if config.Bus == nil {
+		return gopi.ErrBadParameter.WithPrefix("bus")
+	} else {
+		this.bus = config.Bus
+	}
 
 	if config.SSLKey != "" && config.SSLCertificate != "" {
 		if creds, err := credentials.NewServerTLSFromFile(config.SSLCertificate, config.SSLKey); err != nil {
@@ -93,6 +101,7 @@ func (this *server) Close() error {
 
 	// Release resources
 	this.server = nil
+	this.bus = nil
 	this.addr = nil
 
 	return this.Unit.Close()
@@ -128,8 +137,16 @@ func (this *server) Start() error {
 	} else {
 		// Start server, wait until stopped
 		this.SetAddr(lis.Addr())
-		err := this.server.Serve(lis) // blocking call
+		this.bus.Emit(NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED))
+
+		// blocking call
+		err := this.server.Serve(lis)
+
+		// Send message on bus that server has stopped
+		this.bus.Emit(NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED))
 		this.SetAddr(nil)
+
+		// Return any error
 		return err
 	}
 }

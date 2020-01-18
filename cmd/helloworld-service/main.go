@@ -7,6 +7,28 @@
 
 package main
 
-// Frameworks
+import (
+	"fmt"
+	"os"
+
+	// Frameworks
+	"github.com/djthorpe/gopi/v2/app"
+
+	// Units
+	_ "github.com/djthorpe/gopi-rpc/v2/rpc/grpc/helloworld"
+	_ "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
+	_ "github.com/djthorpe/gopi/v2/unit/bus"
+	_ "github.com/djthorpe/gopi/v2/unit/logger"
+)
 
 ////////////////////////////////////////////////////////////////////////////////
+// BOOTSTRAP
+
+func main() {
+	if app, err := app.NewServer("rpc/helloworld/service"); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	} else {
+		// Run and exit
+		os.Exit(app.Run())
+	}
+}
