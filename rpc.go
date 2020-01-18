@@ -12,5 +12,12 @@ import (
 )
 
 type Server interface {
+	// Start the RPC server, blocks until completed
+	Start() error
+
+	// Stop signals end to server, and force end
+	Stop(halt bool) error
+
+	// Implements gopi.Unit
 	gopi.Unit
 }

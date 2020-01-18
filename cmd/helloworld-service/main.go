@@ -13,12 +13,21 @@ import (
 	"os"
 
 	// Frameworks
-	"github.com/djthorpe/gopi/v2"
+	rpc "github.com/djthorpe/gopi-rpc/v2"
+	gopi "github.com/djthorpe/gopi/v2"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func Main(app gopi.App, args []string) error {
+
+	// Get server
+	server := app.UnitInstance("gopi/grpc/server").(rpc.Server)
+	fmt.Println(server)
+
+	// Get services
+	services := app.UnitsByType(gopi.UNIT_RPC_SERVICE)
+	
 
 	// Print out name
 	fmt.Println("Press CTRL+C to exit")

@@ -16,6 +16,7 @@ import (
 
 	// Units
 	_ "github.com/djthorpe/gopi-rpc/v2/rpc/grpc/helloworld"
+	_ "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
 	_ "github.com/djthorpe/gopi/v2/unit/logger"
 )
 
