@@ -17,7 +17,7 @@ func init() {
 		Name: "gopi-rpc/helloworld/service",
 		Type: gopi.UNIT_RPC_SERVICE,
 		New: func(app gopi.App) (gopi.Unit, error) {
-			return gopi.New(Service{}, app.Log().Clone("gopi-rpc/helloworld/service"))
+			return gopi.New(Service{}, app.Log().Clone("rpc/helloworld/service"))
 		},
 	})
 }

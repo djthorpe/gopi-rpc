@@ -9,7 +9,8 @@ package helloworld
 
 import (
 	// Frameworks
-	gopi "github.com/djthorpe/gopi/v2"
+
+	rpc "github.com/djthorpe/gopi-rpc/v2"
 	base "github.com/djthorpe/gopi/v2/base"
 )
 
@@ -17,7 +18,7 @@ import (
 // TYPES
 
 type Service struct {
-	Server gopi.RPCServer
+	Server rpc.Server
 }
 
 type service struct {
