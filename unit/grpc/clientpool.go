@@ -31,9 +31,11 @@ type ClientPool struct {
 }
 
 type clientpool struct {
-	discovery gopi.RPCServiceDiscovery
-
 	base.Unit
+
+	discovery       gopi.RPCServiceDiscovery
+	timeout         time.Duration
+	ssl, skipverify bool
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +48,7 @@ var (
 ////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION gopi.Unit
 
-func (ClientPool) Name() string { return "gopi/grpc/clientpool" }
+func (ClientPool) Name() string { return "gopi/grpc/client/pool" }
 
 func (config ClientPool) New(log gopi.Logger) (gopi.Unit, error) {
 	this := new(clientpool)
@@ -61,11 +63,21 @@ func (config ClientPool) New(log gopi.Logger) (gopi.Unit, error) {
 }
 
 func (this *clientpool) Init(config ClientPool) error {
+	// Set basic parameters
+	this.ssl = config.SSL
+	this.skipverify = config.SkipVerify
+	this.timeout = config.Timeout
+
 	// Success
 	return nil
 }
 
 func (this *clientpool) Close() error {
+
+	// Release resources
+	this.discovery = nil
+
+	// Return success
 	return this.Unit.Close()
 }
 
@@ -120,9 +132,44 @@ func (this *clientpool) ConnectAddr(addr net.IP, port uint16) (gopi.RPCClientCon
 	return nil, gopi.ErrNotImplemented
 }
 
+// Connect to remote host by Fifo
+func (this *clientpool) ConnectFifo(path string) (gopi.RPCClientConn, error) {
+	// Create a connection
+	if conn, err := gopi.New(ClientConn{
+		Fifo:    path,
+		Timeout: this.timeout,
+	}, this.Log.Clone(ClientConn{}.Name())); err != nil {
+		return nil, err
+	} else if err := conn.(*clientconn).Connect(); err != nil {
+		return nil, err
+	} else {
+		return conn.(gopi.RPCClientConn), nil
+	}
+}
+
 // Disconnect from a client connection
-func (this *clientpool) Disconnect(gopi.RPCClientConn) error {
-	return gopi.ErrNotImplemented
+func (this *clientpool) Disconnect(conn gopi.RPCClientConn) error {
+	if conn == nil {
+		return gopi.ErrBadParameter
+	} else {
+		return conn.Close()
+	}
+}
+
+// Create client stub for connection
+func (this *clientpool) CreateStub(name string, conn gopi.RPCClientConn) gopi.RPCClientStub {
+	if modules := gopi.UnitsByName(name); len(modules) == 0 {
+		this.Log.Error(fmt.Errorf("%w: Client Stub %v", gopi.ErrNotFound, strconv.Quote(name)))
+		return nil
+	} else if modules[0].Type != gopi.UNIT_RPC_CLIENT || modules[0].Stub == nil {
+		this.Log.Error(fmt.Errorf("%w: Client Stub %v", gopi.ErrBadParameter, strconv.Quote(name)))
+		return nil
+	} else if stub, err := modules[0].Stub(conn); err != nil {
+		this.Log.Error(fmt.Errorf("%s: %w", modules[0].Name, err))
+		return nil
+	} else {
+		return stub
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,64 @@
+/*
+  Go Language Raspberry Pi Interface
+  (c) Copyright David Thorpe 2016-2020
+  All Rights Reserved
+  For Licensing and Usage information, please see LICENSE.md
+*/
+
+syntax = "proto3";
+
+package gaffer;
+
+// Import dependencies
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+
+// The Kernel service definition
+service Kernel {
+  // Simple ping method to show server is "up"
+  rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // Create a new process
+  rpc CreateProcess (KernelService) returns (KernelProcessId);
+
+  // Return filtered list of processes
+  rpc Processes (KernelProcessId) returns (KernelProcessList);
+}
+
+// A service defintion is used to start a process
+message KernelService {
+  string path = 1;                       // Path to the executable
+  string wd = 2;                         // Working directory
+  string user = 4;                       // User identifier
+  string group = 5;                      // Group identifier
+  repeated string args = 6;              // Executable arguments
+  google.protobuf.Duration timeout = 7;  // Timeout for the process
+  uint32 sid = 8;                        // Service ID
+}
+
+// A returned process identifier
+message KernelProcessId {
+  uint32 id = 1;    // Process ID of a running process
+  uint32 sid = 2;   // Service ID of a running process
+}
+
+// Return a list of processes
+message KernelProcessList {
+  repeated KernelProcess process = 1;
+}
+
+// Return information about a process
+message KernelProcess { 
+  KernelProcessId id = 1;
+  Status status = 2;
+  KernelService service = 3;
+
+  enum Status {
+    	NONE = 0;
+      STARTING = 1;
+      RUNNING = 2;
+      STOPPING = 3;
+      STOPPED = 4;
+      ZOMBIE = 5;
+  }
+}

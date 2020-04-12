@@ -28,6 +28,15 @@ type GRPCServer interface {
 	GRPCServer() *grpc.Server
 }
 
+// GRPCClientConn interface is an RPCClientConn which also
+// returns gRPC-specific properties
+type GRPCClientConn interface {
+	gopi.RPCClientConn
+
+	// Return the gRPC Server object
+	GRPCClient() grpc.ClientConnInterface
+}
+
 /////////////////////////////////////////////////////////////////////
 // UTILITY FUNCTIONS
 

@@ -56,9 +56,8 @@ func NewServer(main gopi.MainCommandFunc, units ...string) (gopi.App, error) {
 }
 
 func (this *server) Run() int {
-
 	// Initialize the application
-	if err := this.App.Start(os.Args[1:]); err != nil {
+	if err := this.App.Start(this, os.Args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) == false {
 			fmt.Fprintln(os.Stderr, this.App.Flags().Name()+":", err)
 			return -1

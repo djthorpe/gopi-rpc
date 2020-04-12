@@ -10,6 +10,9 @@ package grpc
 import (
 	"fmt"
 	"net"
+	"os"
+	"os/user"
+	"strconv"
 	"sync"
 
 	// Frameworks
@@ -27,16 +30,20 @@ type Server struct {
 	SSLKey         string
 	SSLCertificate string
 	Port           uint
+	File           string
+	FileGroup      string
 	ServerOption   []grpc.ServerOption
 	Bus            gopi.Bus
 }
 
 type server struct {
-	bus    gopi.Bus
-	port   uint
-	server *grpc.Server
-	addr   net.Addr
-	ssl    bool
+	bus     gopi.Bus
+	fifo    string
+	fifogid *user.Group
+	port    uint
+	server  *grpc.Server
+	addr    net.Addr
+	ssl     bool
 
 	sync.Mutex
 	base.Unit
@@ -70,7 +77,19 @@ func (this *server) Init(config Server) error {
 		this.bus = config.Bus
 	}
 
-	if config.SSLKey != "" && config.SSLCertificate != "" {
+	if config.File != "" {
+		if this.port != 0 || config.SSLKey != "" || config.SSLCertificate != "" {
+			return fmt.Errorf("%w: Cannot combine -rpc.fifo with -rpc.port, -rpc.sslkey or -rpc.sslcert", gopi.ErrBadParameter)
+		} else if _, err := os.Stat(config.File); err == nil {
+			return fmt.Errorf("%w: -rpc.fifo already exists", gopi.ErrBadParameter)
+		} else if fifogid, err := lookupGroup(config.FileGroup); err != nil {
+			return err
+		} else {
+			this.fifo = config.File
+			this.fifogid = fifogid
+			this.server = grpc.NewServer(config.ServerOption...)
+		}
+	} else if config.SSLKey != "" && config.SSLCertificate != "" {
 		if creds, err := credentials.NewServerTLSFromFile(config.SSLCertificate, config.SSLKey); err != nil {
 			return err
 		} else {
@@ -115,10 +134,8 @@ func (this *server) String() string {
 		return "<" + this.Log.Name() + ">"
 	} else if this.addr != nil {
 		return "<" + this.Log.Name() + " status=serving addr=" + this.Addr().String() + ">"
-	} else if this.port == 0 {
-		return "<" + this.Log.Name() + " status=idle" + ">"
 	} else {
-		return "<" + this.Log.Name() + " status=idle port=" + fmt.Sprint(this.port) + ">"
+		return "<" + this.Log.Name() + " status=idle" + ">"
 	}
 }
 
@@ -129,23 +146,38 @@ func (this *server) Start() error {
 	// Check for serving
 	if this.Addr() != nil {
 		return gopi.ErrInternalAppError.WithPrefix("Start")
-	} else if lis, err := net.Listen("tcp", portString(this.port)); err != nil {
-		return err
+	}
+
+	var lis net.Listener
+	var err error
+	if this.fifo != "" {
+		if lis, err = net.Listen("unix", this.fifo); err == nil && this.fifogid != nil {
+			// Set group and allow group to write
+			if err := setFifoGroup(this.fifo, this.fifogid); err != nil {
+				lis.Close()
+				return err
+			}
+		}
 	} else {
-		// Start server, wait until stopped
-		this.SetAddr(lis.Addr())
-		this.bus.Emit(NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED))
-
-		// blocking call
-		err := this.server.Serve(lis)
-
-		// Send message on bus that server has stopped
-		this.bus.Emit(NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED))
-		this.SetAddr(nil)
-
-		// Return any error
+		lis, err = net.Listen("tcp", portString(this.port))
+	}
+	if err != nil {
 		return err
 	}
+
+	// Start server, wait until stopped
+	this.SetAddr(lis.Addr())
+	this.bus.Emit(NewEvent(this, gopi.RPC_EVENT_SERVER_STARTED))
+
+	// blocking call
+	err = this.server.Serve(lis)
+
+	// Send message on bus that server has stopped
+	this.bus.Emit(NewEvent(this, gopi.RPC_EVENT_SERVER_STOPPED))
+	this.SetAddr(nil)
+
+	// Return any error
+	return err
 }
 
 func (this *server) Stop(halt bool) error {
@@ -188,4 +220,29 @@ func portString(port uint) string {
 	} else {
 		return fmt.Sprint(":", port)
 	}
+}
+
+func lookupGroup(name string) (*user.Group, error) {
+	if name == "" {
+		return nil, nil
+	} else if group, err := user.LookupGroup(name); err == nil {
+		return group, nil
+	} else if group, err := user.LookupGroupId(name); err == nil {
+		return group, nil
+	} else {
+		return nil, fmt.Errorf("%w: Invalid group", gopi.ErrBadParameter)
+	}
+}
+
+func setFifoGroup(path string, group *user.Group) error {
+	if gid, err := strconv.ParseUint(group.Gid, 10, 32); err != nil {
+		return err
+	} else if err := os.Chown(path, -1, int(gid)); err != nil {
+		return err
+	} else if err := os.Chmod(path, 0775); err != nil {
+		return err
+	}
+
+	// Success
+	return nil
 }
