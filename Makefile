@@ -15,6 +15,16 @@ all:
 protogen:
 	$(GO) generate -x ./protobuf/...
 
+gaffer: protogen
+	@install -d /opt/gaffer/sbin
+	@install -d /opt/gaffer/bin
+	@install -d /opt/gaffer/etc
+	@install etc/gaffer.env /opt/gaffer/etc
+	@install etc/gaffer.service /opt/gaffer/etc
+	@$(GO) build -o /opt/gaffer/sbin/gaffer-kernel $(GOFLAGS) ./cmd/gaffer-kernel
+	@echo Run: sudo ln -s /opt/gaffer/etc/gaffer.service /etc/systemd/system/gaffer.service
+	@echo      sudo systemctl enable gaffer.service
+
 install: protogen
 	$(GO) install $(GOFLAGS) ./cmd/...
 

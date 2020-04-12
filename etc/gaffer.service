@@ -1,0 +1,14 @@
+[Unit]
+Description=Gaffer Kernel service
+
+[Service]
+EnvironmentFile=-/opt/gaffer/etc/gaffer.env
+RuntimeDirectory=gaffer
+ExecStart=/opt/gaffer/sbin/gaffer-kernel \
+  -rpc.fifo=${RUNTIME_DIRECTORY}/${GAFFER_FIFO} \
+  -rpc.fifogid ${GAFFER_GID} \
+  -gaffer.root ${GAFFER_ROOT}
+
+[Install]
+WantedBy=multi-user.target
+
