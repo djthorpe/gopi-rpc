@@ -44,6 +44,14 @@ type kernel struct {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// CONSTANTS
+
+const (
+	// Time to look to prune new and stopped processes
+	DURATION_PRUNE = 10 * time.Second
+)
+
+////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION gopi.Unit
 
 func (Kernel) Name() string { return "gaffer/kernel" }
@@ -125,12 +133,45 @@ func (this *kernel) CreateProcess(service rpc.GafferService) (uint32, error) {
 	} else if _, exists := this.process[id]; exists {
 		return 0, gopi.ErrInternalAppError
 	} else {
+		// Success
 		this.process[id] = process
-		// signal run
-		this.runproc <- id
-		// return success
 		return id, nil
 	}
+}
+
+// RunProcess starts a process in NEW state
+func (this *kernel) RunProcess(id uint32) error {
+	this.Lock()
+	defer this.Unlock()
+
+	if process, exists := this.process[id]; exists == false {
+		return gopi.ErrBadParameter.WithPrefix("id")
+	} else if process.Status() != rpc.GAFFER_STATUS_NEW {
+		return gopi.ErrOutOfOrder
+	} else {
+		// signal the process needs to be run
+		this.runproc <- id
+	}
+
+	// Success
+	return nil
+}
+
+// StopProcess kills a process in RUNNING state
+func (this *kernel) StopProcess(id uint32) error {
+	this.Lock()
+	defer this.Unlock()
+
+	if process, exists := this.process[id]; exists == false {
+		return gopi.ErrBadParameter.WithPrefix("id")
+	} else if process.Status() != rpc.GAFFER_STATUS_RUNNING {
+		return gopi.ErrOutOfOrder
+	} else if err := process.Stop(); err != nil {
+		return err
+	}
+
+	// Success
+	return nil
 }
 
 func (this *kernel) Processes(id, sid uint32) []rpc.GafferProcess {
@@ -173,14 +214,20 @@ FOR_LOOP:
 					close(events)
 				} else {
 					// Start routine to receive events
-					go this.EventProcess(id, events)
+					go func() {
+						this.EventProcess(id, events)
+					}()
 				}
 			}
 		case id := <-this.endproc:
 			this.Log.Debug("PROC", id, "HAS ENDED")
 		case <-ticker.C:
-			this.Log.Debug("TICK")
-			ticker.Reset(10 * time.Second)
+			// Prune old processes which are stale after 20 seconds
+			if modified := this.ProcessPrune(DURATION_PRUNE * 2); modified {
+				ticker.Reset(DURATION_PRUNE / 2)
+			} else {
+				ticker.Reset(DURATION_PRUNE)
+			}
 		}
 	}
 }
@@ -198,6 +245,26 @@ FOR_LOOP:
 	}
 	// Signal end of process
 	this.endproc <- id
+}
+
+func (this *kernel) ProcessPrune(delta time.Duration) bool {
+	this.Lock()
+	defer this.Unlock()
+
+	for k, process := range this.process {
+		switch process.Status() {
+		case rpc.GAFFER_STATUS_NEW, rpc.GAFFER_STATUS_STOPPED:
+			if process.Timestamp().IsZero() == false && time.Now().Sub(process.Timestamp()) > delta {
+				// Prune processes which are stale
+				this.Log.Debug("Prune:", process)
+				delete(this.process, k)
+				return true
+			}
+		}
+	}
+
+	// Nothing updated
+	return false
 }
 
 ////////////////////////////////////////////////////////////////////////////////

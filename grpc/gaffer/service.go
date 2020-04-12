@@ -10,6 +10,7 @@ package gaffer
 import (
 	"context"
 	"fmt"
+	"time"
 
 	// Frameworks
 	rpc "github.com/djthorpe/gopi-rpc/v2"
@@ -124,4 +125,37 @@ func (this *kernelservice) Processes(_ context.Context, pb *pb.KernelProcessId) 
 
 	processes := this.kernel.Processes(pb.Id, pb.Sid)
 	return ProtoFromProcessList(processes), nil
+}
+
+func (this *kernelservice) RunProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
+	this.Log.Debug("<RunProcess id=", pb.GetId(), ">")
+	return &empty.Empty{}, this.kernel.RunProcess(pb.GetId())
+}
+
+func (this *kernelservice) StopProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
+	this.Log.Debug("<StopProcess id=", pb.GetId, ">")
+	return &empty.Empty{}, this.kernel.StopProcess(pb.GetId())
+}
+
+func (this *kernelservice) StreamEvents(filter *pb.KernelProcessId, stream pb.Kernel_StreamEventsServer) error {
+	this.Log.Debug("<StreamEvents filter=[", filter, "]>")
+
+	// Send an empty message once a second
+	ticker := time.NewTicker(time.Second)
+FOR_LOOP:
+	for {
+		select {
+		case <-ticker.C:
+			if err := stream.Send(&pb.KernelProcessEvent{}); err != nil {
+				this.Log.Error(fmt.Errorf("StreamEvents: %w", err))
+				break FOR_LOOP
+			}
+		}
+	}
+
+	// Stop ticker, unsubscribe from events
+	ticker.Stop()
+
+	// Return success
+	return nil
 }

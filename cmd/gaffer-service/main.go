@@ -51,6 +51,8 @@ func UserGroupToString(user, group string) string {
 func Processes(app gopi.App, stub rpc.GafferKernelStub) error {
 	if processes, err := stub.Processes(context.Background(), 0, 0); err != nil {
 		return err
+	} else if len(processes) == 0 {
+		return fmt.Errorf("No processes returned")
 	} else {
 		table := tablewriter.NewWriter(os.Stdout)
 		table.SetHeader([]string{"id", "sid", "status", "service", "user"})
@@ -73,12 +75,15 @@ func Processes(app gopi.App, stub rpc.GafferKernelStub) error {
 func Run(app gopi.App, stub rpc.GafferKernelStub, path string, args []string) error {
 	if id, err := stub.CreateProcess(context.Background(), rpc.GafferService{
 		Path:    path,
+		Args:    args,
 		Wd:      app.Flags().GetString("wd", gopi.FLAG_NS_DEFAULT),
 		User:    app.Flags().GetString("user", gopi.FLAG_NS_DEFAULT),
 		Group:   app.Flags().GetString("group", gopi.FLAG_NS_DEFAULT),
 		Timeout: app.Flags().GetDuration("timeout", gopi.FLAG_NS_DEFAULT),
-		Args:    args,
+		Sid:     uint32(app.Flags().GetUint("sid", gopi.FLAG_NS_DEFAULT)),
 	}); err != nil {
+		return err
+	} else if err := stub.RunProcess(context.Background(), id); err != nil {
 		return err
 	} else {
 		fmt.Println("id=", id)
@@ -124,6 +129,7 @@ func main() {
 		app.Flags().FlagString("user", "", "User")
 		app.Flags().FlagString("group", "", "Group")
 		app.Flags().FlagDuration("timeout", 0, "Process timeout")
+		app.Flags().FlagUint("sid", 0, "Service ID")
 
 		// Run and exit
 		os.Exit(app.Run())

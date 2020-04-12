@@ -31,12 +31,14 @@ type Process struct {
 	sync.Mutex
 	sync.WaitGroup
 
-	id, sid        uint32
-	timeout        time.Duration
-	cmd            *exec.Cmd
-	cancel         context.CancelFunc
-	stdout, stderr io.ReadCloser
-	user, group    string
+	id, sid        uint32             // Process ID and Service ID
+	timeout        time.Duration      // Timeout
+	cmd            *exec.Cmd          // Command object
+	cancel         context.CancelFunc // Cancel function
+	stdout, stderr io.ReadCloser      // Stdout and Stderr
+	user, group    string             // User and group process run under
+	stopping       bool               // Stopping flag
+	ts             time.Time          // Last updated
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,6 +127,9 @@ func NewProcess(id, sid uint32, path string, wd string, args []string, uid, gid 
 		this.stderr = stderr
 	}
 
+	// Set timestamp
+	this.ts = time.Now()
+
 	// Success
 	return this, nil
 }
@@ -136,14 +141,19 @@ func (this *Process) Start(out chan<- *Event) error {
 	this.Lock()
 	defer this.Unlock()
 
+	// Start logging to channels,
+	go this.processLogger(this.stdout, out, EVENT_TYPE_STDOUT)
+	go this.processLogger(this.stderr, out, EVENT_TYPE_STDERR)
+
 	// Start but don't wait
 	if err := this.cmd.Start(); err != nil {
 		return err
 	}
 
-	// Start logging to channels, and wait for process to end
-	go this.processLogger(this.stdout, out, EVENT_TYPE_STDOUT)
-	go this.processLogger(this.stderr, out, EVENT_TYPE_STDERR)
+	// Set timestamp
+	this.ts = time.Now()
+
+	// Wait for process to end
 	go this.processWait(out)
 
 	// Success
@@ -153,6 +163,10 @@ func (this *Process) Start(out chan<- *Event) error {
 func (this *Process) Stop() error {
 	this.Lock()
 	defer this.Unlock()
+
+	// Set state to stopping
+	this.stopping = true
+	this.ts = time.Now()
 
 	if this.cmd.Process != nil {
 		this.cancel()
@@ -178,6 +192,10 @@ func (this *Process) Pid() uint32 {
 
 func (this *Process) Id() uint32 {
 	return this.id
+}
+
+func (this *Process) Timestamp() time.Time {
+	return this.ts
 }
 
 func (this *Process) ExitCode() int64 {
@@ -215,7 +233,9 @@ func (this *Process) Status() rpc.GafferStatus {
 	defer this.Unlock()
 
 	if this.cmd.Process == nil && this.cmd.ProcessState == nil {
-		return rpc.GAFFER_STATUS_STARTING
+		return rpc.GAFFER_STATUS_NEW
+	} else if this.stopping {
+		return rpc.GAFFER_STATUS_STOPPING
 	} else if this.cmd.ProcessState != nil {
 		return rpc.GAFFER_STATUS_STOPPED
 	} else if this.cmd.Process != nil {
@@ -246,10 +266,11 @@ func (this *Process) processLogger(fh io.Reader, out chan<- *Event, t EventType)
 
 	buf := bufio.NewReader(fh)
 	bytes := make([]byte, BUF_MAX_SIZE)
+FOR_LOOP:
 	for {
 		if n, err := buf.Read(bytes); err == io.EOF {
-			break
-		} else if n > 0 {
+			break FOR_LOOP
+		} else {
 			out <- NewBufferEvent(bytes[:n], t)
 		}
 	}
@@ -260,6 +281,12 @@ func (this *Process) processWait(out chan<- *Event) {
 	defer this.WaitGroup.Done()
 
 	err := this.cmd.Wait()
+
+	// Flag state change
+	this.stopping = false
+	this.ts = time.Now()
+
+	// Output stop event
 	out <- NewStoppedEvent(err)
 }
 

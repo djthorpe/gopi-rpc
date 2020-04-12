@@ -11,6 +11,7 @@ import (
 	// Frameworks
 	"context"
 	"fmt"
+	"io"
 
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
@@ -118,5 +119,69 @@ func (this *kernelclient) Processes(ctx context.Context, id, sid uint32) ([]rpc.
 			list[i] = ProtoToProcess(process)
 		}
 		return list, nil
+	}
+}
+
+func (this *kernelclient) RunProcess(ctx context.Context, id uint32) error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if _, err := this.client.RunProcess(ctx, ProtoFromProcessId(id, 0)); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (this *kernelclient) StopProcess(ctx context.Context, id uint32) error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if _, err := this.client.StopProcess(ctx, ProtoFromProcessId(id, 0)); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (this *kernelclient) StreamEvents(ctx context.Context, id, sid uint32) error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	stream, err := this.client.StreamEvents(ctx, ProtoFromProcessId(id, sid))
+	if err != nil {
+		return err
+	}
+
+	// Errors channel receives errors from recv
+	errors := make(chan error)
+
+	// Receive messages in the background
+	go func() {
+	FOR_LOOP:
+		for {
+			if evt_, err := stream.Recv(); err == io.EOF {
+				break FOR_LOOP
+			} else if err != nil {
+				errors <- err
+				break FOR_LOOP
+			} else {
+				// TODO
+				fmt.Println(evt_)
+			}
+		}
+		close(errors)
+	}()
+
+	// Continue until error or io.EOF is returned
+	for {
+		select {
+		case <-ctx.Done():
+			if err := <-errors; err == nil || grpc.IsErrCanceled(err) {
+				return nil
+			} else {
+				return err
+			}
+		}
 	}
 }

@@ -21,8 +21,17 @@ service Kernel {
   // Create a new process
   rpc CreateProcess (KernelService) returns (KernelProcessId);
 
+  // Run a process
+  rpc RunProcess (KernelProcessId) returns (google.protobuf.Empty);
+
+  // Stop a process
+  rpc StopProcess (KernelProcessId) returns (google.protobuf.Empty);
+
   // Return filtered list of processes
   rpc Processes (KernelProcessId) returns (KernelProcessList);
+
+  // Stream filtered list of events
+  rpc StreamEvents (KernelProcessId) returns (stream KernelProcessEvent); 
 }
 
 // A service defintion is used to start a process
@@ -55,10 +64,26 @@ message KernelProcess {
 
   enum Status {
     	NONE = 0;
-      STARTING = 1;
+      NEW = 1;
       RUNNING = 2;
       STOPPING = 3;
       STOPPED = 4;
-      ZOMBIE = 5;
   }
+}
+
+// Monitor discovery changes
+message KernelProcessEvent {
+  enum Type {
+    NONE = 0;
+    NEW = 1;
+    RUNNING = 2;
+    STOPPING = 3;
+    STOPPED = 4;
+    STDOUT = 5;
+    STDERR = 6;
+  }
+
+  Type type = 1;
+  KernelProcessId id = 2;
+  bytes buf = 3;
 }

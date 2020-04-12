@@ -13,17 +13,21 @@ all:
 	@echo "Synax: make protogen|install|test|clean"
 
 protogen:
-	$(GO) generate -x ./protobuf/...
+	@$(GO) generate ./protobuf/...
 
 gaffer: protogen
+	@echo Installing gaffer to /opt/gaffer
 	@install -d /opt/gaffer/sbin
 	@install -d /opt/gaffer/bin
 	@install -d /opt/gaffer/etc
 	@install etc/gaffer.env /opt/gaffer/etc
 	@install etc/gaffer.service /opt/gaffer/etc
 	@$(GO) build -o /opt/gaffer/sbin/gaffer-kernel $(GOFLAGS) ./cmd/gaffer-kernel
-	@echo Run: sudo ln -s /opt/gaffer/etc/gaffer.service /etc/systemd/system/gaffer.service
-	@echo      sudo systemctl enable gaffer.service
+	@$(GO) build -o /opt/gaffer/sbin/gaffer-service $(GOFLAGS) ./cmd/gaffer-service
+	@echo "Run the following commands:"
+	@echo "  sudo ln -s /opt/gaffer/etc/gaffer.service /etc/systemd/system/gaffer.service"
+	@echo "  sudo groupadd --system --force gaffer"
+	@echo "  sudo systemctl enable gaffer.service && sudo systemctl daemon-reload && sudo systemctl restart gaffer"
 
 install: protogen
 	$(GO) install $(GOFLAGS) ./cmd/...

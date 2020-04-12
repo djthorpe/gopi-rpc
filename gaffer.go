@@ -31,6 +31,12 @@ type GafferKernel interface {
 	// a unique id for that process
 	CreateProcess(GafferService) (uint32, error)
 
+	// RunProcess starts a process in NEW state
+	RunProcess(uint32) error
+
+	// StopProcess kills a process in RUNNING state
+	StopProcess(uint32) error
+
 	// Processes returns a list of running processes, filtered optionally by
 	// process id and service id, both can be zero for 'any'
 	Processes(uint32, uint32) []GafferProcess
@@ -62,8 +68,17 @@ type GafferKernelStub interface {
 	// returns a unique process id
 	CreateProcess(context.Context, GafferService) (uint32, error)
 
+	// RunProcess runs a created process
+	RunProcess(context.Context, uint32) error
+
+	// StopProcess stops a running process
+	StopProcess(context.Context, uint32) error
+
 	// Processes returns a filtered set of processes
 	Processes(context.Context, uint32, uint32) ([]GafferProcess, error)
+
+	// Stream events until cancelled, using a filter
+	StreamEvents(context.Context, uint32, uint32) error
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -71,11 +86,10 @@ type GafferKernelStub interface {
 
 const (
 	GAFFER_STATUS_NONE GafferStatus = iota
-	GAFFER_STATUS_STARTING
+	GAFFER_STATUS_NEW
 	GAFFER_STATUS_RUNNING
 	GAFFER_STATUS_STOPPING
 	GAFFER_STATUS_STOPPED
-	GAFFER_STATUS_ZOMBIE
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -85,16 +99,14 @@ func (s GafferStatus) String() string {
 	switch s {
 	case GAFFER_STATUS_NONE:
 		return "GAFFER_STATUS_NONE"
-	case GAFFER_STATUS_STARTING:
-		return "GAFFER_STATUS_STARTING"
+	case GAFFER_STATUS_NEW:
+		return "GAFFER_STATUS_NEW"
 	case GAFFER_STATUS_RUNNING:
 		return "GAFFER_STATUS_RUNNING"
 	case GAFFER_STATUS_STOPPING:
 		return "GAFFER_STATUS_STOPPING"
 	case GAFFER_STATUS_STOPPED:
 		return "GAFFER_STATUS_STOPPED"
-	case GAFFER_STATUS_ZOMBIE:
-		return "GAFFER_STATUS_ZOMBIE"
 	default:
 		return "[?? Invalid GafferStatus value]"
 	}
