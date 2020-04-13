@@ -101,7 +101,7 @@ func (this *kernelclient) CreateProcess(ctx context.Context, service rpc.GafferS
 	if id, err := this.client.CreateProcess(ctx, ProtoFromService(service)); err != nil {
 		return 0, err
 	} else if id == nil {
-		return 0, gopi.ErrInternalAppError
+		return 0, gopi.ErrInternalAppError.WithPrefix("CreateProcess")
 	} else {
 		return id.GetId(), nil
 	}
@@ -117,6 +117,21 @@ func (this *kernelclient) Processes(ctx context.Context, id, sid uint32) ([]rpc.
 		list := make([]rpc.GafferProcess, len(processes.Process))
 		for i, process := range processes.Process {
 			list[i] = ProtoToProcess(process)
+		}
+		return list, nil
+	}
+}
+
+func (this *kernelclient) Executables(ctx context.Context) ([]string, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if executables, err := this.client.Executables(ctx, &empty.Empty{}); err != nil {
+		return nil, err
+	} else {
+		list := make([]string, len(executables.Executable))
+		for i, exec := range executables.Executable {
+			list[i] = exec
 		}
 		return list, nil
 	}

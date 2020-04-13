@@ -8,9 +8,9 @@
 package gaffer
 
 import (
-	// Frameworks
 	"fmt"
 
+	// Frameworks
 	rpc "github.com/djthorpe/gopi-rpc/v2"
 	ptypes "github.com/golang/protobuf/ptypes"
 
@@ -58,7 +58,7 @@ func ProtoFromProcess(process rpc.GafferProcess) *pb.KernelProcess {
 	service := process.Service()
 	return &pb.KernelProcess{
 		Id:      ProtoFromProcessId(process.Id(), service.Sid),
-		Status:  pb.KernelProcess_Status(process.Status()),
+		State:   pb.KernelProcess_State(process.State()),
 		Service: ProtoFromService(service),
 	}
 }
@@ -76,6 +76,16 @@ func ProtoFromProcessList(process []rpc.GafferProcess) *pb.KernelProcessList {
 	}
 	for i, p := range process {
 		list.Process[i] = ProtoFromProcess(p)
+	}
+	return list
+}
+
+func ProtoFromExecutablesList(executables []string) *pb.KernelExecutableList {
+	list := &pb.KernelExecutableList{
+		Executable: make([]string, len(executables)),
+	}
+	for i, exec := range executables {
+		list.Executable[i] = exec
 	}
 	return list
 }
@@ -103,11 +113,11 @@ func (this *protoProcess) Service() rpc.GafferService {
 	}
 }
 
-func (this *protoProcess) Status() rpc.GafferStatus {
+func (this *protoProcess) State() rpc.GafferState {
 	if this.pb == nil {
-		return rpc.GAFFER_STATUS_NONE
+		return rpc.GAFFER_STATE_NONE
 	} else {
-		return rpc.GafferStatus(this.pb.GetStatus())
+		return rpc.GafferState(this.pb.GetState())
 	}
 }
 

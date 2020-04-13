@@ -18,7 +18,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-type GafferStatus uint
+type GafferState uint
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERFACES
@@ -45,11 +45,16 @@ type GafferKernel interface {
 	// Processes returns a list of running processes, filtered optionally by
 	// process id and service id, both can be zero for 'any'
 	Processes(uint32, uint32) []GafferProcess
+
+	// Return a list of executables under the gaffer root, or returns
+	// an empty list if the gaffer root is not defined. When argument
+	// is set to true, then recurse into subfolders
+	Executables(bool) []string
 }
 
 // GafferService represents a service to be run
 type GafferService struct {
-	Path        string        // Path represents the path to the process executable
+	Path        string        // Path represents the path to the service executable
 	Wd          string        // Working directory
 	User, Group string        // User and group for process
 	Timeout     time.Duration // Timeout for maximum run time for process or zero
@@ -61,12 +66,14 @@ type GafferService struct {
 type GafferProcess interface {
 	Id() uint32
 	Service() GafferService
-	Status() GafferStatus
+	State() GafferState
 }
 
 // GafferKernelClient represents a connection to a remote kernel service
 type GafferKernelStub interface {
-	// Ping returns nil if the remote service is running
+	gopi.RPCClientStub
+
+	// Ping returns without error if the remote service is running
 	Ping(context.Context) error
 
 	// CreateProcess creates a new process from a service and
@@ -82,6 +89,9 @@ type GafferKernelStub interface {
 	// Processes returns a filtered set of processes
 	Processes(context.Context, uint32, uint32) ([]GafferProcess, error)
 
+	// Executables returns the set of executable service names
+	Executables(context.Context) ([]string, error)
+
 	// Stream events until cancelled, using a filter
 	StreamEvents(context.Context, uint32, uint32) error
 }
@@ -90,28 +100,34 @@ type GafferKernelStub interface {
 // CONSTANTS
 
 const (
-	GAFFER_STATUS_NONE GafferStatus = iota
-	GAFFER_STATUS_NEW
-	GAFFER_STATUS_RUNNING
-	GAFFER_STATUS_STOPPING
-	GAFFER_STATUS_STOPPED
+	GAFFER_STATE_NONE GafferState = iota
+	GAFFER_STATE_NEW
+	GAFFER_STATE_RUNNING
+	GAFFER_STATE_STOPPING
+	GAFFER_STATE_STOPPED
+	GAFFER_STATE_STDOUT
+	GAFFER_STATE_STDERR
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
-func (s GafferStatus) String() string {
+func (s GafferState) String() string {
 	switch s {
-	case GAFFER_STATUS_NONE:
-		return "GAFFER_STATUS_NONE"
-	case GAFFER_STATUS_NEW:
-		return "GAFFER_STATUS_NEW"
-	case GAFFER_STATUS_RUNNING:
-		return "GAFFER_STATUS_RUNNING"
-	case GAFFER_STATUS_STOPPING:
-		return "GAFFER_STATUS_STOPPING"
-	case GAFFER_STATUS_STOPPED:
-		return "GAFFER_STATUS_STOPPED"
+	case GAFFER_STATE_NONE:
+		return "GAFFER_STATE_NONE"
+	case GAFFER_STATE_NEW:
+		return "GAFFER_STATE_NEW"
+	case GAFFER_STATE_RUNNING:
+		return "GAFFER_STATE_RUNNING"
+	case GAFFER_STATE_STOPPING:
+		return "GAFFER_STATE_STOPPING"
+	case GAFFER_STATE_STOPPED:
+		return "GAFFER_STATE_STOPPED"
+	case GAFFER_STATE_STDOUT:
+		return "GAFFER_STATE_STDOUT"
+	case GAFFER_STATE_STDERR:
+		return "GAFFER_STATE_STDERR"
 	default:
 		return "[?? Invalid GafferStatus value]"
 	}

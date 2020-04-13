@@ -95,7 +95,7 @@ func (this *clientconn) Init(config ClientConn) error {
 		this.addr = fmt.Sprintf("[%v]:%v", v6.String(), config.Port)
 		this.port = config.Port
 	} else {
-		return gopi.ErrInternalAppError
+		return gopi.ErrInternalAppError.WithPrefix("ClientConn")
 	}
 
 	// Success

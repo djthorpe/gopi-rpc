@@ -30,6 +30,9 @@ service Kernel {
   // Return filtered list of processes
   rpc Processes (KernelProcessId) returns (KernelProcessList);
 
+  // Return list of service executables
+  rpc Executables (google.protobuf.Empty) returns (KernelExecutableList);
+
   // Stream filtered list of events
   rpc StreamEvents (KernelProcessId) returns (stream KernelProcessEvent); 
 }
@@ -56,13 +59,18 @@ message KernelProcessList {
   repeated KernelProcess process = 1;
 }
 
+// Return a list of executables
+message KernelExecutableList {
+  repeated string executable = 1;
+}
+
 // Return information about a process
 message KernelProcess { 
   KernelProcessId id = 1;
-  Status status = 2;
+  State state = 2;
   KernelService service = 3;
 
-  enum Status {
+  enum State {
     	NONE = 0;
       NEW = 1;
       RUNNING = 2;

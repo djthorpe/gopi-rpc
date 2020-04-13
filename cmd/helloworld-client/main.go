@@ -55,7 +55,7 @@ func ConnectStub(app gopi.App, host string) (rpc.HelloworldStub, error) {
 	} else if conn, err := clientpool.ConnectAddr(addr, port); err != nil {
 		return nil, err
 	} else if stub, ok := clientpool.CreateStub("gopi.Helloworld", conn).(rpc.HelloworldStub); ok == false {
-		return nil, gopi.ErrInternalAppError
+		return nil, gopi.ErrInternalAppError.WithPrefix("ConnectStub")
 	} else {
 		return stub, nil
 	}

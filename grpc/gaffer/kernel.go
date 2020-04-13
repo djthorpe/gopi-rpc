@@ -127,6 +127,12 @@ func (this *kernelservice) Processes(_ context.Context, pb *pb.KernelProcessId) 
 	return ProtoFromProcessList(processes), nil
 }
 
+func (this *kernelservice) Executables(context.Context, *empty.Empty) (*pb.KernelExecutableList, error) {
+	this.Log.Debug("<Executables>")
+	executables := this.kernel.Executables(true)
+	return ProtoFromExecutablesList(executables), nil
+}
+
 func (this *kernelservice) RunProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
 	this.Log.Debug("<RunProcess id=", pb.GetId(), ">")
 	return &empty.Empty{}, this.kernel.RunProcess(pb.GetId())

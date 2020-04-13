@@ -104,6 +104,10 @@ func (this *kernel) Close() error {
 	close(this.stop)
 	this.WaitGroup.Wait()
 
+	// Lock to release resources
+	this.Lock()
+	defer this.Unlock()
+
 	// Close channels
 	close(this.runproc)
 	close(this.endproc)
@@ -122,7 +126,7 @@ func (this *kernel) CreateProcess(service rpc.GafferService) (uint32, error) {
 	this.Lock()
 	defer this.Unlock()
 	if id := this.newId(); id == 0 {
-		return 0, gopi.ErrInternalAppError
+		return 0, gopi.ErrInternalAppError.WithPrefix("NewId")
 	} else {
 		return this.CreateProcessEx(id, service)
 	}
@@ -141,7 +145,7 @@ func (this *kernel) CreateProcessEx(id uint32, service rpc.GafferService) (uint3
 	} else if process, err := NewProcess(id, service.Sid, path, service.Wd, service.Args, uid, gid, service.Timeout); err != nil {
 		return 0, err
 	} else if _, exists := this.process[id]; exists {
-		return 0, gopi.ErrInternalAppError
+		return 0, gopi.ErrInternalAppError.WithPrefix("CreateProcessEx")
 	} else {
 		// Success
 		this.process[id] = process
@@ -156,7 +160,7 @@ func (this *kernel) RunProcess(id uint32) error {
 
 	if process, exists := this.process[id]; exists == false {
 		return gopi.ErrBadParameter.WithPrefix("id")
-	} else if process.Status() != rpc.GAFFER_STATUS_NEW {
+	} else if process.State() != rpc.GAFFER_STATE_NEW {
 		return gopi.ErrOutOfOrder
 	} else {
 		// signal the process needs to be run
@@ -176,7 +180,7 @@ func (this *kernel) StopProcess(id uint32) error {
 		return gopi.ErrBadParameter.WithPrefix("id")
 	} else if process, exists := this.process[id]; exists == false {
 		return gopi.ErrBadParameter.WithPrefix("id")
-	} else if process.Status() != rpc.GAFFER_STATUS_RUNNING {
+	} else if process.State() != rpc.GAFFER_STATE_RUNNING {
 		return gopi.ErrOutOfOrder
 	} else if err := process.Stop(); err != nil {
 		return err
@@ -202,6 +206,34 @@ func (this *kernel) Processes(id, sid uint32) []rpc.GafferProcess {
 		processes = append(processes, process)
 	}
 	return processes
+}
+
+func (this *kernel) Executables(recursive bool) []string {
+	// Do not list executables if the root is not set
+	if this.root == "/" || this.root == "" {
+		return nil
+	}
+
+	// Walk the root path to find executables
+	executables := make([]string, 0)
+	if err := filepath.Walk(this.root, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() && recursive == false {
+			return filepath.SkipDir
+		}
+		if info.Mode().IsRegular() && isExecutableFileAtPath(path) == nil {
+			// Trim prefix
+			sep := string(filepath.Separator)
+			path := strings.TrimPrefix(strings.TrimPrefix(path, this.root), sep)
+			// Append
+			executables = append(executables, path)
+		}
+		return nil
+	}); err != nil {
+		this.Log.Error(err)
+		return nil
+	}
+
+	return executables
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -254,7 +286,7 @@ FOR_LOOP:
 		select {
 		case evt := <-out:
 			fmt.Println("ID=", id, "EVT=", evt)
-			if evt.Type == EVENT_TYPE_STOPPED {
+			if evt.State == rpc.GAFFER_STATE_STOPPED {
 				break FOR_LOOP
 			}
 		}
@@ -268,8 +300,8 @@ func (this *kernel) ProcessPrune(delta time.Duration) bool {
 	defer this.Unlock()
 
 	for k, process := range this.process {
-		switch process.Status() {
-		case rpc.GAFFER_STATUS_NEW, rpc.GAFFER_STATUS_STOPPED:
+		switch process.State() {
+		case rpc.GAFFER_STATE_NEW, rpc.GAFFER_STATE_STOPPED:
 			if process.Timestamp().IsZero() == false && time.Now().Sub(process.Timestamp()) > delta {
 				// Prune processes which are stale
 				this.Log.Debug("Prune:", process)

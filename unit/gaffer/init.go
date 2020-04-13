@@ -16,7 +16,7 @@ import (
 // INIT
 
 func init() {
-	// Kernel
+	// Gaffer Kernel
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name: Kernel{}.Name(),
 		Config: func(app gopi.App) error {
@@ -30,19 +30,19 @@ func init() {
 		},
 	})
 
-	// Service
+	// Gaffer Service
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name:     Service{}.Name(),
+		Name:     Gaffer{}.Name(),
 		Requires: []string{"clientpool"},
 		Config: func(app gopi.App) error {
 			app.Flags().FlagString("gaffer.fifo", "", "Unix socket connection to kernel")
 			return nil
 		},
 		New: func(app gopi.App) (gopi.Unit, error) {
-			return gopi.New(Service{
+			return gopi.New(Gaffer{
 				Fifo:       app.Flags().GetString("gaffer.fifo", gopi.FLAG_NS_DEFAULT),
 				Clientpool: app.UnitInstance("clientpool").(gopi.RPCClientPool),
-			}, app.Log().Clone(Service{}.Name()))
+			}, app.Log().Clone(Gaffer{}.Name()))
 		},
 	})
 }

@@ -9,13 +9,18 @@ package rpc
 
 import (
 	"context"
+
+	// Frameworks
+	gopi "github.com/djthorpe/gopi/v2"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERFACES
 
-// GafferKernelClient represents a connection to a remote kernel service
+// HelloworldStub represents a connection to a remote helloworld service
 type HelloworldStub interface {
-	// Ping returns nil if the remote service is running
+	gopi.RPCClientStub
+
+	// Ping returns without error if the remote service is running
 	Ping(context.Context) error
 }

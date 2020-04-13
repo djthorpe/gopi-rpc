@@ -142,8 +142,8 @@ func (this *Process) Start(out chan<- *Event) error {
 	defer this.Unlock()
 
 	// Start logging to channels,
-	go this.processLogger(this.stdout, out, EVENT_TYPE_STDOUT)
-	go this.processLogger(this.stderr, out, EVENT_TYPE_STDERR)
+	go this.processLogger(this.stdout, out, rpc.GAFFER_STATE_STDOUT)
+	go this.processLogger(this.stderr, out, rpc.GAFFER_STATE_STDERR)
 
 	// Start but don't wait
 	if err := this.cmd.Start(); err != nil {
@@ -228,20 +228,20 @@ func (this *Process) Service() rpc.GafferService {
 	}
 }
 
-func (this *Process) Status() rpc.GafferStatus {
+func (this *Process) State() rpc.GafferState {
 	this.Lock()
 	defer this.Unlock()
 
 	if this.cmd.Process == nil && this.cmd.ProcessState == nil {
-		return rpc.GAFFER_STATUS_NEW
+		return rpc.GAFFER_STATE_NEW
 	} else if this.stopping {
-		return rpc.GAFFER_STATUS_STOPPING
+		return rpc.GAFFER_STATE_STOPPING
 	} else if this.cmd.ProcessState != nil {
-		return rpc.GAFFER_STATUS_STOPPED
+		return rpc.GAFFER_STATE_STOPPED
 	} else if this.cmd.Process != nil {
-		return rpc.GAFFER_STATUS_RUNNING
+		return rpc.GAFFER_STATE_RUNNING
 	} else {
-		return rpc.GAFFER_STATUS_NONE
+		return rpc.GAFFER_STATE_NONE
 	}
 }
 
@@ -252,7 +252,7 @@ func (this *Process) String() string {
 	str := "<gaffer.Process"
 	str += " id=" + fmt.Sprint(this.id)
 	str += " exec=" + strconv.Quote(this.cmd.Path)
-	str += " status=" + fmt.Sprint(this.Status())
+	str += " state=" + fmt.Sprint(this.State())
 
 	return str + ">"
 }
@@ -260,7 +260,7 @@ func (this *Process) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // BACKGROUND TASKS
 
-func (this *Process) processLogger(fh io.Reader, out chan<- *Event, t EventType) {
+func (this *Process) processLogger(fh io.Reader, out chan<- *Event, t rpc.GafferState) {
 	this.WaitGroup.Add(1)
 	defer this.WaitGroup.Done()
 
@@ -270,7 +270,7 @@ FOR_LOOP:
 	for {
 		if n, err := buf.Read(bytes); err == io.EOF {
 			break FOR_LOOP
-		} else {
+		} else if n > 0 {
 			out <- NewBufferEvent(bytes[:n], t)
 		}
 	}

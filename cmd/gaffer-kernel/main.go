@@ -43,7 +43,7 @@ func StartService(app gopi.App) error {
 	args := make([]string, 0)
 
 	if kernel := app.UnitInstance("gaffer/kernel").(GafferKernelEx); kernel == nil {
-		return gopi.ErrInternalAppError
+		return gopi.ErrInternalAppError.WithPrefix("StartService")
 	} else if service := app.Flags().GetString("gaffer.service", gopi.FLAG_NS_DEFAULT); service == "" {
 		// No service to start
 		return nil
