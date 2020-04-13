@@ -128,12 +128,36 @@ func (this *clientpool) Connect(service gopi.RPCServiceRecord, flags gopi.RPCFla
 
 // Connect to remote host by IP address and port
 func (this *clientpool) ConnectAddr(addr net.IP, port uint16) (gopi.RPCClientConn, error) {
-	this.Log.Debug("ConnectAddr", addr, ":", port)
-	return nil, gopi.ErrNotImplemented
+	this.Log.Debug("ConnectAddr", fmt.Sprintf("%v:%v", addr, port))
+
+	// Check incoming parameters
+	if addr == nil {
+		return nil, gopi.ErrBadParameter.WithPrefix("addr")
+	}
+	if port == 0 {
+		return nil, gopi.ErrBadParameter.WithPrefix("port")
+	}
+
+	// Create a connection
+	if conn, err := gopi.New(ClientConn{
+		Addr:       addr,
+		Port:       port,
+		Timeout:    this.timeout,
+		SSL:        this.ssl,
+		SkipVerify: this.skipverify,
+	}, this.Log.Clone(ClientConn{}.Name())); err != nil {
+		return nil, err
+	} else if err := conn.(*clientconn).Connect(); err != nil {
+		return nil, err
+	} else {
+		return conn.(gopi.RPCClientConn), nil
+	}
 }
 
 // Connect to remote host by Fifo
 func (this *clientpool) ConnectFifo(path string) (gopi.RPCClientConn, error) {
+	this.Log.Debug("ConnectFifo", strconv.Quote(path))
+
 	// Create a connection
 	if conn, err := gopi.New(ClientConn{
 		Fifo:    path,

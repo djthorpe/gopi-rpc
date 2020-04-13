@@ -9,6 +9,7 @@ package helloworld
 
 import (
 	"context"
+	"fmt"
 
 	// Frameworks
 	grpc "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
@@ -28,9 +29,9 @@ type Service struct {
 }
 
 type service struct {
-	server gopi.RPCServer
-
 	base.Unit
+
+	server gopi.RPCServer
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +68,13 @@ func (this *service) Init(config Service) error {
 
 func (this *service) Close() error {
 	return this.Unit.Close()
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (this *service) String() string {
+	return "<" + this.Log.Name() + " " + fmt.Sprint(this.server) + ">"
 }
 
 ////////////////////////////////////////////////////////////////////////////////

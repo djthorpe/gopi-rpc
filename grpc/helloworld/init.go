@@ -14,20 +14,24 @@ import (
 
 func init() {
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name:     "rpc/helloworld/service",
+		Name:     Service{}.Name(),
 		Type:     gopi.UNIT_RPC_SERVICE,
 		Requires: []string{"server"},
 		New: func(app gopi.App) (gopi.Unit, error) {
 			return gopi.New(Service{
 				Server: app.UnitInstance("server").(gopi.RPCServer),
-			}, app.Log().Clone("rpc/helloworld/service"))
+			}, app.Log().Clone(Service{}.Name()))
 		},
 	})
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name:     "gopi.Helloworld",
-		Type:     gopi.UNIT_RPC_CLIENT,
-		New: func(app gopi.App) (gopi.Unit, error) {
-			return gopi.New(Client{}, app.Log().Clone("rpc/helloworld/client"))
+		Name: Client{}.Name(),
+		Type: gopi.UNIT_RPC_CLIENT,
+		Stub: func(conn gopi.RPCClientConn) (gopi.RPCClientStub, error) {
+			if unit, err := gopi.New(Client{Conn: conn}, nil); err != nil {
+				return nil, err
+			} else {
+				return unit.(gopi.RPCClientStub), nil
+			}
 		},
 	})
 }

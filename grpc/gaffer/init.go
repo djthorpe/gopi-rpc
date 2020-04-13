@@ -14,6 +14,8 @@ import (
 )
 
 func init() {
+
+	// Kernel
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     KernelService{}.Name(),
 		Type:     gopi.UNIT_RPC_SERVICE,
@@ -25,10 +27,24 @@ func init() {
 			}, app.Log().Clone(KernelService{}.Name()))
 		},
 	})
+
+	// Service
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name:     KernelClient{}.Name(),
-		Type:     gopi.UNIT_RPC_CLIENT,
-		Requires: []string{"clientpool"},
+		Name:     GafferService{}.Name(),
+		Type:     gopi.UNIT_RPC_SERVICE,
+		Requires: []string{"server", "gaffer/service"},
+		New: func(app gopi.App) (gopi.Unit, error) {
+			return gopi.New(GafferService{
+				Server: app.UnitInstance("server").(gopi.RPCServer),
+				Gaffer: app.UnitInstance("gaffer/service").(rpc.Gaffer),
+			}, app.Log().Clone(GafferService{}.Name()))
+		},
+	})
+
+	// Client
+	gopi.UnitRegister(gopi.UnitConfig{
+		Name: KernelClient{}.Name(),
+		Type: gopi.UNIT_RPC_CLIENT,
 		Stub: func(conn gopi.RPCClientConn) (gopi.RPCClientStub, error) {
 			if unit, err := gopi.New(KernelClient{Conn: conn}, nil); err != nil {
 				return nil, err

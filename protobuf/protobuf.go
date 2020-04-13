@@ -9,6 +9,7 @@ package protobuf
 
 //go:generate protoc helloworld/helloworld.proto --go_out=plugins=grpc:.
 //go:generate protoc gaffer/kernel.proto --go_out=plugins=grpc:.
+//go:generate protoc gaffer/service.proto --go_out=plugins=grpc:.
 
 /*
 	This folder contains all the protocol buffer definitions including

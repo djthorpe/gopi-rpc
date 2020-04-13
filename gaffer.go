@@ -23,6 +23,11 @@ type GafferStatus uint
 ////////////////////////////////////////////////////////////////////////////////
 // INTERFACES
 
+// Gaffer operations
+type Gaffer interface {
+	gopi.Unit
+}
+
 // GafferKernel operations
 type GafferKernel interface {
 	gopi.Unit

@@ -88,11 +88,11 @@ func (this *clientconn) Init(config ClientConn) error {
 		}
 	} else if config.Addr == nil || config.Port == 0 {
 		return fmt.Errorf("%w: Missing address or port", gopi.ErrBadParameter)
-	} else if v6 := config.Addr.To16(); v6 != nil {
-		this.addr = fmt.Sprintf("ipv6:[%v]:%v", v6.String(), config.Port)
-		this.port = config.Port
 	} else if v4 := config.Addr.To4(); v4 != nil {
-		this.addr = fmt.Sprintf("ipv4:%v:%v", v4.String(), config.Port)
+		this.addr = fmt.Sprintf("%v:%v", v4.String(), config.Port)
+		this.port = config.Port
+	} else if v6 := config.Addr.To16(); v6 != nil {
+		this.addr = fmt.Sprintf("[%v]:%v", v6.String(), config.Port)
 		this.port = config.Port
 	} else {
 		return gopi.ErrInternalAppError
@@ -123,6 +123,7 @@ func (this *clientconn) Close() error {
 // CONNECT and DISCONNECT
 
 func (this *clientconn) Connect() error {
+	this.Log.Debug("Connect", this.addr)
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
@@ -142,6 +143,7 @@ func (this *clientconn) Connect() error {
 }
 
 func (this *clientconn) Disconnect() error {
+	this.Log.Debug("Disconnect", this.addr)
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
@@ -205,7 +207,7 @@ func (this *clientconn) listServices(c reflection_pb.ServerReflection_ServerRefl
 	if resp, err := c.Recv(); err != nil {
 		return nil, err
 	} else if modules := resp.GetListServicesResponse(); modules == nil {
-		return nil, fmt.Errorf("%s: GetListServicesResponse", gopi.ErrUnexpectedResponse)
+		return nil, fmt.Errorf("%w: GetListServicesResponse", gopi.ErrUnexpectedResponse)
 	} else {
 		module_services := modules.GetService()
 		module_names := make([]string, len(module_services))

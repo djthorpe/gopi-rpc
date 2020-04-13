@@ -1,14 +1,14 @@
 [Unit]
-Description=Gaffer Kernel service
+Description=Gaffer microservice manager
 
 [Service]
 EnvironmentFile=-/opt/gaffer/etc/gaffer.env
 RuntimeDirectory=gaffer
-ExecStart=/opt/gaffer/sbin/gaffer-kernel \
-  -rpc.fifo=${RUNTIME_DIRECTORY}/${GAFFER_FIFO} \
-  -rpc.fifogid ${GAFFER_GID} \
-  -gaffer.root ${GAFFER_ROOT}
+ExecStart=/opt/gaffer/libexec/gaffer-kernel \
+  -rpc.fifo=${RUNTIME_DIRECTORY}/${GAFFER_FIFO} -rpc.fifogid=${GAFFER_GID} \
+  -gaffer.root=${GAFFER_ROOT} \
+  -gaffer.service=${GAFFER_SERVICE} -gaffer.port=${GAFFER_PORT} \
+  -gaffer.user=${GAFFER_UID} -gaffer.group=${GAFFER_GID} 
 
 [Install]
 WantedBy=multi-user.target
-

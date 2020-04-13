@@ -11,20 +11,20 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	// Frameworks
-	rpc "github.com/djthorpe/gopi-rpc/v2"
+	app "github.com/djthorpe/gopi-rpc/v2/app"
 	gopi "github.com/djthorpe/gopi/v2"
-	app "github.com/djthorpe/gopi/v2/app"
-	tablewriter "github.com/olekukonko/tablewriter"
 
 	// Units
 	_ "github.com/djthorpe/gopi-rpc/v2/grpc/gaffer"
+	_ "github.com/djthorpe/gopi-rpc/v2/unit/gaffer"
 	_ "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
+	_ "github.com/djthorpe/gopi/v2/unit/bus"
 	_ "github.com/djthorpe/gopi/v2/unit/logger"
 )
 
+/*
 ////////////////////////////////////////////////////////////////////////////////
 // LIST PROCESSES
 
@@ -131,6 +131,31 @@ func main() {
 		app.Flags().FlagDuration("timeout", 0, "Process timeout")
 		app.Flags().FlagUint("sid", 0, "Service ID")
 
+		// Run and exit
+		os.Exit(app.Run())
+	}
+}
+*/
+
+////////////////////////////////////////////////////////////////////////////////
+// MAIN
+
+func Main(app gopi.App, args []string) error {
+	// Wait until CTRL+C pressed
+	fmt.Println("Press CTRL+C to exit")
+	app.WaitForSignal(context.Background(), os.Interrupt)
+
+	// Success
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// BOOTSTRAP
+
+func main() {
+	if app, err := app.NewServer(Main, "rpc/gaffer/service"); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	} else {
 		// Run and exit
 		os.Exit(app.Run())
 	}

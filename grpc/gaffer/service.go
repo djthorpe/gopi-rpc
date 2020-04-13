@@ -10,7 +10,6 @@ package gaffer
 import (
 	"context"
 	"fmt"
-	"time"
 
 	// Frameworks
 	rpc "github.com/djthorpe/gopi-rpc/v2"
@@ -26,25 +25,25 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-type KernelService struct {
+type GafferService struct {
 	Server gopi.RPCServer
-	Kernel rpc.GafferKernel
+	Gaffer rpc.Gaffer
 }
 
-type kernelservice struct {
+type gafferservice struct {
 	base.Unit
 
 	server gopi.RPCServer
-	kernel rpc.GafferKernel
+	gaffer rpc.Gaffer
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION gopi.Unit
 
-func (KernelService) Name() string { return "rpc/gaffer/kernel/service" }
+func (GafferService) Name() string { return "rpc/gaffer/service" }
 
-func (config KernelService) New(log gopi.Logger) (gopi.Unit, error) {
-	this := new(kernelservice)
+func (config GafferService) New(log gopi.Logger) (gopi.Unit, error) {
+	this := new(gafferservice)
 	if err := this.Unit.Init(log); err != nil {
 		return nil, err
 	} else if err := this.Init(config); err != nil {
@@ -55,7 +54,7 @@ func (config KernelService) New(log gopi.Logger) (gopi.Unit, error) {
 	return this, nil
 }
 
-func (this *kernelservice) Init(config KernelService) error {
+func (this *gafferservice) Init(config GafferService) error {
 	// Set server
 	if config.Server == nil {
 		return gopi.ErrBadParameter.WithPrefix("Server")
@@ -63,28 +62,33 @@ func (this *kernelservice) Init(config KernelService) error {
 		this.server = config.Server
 	}
 
-	// Set kernel
-	if config.Kernel == nil {
-		return gopi.ErrBadParameter.WithPrefix("Kernel")
+	// Set gaffer
+	if config.Gaffer == nil {
+		return gopi.ErrBadParameter.WithPrefix("Gaffer")
 	} else {
-		this.kernel = config.Kernel
+		this.gaffer = config.Gaffer
 	}
 
 	// Register with server
-	pb.RegisterKernelServer(this.server.(grpc.GRPCServer).GRPCServer(), this)
+	pb.RegisterGafferServer(this.server.(grpc.GRPCServer).GRPCServer(), this)
 
 	// Success
 	return nil
 }
 
-func (this *kernelservice) Close() error {
+func (this *gafferservice) Close() error {
+	// Release resources
+	this.server = nil
+	this.gaffer = nil
+
+	// Return success
 	return this.Unit.Close()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION gopi.RPCService
 
-func (this *kernelservice) CancelRequests() error {
+func (this *gafferservice) CancelRequests() error {
 	// Do not need to cancel
 	return nil
 }
@@ -92,70 +96,17 @@ func (this *kernelservice) CancelRequests() error {
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
-func (this *kernelservice) String() string {
+func (this *gafferservice) String() string {
 	str := "<" + this.Log.Name()
 	str += " server=" + fmt.Sprint(this.server)
-	str += " kernel=" + fmt.Sprint(this.kernel)
+	str += " gaffer=" + fmt.Sprint(this.gaffer)
 	return str + ">"
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// IMPLEMENTATION gopi.GafferKernel
+// IMPLEMENTATION gopi.GafferService
 
-func (this *kernelservice) Ping(context.Context, *empty.Empty) (*empty.Empty, error) {
+func (this *gafferservice) Ping(context.Context, *empty.Empty) (*empty.Empty, error) {
 	this.Log.Debug("<Ping>")
-
 	return &empty.Empty{}, nil
-}
-
-func (this *kernelservice) CreateProcess(_ context.Context, pb *pb.KernelService) (*pb.KernelProcessId, error) {
-	this.Log.Debug("<CreateProcess service=[", pb, "]>")
-
-	if service := ProtoToService(pb); service.Path == "" {
-		return nil, gopi.ErrBadParameter
-	} else if pid, err := this.kernel.CreateProcess(service); err != nil {
-		return nil, err
-	} else {
-		return ProtoFromProcessId(pid, service.Sid), nil
-	}
-}
-
-func (this *kernelservice) Processes(_ context.Context, pb *pb.KernelProcessId) (*pb.KernelProcessList, error) {
-	this.Log.Debug("<Processes filter=[", pb, "]>")
-
-	processes := this.kernel.Processes(pb.Id, pb.Sid)
-	return ProtoFromProcessList(processes), nil
-}
-
-func (this *kernelservice) RunProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
-	this.Log.Debug("<RunProcess id=", pb.GetId(), ">")
-	return &empty.Empty{}, this.kernel.RunProcess(pb.GetId())
-}
-
-func (this *kernelservice) StopProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
-	this.Log.Debug("<StopProcess id=", pb.GetId, ">")
-	return &empty.Empty{}, this.kernel.StopProcess(pb.GetId())
-}
-
-func (this *kernelservice) StreamEvents(filter *pb.KernelProcessId, stream pb.Kernel_StreamEventsServer) error {
-	this.Log.Debug("<StreamEvents filter=[", filter, "]>")
-
-	// Send an empty message once a second
-	ticker := time.NewTicker(time.Second)
-FOR_LOOP:
-	for {
-		select {
-		case <-ticker.C:
-			if err := stream.Send(&pb.KernelProcessEvent{}); err != nil {
-				this.Log.Error(fmt.Errorf("StreamEvents: %w", err))
-				break FOR_LOOP
-			}
-		}
-	}
-
-	// Stop ticker, unsubscribe from events
-	ticker.Stop()
-
-	// Return success
-	return nil
 }

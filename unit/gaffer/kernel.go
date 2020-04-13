@@ -121,13 +121,23 @@ func (this *kernel) Close() error {
 func (this *kernel) CreateProcess(service rpc.GafferService) (uint32, error) {
 	this.Lock()
 	defer this.Unlock()
+	if id := this.newId(); id == 0 {
+		return 0, gopi.ErrInternalAppError
+	} else {
+		return this.CreateProcessEx(id, service)
+	}
+}
 
-	if path, err := this.pathForExecutable(strings.TrimSpace(service.Path)); err != nil {
+func (this *kernel) CreateProcessEx(id uint32, service rpc.GafferService) (uint32, error) {
+	this.Lock()
+	defer this.Unlock()
+
+	if _, exists := this.process[id]; exists {
+		return 0, gopi.ErrDuplicateItem.WithPrefix("id")
+	} else if path, err := this.pathForExecutable(strings.TrimSpace(service.Path)); err != nil {
 		return 0, err
 	} else if uid, gid, err := getUserGroup(service.User, service.Group); err != nil {
 		return 0, err
-	} else if id := this.newId(); id == 0 {
-		return 0, gopi.ErrInternalAppError
 	} else if process, err := NewProcess(id, service.Sid, path, service.Wd, service.Args, uid, gid, service.Timeout); err != nil {
 		return 0, err
 	} else if _, exists := this.process[id]; exists {
@@ -162,7 +172,9 @@ func (this *kernel) StopProcess(id uint32) error {
 	this.Lock()
 	defer this.Unlock()
 
-	if process, exists := this.process[id]; exists == false {
+	if id == 0 {
+		return gopi.ErrBadParameter.WithPrefix("id")
+	} else if process, exists := this.process[id]; exists == false {
 		return gopi.ErrBadParameter.WithPrefix("id")
 	} else if process.Status() != rpc.GAFFER_STATUS_RUNNING {
 		return gopi.ErrOutOfOrder
@@ -181,6 +193,10 @@ func (this *kernel) Processes(id, sid uint32) []rpc.GafferProcess {
 			continue
 		}
 		if id != 0 && id != process.id {
+			continue
+		}
+		if process.id == 0 {
+			// Hide process zero
 			continue
 		}
 		processes = append(processes, process)

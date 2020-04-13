@@ -26,7 +26,8 @@ import (
 // INTERFACES
 
 type server struct {
-	main gopi.MainCommandFunc
+	main    gopi.MainCommandFunc
+	started sync.WaitGroup
 
 	sync.WaitGroup
 	base.App
@@ -89,21 +90,28 @@ func (this *server) Run() int {
 
 	// Gather services
 	for _, unit := range gopi.UnitsByType(gopi.UNIT_RPC_SERVICE) {
-		if instance, ok := this.UnitInstance(unit.Name).(gopi.RPCService); instance == nil || ok == false {
+		if instance, ok := this.UnitInstance(unit.Name).(gopi.RPCService); instance == nil {
+			// No instance created for service
+			continue
+		} else if ok == false {
+			// Cannot cast to gopi.RPCService
 			fmt.Fprintln(os.Stderr, this.App.Flags().Name()+":", fmt.Errorf("Invalid RPCService: %v", strconv.Quote(unit.Name)))
 			return -1
 		} else {
-			fmt.Println("Serving:", instance)
+			this.Log().Debug("Service", instance)
 		}
 	}
 
 	// Run main function in background
-	this.WaitGroup.Add(1)
 	go func() {
+		this.started.Add(1)
+		this.WaitGroup.Add(1)
 		defer this.WaitGroup.Done()
 		if err := this.main(this, this.Flags().Args()); err != nil {
 			fmt.Fprintln(os.Stderr, this.App.Flags().Name()+":", err)
 		}
+		// Here we wait until the start signal is received
+		this.started.Wait()
 		// Stop server gracefully
 		server.Stop(false)
 	}()
@@ -127,6 +135,7 @@ func (this *server) RPCEventHandler(_ context.Context, _ gopi.App, evt gopi.Even
 	case gopi.RPC_EVENT_SERVER_STARTED:
 		server := rpcEvent.Source().(gopi.RPCServer)
 		this.WaitGroup.Add(1)
+		this.started.Done()
 		this.Log().Debug("Server started", server.Addr())
 		// TODO: Register service
 	case gopi.RPC_EVENT_SERVER_STOPPED:
