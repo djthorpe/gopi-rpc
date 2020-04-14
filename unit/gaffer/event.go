@@ -19,24 +19,25 @@ import (
 // TYPES
 
 type Event struct {
-	State rpc.GafferState
-	Buf   []byte
-	Err   error
+	Process rpc.GafferProcess
+	State   rpc.GafferState
+	Buf     []byte
+	Err     error
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
-func NewRunningEvent() *Event {
-	return &Event{rpc.GAFFER_STATE_RUNNING, nil, nil}
+func NewRunningEvent(process rpc.GafferProcess) *Event {
+	return &Event{process, rpc.GAFFER_STATE_RUNNING, nil, nil}
 }
 
-func NewStoppedEvent(err error) *Event {
-	return &Event{rpc.GAFFER_STATE_STOPPED, nil, err}
+func NewStoppedEvent(process rpc.GafferProcess, err error) *Event {
+	return &Event{process, rpc.GAFFER_STATE_STOPPED, nil, err}
 }
 
-func NewBufferEvent(buf []byte, t rpc.GafferState) *Event {
-	return &Event{t, buf, nil}
+func NewBufferEvent(process rpc.GafferProcess, buf []byte, t rpc.GafferState) *Event {
+	return &Event{process, t, buf, nil}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +45,9 @@ func NewBufferEvent(buf []byte, t rpc.GafferState) *Event {
 
 func (this *Event) String() string {
 	str := "<Event " + fmt.Sprint(this.State)
+	if this.Process != nil {
+		str += " process_id=" + fmt.Sprint(this.Process.Id())
+	}
 	switch this.State {
 	case rpc.GAFFER_STATE_STDERR, rpc.GAFFER_STATE_STDOUT:
 		str += " buf=" + strconv.Quote(string(this.Buf))

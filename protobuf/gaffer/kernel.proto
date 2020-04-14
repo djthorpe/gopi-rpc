@@ -81,7 +81,12 @@ message KernelProcess {
 
 // Monitor discovery changes
 message KernelProcessEvent {
-  enum Type {
+  State state = 1;
+  KernelProcess process = 2;
+  bytes buf = 3;
+  string error = 4;
+
+  enum State {
     NONE = 0;
     NEW = 1;
     RUNNING = 2;
@@ -90,8 +95,4 @@ message KernelProcessEvent {
     STDOUT = 5;
     STDERR = 6;
   }
-
-  Type type = 1;
-  KernelProcessId id = 2;
-  bytes buf = 3;
 }

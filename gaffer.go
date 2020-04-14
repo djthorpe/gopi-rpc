@@ -30,7 +30,7 @@ type Gaffer interface {
 
 // GafferKernel operations
 type GafferKernel interface {
-	gopi.Unit
+	gopi.PubSub
 
 	// CreateProcess creates a new process, which is ready to run and returns
 	// a unique id for that process

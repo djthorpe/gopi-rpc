@@ -19,6 +19,20 @@ import (
 )
 
 ////////////////////////////////////////////////////////////////////////////////
+// EVENT
+
+type GafferKernelEvent interface {
+	State() rpc.GafferState
+	Process() rpc.GafferProcess
+	Buf() []byte
+	Error() error
+}
+
+func ProtoFromEvent(event GafferKernelEvent) *pb.KernelProcessEvent {
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // SERVICE
 
 func ProtoToService(proto *pb.KernelService) rpc.GafferService {

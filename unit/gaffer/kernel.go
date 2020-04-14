@@ -8,7 +8,6 @@
 package gaffer
 
 import (
-	// Frameworks
 	"fmt"
 	"math/rand"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	// Frameworks
 	rpc "github.com/djthorpe/gopi-rpc/v2"
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
@@ -34,6 +34,7 @@ type Kernel struct {
 
 type kernel struct {
 	base.Unit
+	base.PubSub
 	sync.Mutex
 	sync.WaitGroup
 
@@ -108,6 +109,9 @@ func (this *kernel) Close() error {
 	this.Lock()
 	defer this.Unlock()
 
+	// Unsubscribe channels
+	this.PubSub.Close()
+
 	// Close channels
 	close(this.runproc)
 	close(this.endproc)
@@ -121,6 +125,25 @@ func (this *kernel) Close() error {
 	// Return success
 	return nil
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (this *kernel) String() string {
+	str := "<" + this.Log.Name()
+	str += " root=" + strconv.Quote(this.root)
+	if len(this.process) > 0 {
+		str += " processes=["
+		for _, process := range this.process {
+			str += " " + process.String()
+		}
+		str += " ]"
+	}
+	return str + ">"
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION rpc.GafferKernel
 
 func (this *kernel) CreateProcess(service rpc.GafferService) (uint32, error) {
 	this.Lock()
@@ -285,7 +308,7 @@ FOR_LOOP:
 	for {
 		select {
 		case evt := <-out:
-			fmt.Println("ID=", id, "EVT=", evt)
+			this.Emit(evt)
 			if evt.State == rpc.GAFFER_STATE_STOPPED {
 				break FOR_LOOP
 			}

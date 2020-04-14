@@ -217,7 +217,7 @@ func (this *Process) Service() rpc.GafferService {
 		return rpc.GafferService{}
 	} else {
 		return rpc.GafferService{
-			Path:    this.cmd.Path,
+			Path:    this.cmd.Path, // TODO: relative to root
 			Wd:      this.cmd.Dir,
 			Args:    this.cmd.Args,
 			Timeout: this.timeout,
@@ -271,7 +271,7 @@ FOR_LOOP:
 		if n, err := buf.Read(bytes); err == io.EOF {
 			break FOR_LOOP
 		} else if n > 0 {
-			out <- NewBufferEvent(bytes[:n], t)
+			out <- NewBufferEvent(this, bytes[:n], t)
 		}
 	}
 }
@@ -287,7 +287,7 @@ func (this *Process) processWait(out chan<- *Event) {
 	this.ts = time.Now()
 
 	// Output stop event
-	out <- NewStoppedEvent(err)
+	out <- NewStoppedEvent(this, err)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

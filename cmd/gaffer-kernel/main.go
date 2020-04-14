@@ -111,6 +111,7 @@ func Main(app gopi.App, args []string) error {
 	// Wait until CTRL+C pressed
 	fmt.Println("Press CTRL+C to exit")
 	app.WaitForSignal(context.Background(), os.Interrupt)
+	fmt.Println("Received interrupt signal, exiting")
 
 	// Success
 	return nil

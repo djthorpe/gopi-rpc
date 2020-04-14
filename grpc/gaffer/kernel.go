@@ -33,6 +33,7 @@ type KernelService struct {
 
 type kernelservice struct {
 	base.Unit
+	base.PubSub
 
 	server gopi.RPCServer
 	kernel rpc.GafferKernel
@@ -78,6 +79,15 @@ func (this *kernelservice) Init(config KernelService) error {
 }
 
 func (this *kernelservice) Close() error {
+	if err := this.PubSub.Close(); err != nil {
+		return err
+	}
+
+	// Release resources
+	this.kernel = nil
+	this.server = nil
+
+	// Return success
 	return this.Unit.Close()
 }
 
@@ -85,7 +95,10 @@ func (this *kernelservice) Close() error {
 // IMPLEMENTATION gopi.RPCService
 
 func (this *kernelservice) CancelRequests() error {
-	// Do not need to cancel
+	// Send a NullEvent on the PubSub channel to indicate end
+	this.PubSub.Emit(gopi.NullEvent)
+
+	// Return success
 	return nil
 }
 
@@ -146,21 +159,33 @@ func (this *kernelservice) StopProcess(_ context.Context, pb *pb.KernelProcessId
 func (this *kernelservice) StreamEvents(filter *pb.KernelProcessId, stream pb.Kernel_StreamEventsServer) error {
 	this.Log.Debug("<StreamEvents filter=[", filter, "]>")
 
-	// Send an empty message once a second
+	// Subscribe to cancels and send an empty message once a second
+	cancel := this.PubSub.Subscribe()
 	ticker := time.NewTicker(time.Second)
+	// Subscribe to messages from kernel
+	msgs := this.kernel.Subscribe()
 FOR_LOOP:
 	for {
 		select {
+		case msg := <-msgs:
+			fmt.Println(msg)
 		case <-ticker.C:
 			if err := stream.Send(&pb.KernelProcessEvent{}); err != nil {
-				this.Log.Error(fmt.Errorf("StreamEvents: %w", err))
+				if grpc.IsErrUnavailable(err) == false {
+					this.Log.Error(fmt.Errorf("StreamEvents: %w", err))
+				}
 				break FOR_LOOP
 			}
+		case <-cancel:
+			this.Log.Debug("StreamEvents: Cancel called")
+			break FOR_LOOP
 		}
 	}
 
 	// Stop ticker, unsubscribe from events
 	ticker.Stop()
+	this.kernel.Unsubscribe(msgs)
+	this.Log.Debug("StreamEvents: Ended")
 
 	// Return success
 	return nil
