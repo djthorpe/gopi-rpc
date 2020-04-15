@@ -164,11 +164,20 @@ func (this *kernelservice) StreamEvents(filter *pb.KernelProcessId, stream pb.Ke
 	ticker := time.NewTicker(time.Second)
 	// Subscribe to messages from kernel
 	msgs := this.kernel.Subscribe()
+
+	// Repeat until stream is canceled by server or client
 FOR_LOOP:
 	for {
 		select {
 		case msg := <-msgs:
-			fmt.Println(msg)
+			if event, ok := msg.(GafferKernelEvent); ok {
+				if err := stream.Send(ProtoFromEvent(event)); err != nil {
+					if grpc.IsErrUnavailable(err) == false {
+						this.Log.Error(fmt.Errorf("StreamEvents: %w", err))
+					}
+					break FOR_LOOP
+				}
+			}
 		case <-ticker.C:
 			if err := stream.Send(&pb.KernelProcessEvent{}); err != nil {
 				if grpc.IsErrUnavailable(err) == false {
@@ -185,6 +194,7 @@ FOR_LOOP:
 	// Stop ticker, unsubscribe from events
 	ticker.Stop()
 	this.kernel.Unsubscribe(msgs)
+	this.PubSub.Unsubscribe(cancel)
 	this.Log.Debug("StreamEvents: Ended")
 
 	// Return success

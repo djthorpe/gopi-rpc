@@ -19,14 +19,14 @@ import (
 // TYPES
 
 type Event struct {
-	Process rpc.GafferProcess
-	State   rpc.GafferState
-	Buf     []byte
-	Err     error
+	process rpc.GafferProcess
+	state   rpc.GafferState
+	buf     []byte
+	err     error
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// PUBLIC METHODS
+// NEW
 
 func NewRunningEvent(process rpc.GafferProcess) *Event {
 	return &Event{process, rpc.GAFFER_STATE_RUNNING, nil, nil}
@@ -41,19 +41,38 @@ func NewBufferEvent(process rpc.GafferProcess, buf []byte, t rpc.GafferState) *E
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// PUBLIC METHODS
+
+func (this *Event) Process() rpc.GafferProcess {
+	return this.process
+}
+
+func (this *Event) State() rpc.GafferState {
+	return this.state
+}
+
+func (this *Event) Buf() []byte {
+	return this.buf
+}
+
+func (this *Event) Error() error {
+	return this.err
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
 func (this *Event) String() string {
 	str := "<Event " + fmt.Sprint(this.State)
 	if this.Process != nil {
-		str += " process_id=" + fmt.Sprint(this.Process.Id())
+		str += " process_id=" + fmt.Sprint(this.process.Id())
 	}
-	switch this.State {
+	switch this.state {
 	case rpc.GAFFER_STATE_STDERR, rpc.GAFFER_STATE_STDOUT:
-		str += " buf=" + strconv.Quote(string(this.Buf))
+		str += " buf=" + strconv.Quote(string(this.buf))
 	case rpc.GAFFER_STATE_STOPPED:
-		if this.Err != nil {
-			str += " err=" + strconv.Quote(fmt.Sprint(this.Err))
+		if this.err != nil {
+			str += " err=" + strconv.Quote(fmt.Sprint(this.err))
 		}
 	}
 	return str + ">"

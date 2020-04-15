@@ -180,7 +180,7 @@ func (this *kernelclient) StreamEvents(ctx context.Context, id, sid uint32) erro
 			} else if err != nil {
 				errors <- err
 				break FOR_LOOP
-			} else if evt_.Type == pb.KernelProcessEvent_NONE {
+			} else if evt_.State == pb.KernelProcessEvent_NONE {
 				// Null event - mark timestamp
 				//ts = time.Now()
 			} else {

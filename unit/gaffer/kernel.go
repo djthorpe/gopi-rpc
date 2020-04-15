@@ -222,10 +222,6 @@ func (this *kernel) Processes(id, sid uint32) []rpc.GafferProcess {
 		if id != 0 && id != process.id {
 			continue
 		}
-		if process.id == 0 {
-			// Hide process zero
-			continue
-		}
 		processes = append(processes, process)
 	}
 	return processes
@@ -309,7 +305,7 @@ FOR_LOOP:
 		select {
 		case evt := <-out:
 			this.Emit(evt)
-			if evt.State == rpc.GAFFER_STATE_STOPPED {
+			if evt.state == rpc.GAFFER_STATE_STOPPED {
 				break FOR_LOOP
 			}
 		}

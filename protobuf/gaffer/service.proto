@@ -16,4 +16,20 @@ import "google/protobuf/empty.proto";
 service Gaffer {
   // Simple ping method to show server is "up"
   rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // Return services
+  rpc Services(google.protobuf.Empty) returns (ServiceList);
+}
+
+// A service defintion is used to start a process
+message Service {
+  string name = 1;                       // Name for the service
+  string path = 2;                       // Path to the executable
+  repeated string args = 3;              // Executable arguments
+  bool enabled = 4;
+}
+
+// Return a list of processes
+message ServiceList {
+  repeated Service service = 1;
 }

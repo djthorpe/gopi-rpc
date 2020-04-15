@@ -28,8 +28,21 @@ type GafferKernelEvent interface {
 	Error() error
 }
 
-func ProtoFromEvent(event GafferKernelEvent) *pb.KernelProcessEvent {
+func ErrorToString(err error) string {
+	if err == nil {
+		return ""
+	} else {
+		return err.Error()
+	}
+}
 
+func ProtoFromEvent(event GafferKernelEvent) *pb.KernelProcessEvent {
+	return &pb.KernelProcessEvent{
+		State:   pb.KernelProcessEvent_State(event.State()),
+		Process: ProtoFromProcess(event.Process()),
+		Buf:     event.Buf(),
+		Error:   ErrorToString(event.Error()),
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

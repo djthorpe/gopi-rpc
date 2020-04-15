@@ -45,6 +45,8 @@ type gaffer struct {
 const (
 	// Time to look for new services
 	DURATION_DISCOVER = 20 * time.Second
+	// Time to update process state
+	DURATION_PROCESS = 5 * time.Second
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -142,23 +144,35 @@ func (this *gaffer) BackgroundProcess() {
 	defer this.WaitGroup.Done()
 
 	// ticker to discover new services
-	ticker := time.NewTimer(100 * time.Millisecond)
+	ticker1 := time.NewTimer(100 * time.Millisecond)
+	ticker2 := time.NewTimer(time.Second)
 
 FOR_LOOP:
 	for {
 		select {
 		case <-this.stop:
-			ticker.Stop()
+			ticker1.Stop()
+			ticker2.Stop()
 			break FOR_LOOP
-		case <-ticker.C:
+		case <-ticker1.C:
 			// Discover new services every 30 seconds
 			if modified, err := this.discoverServices(); err != nil {
 				this.Unit.Log.Error(err)
-				ticker.Reset(DURATION_DISCOVER)
+				ticker1.Reset(DURATION_DISCOVER)
 			} else if modified {
-				ticker.Reset(DURATION_DISCOVER / 2)
+				ticker1.Reset(DURATION_DISCOVER / 2)
 			} else {
-				ticker.Reset(DURATION_DISCOVER)
+				ticker1.Reset(DURATION_DISCOVER)
+			}
+		case <-ticker2.C:
+			// Discover process state changes every 5 seconds
+			if modified, err := this.discoverProcesses(); err != nil {
+				this.Unit.Log.Error(err)
+				ticker2.Reset(DURATION_PROCESS)
+			} else if modified {
+				ticker2.Reset(DURATION_PROCESS / 2)
+			} else {
+				ticker2.Reset(DURATION_PROCESS)
 			}
 		}
 	}
@@ -176,6 +190,20 @@ func (this *gaffer) discoverServices() (bool, error) {
 		return this.Services.Modify(executables), nil
 	}
 }
+
+func (this *gaffer) discoverProcesses() (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if processes, err := this.kernel1.Processes(ctx, 0, 0); err != nil {
+		return false, err
+	} else {
+		fmt.Println("Processes=", processes)
+		return false, nil
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PRIVATE METHODS
 
 func NewKernelStub(config Gaffer) (rpc.GafferKernelStub, error) {
 	if conn, err := config.Clientpool.ConnectFifo(config.Fifo); err != nil {
