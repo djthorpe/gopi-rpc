@@ -51,8 +51,8 @@ func StartService(app gopi.App) error {
 		if port := app.Flags().GetUint("gaffer.port", gopi.FLAG_NS_DEFAULT); port != 0 {
 			args = append(args, "-rpc.port", fmt.Sprint(port))
 		}
-		if fifo := app.Flags().GetString("rpc.fifo", gopi.FLAG_NS_DEFAULT); fifo != "" {
-			args = append(args, "-gaffer.fifo", fifo)
+		if fifo := app.Flags().GetString("rpc.sock", gopi.FLAG_NS_DEFAULT); fifo != "" {
+			args = append(args, "-kernel.sock", fifo)
 		}
 		if app.Log().IsDebug() {
 			args = append(args, "-debug")
@@ -94,9 +94,9 @@ func RPCEventHandler(_ context.Context, app gopi.App, evt gopi.Event) {
 // MAIN
 
 func Main(app gopi.App, args []string) error {
-	// We require an rpc.fifo argument
-	if fifo := app.Flags().GetString("rpc.fifo", gopi.FLAG_NS_DEFAULT); fifo == "" {
-		return fmt.Errorf("Missing required flag -rpc.fifo")
+	// We require an rpc.sock argument. Remove any old socket which exists
+	if fifo := app.Flags().GetString("rpc.sock", gopi.FLAG_NS_DEFAULT); fifo == "" {
+		return fmt.Errorf("Missing required flag -rpc.sock")
 	}
 
 	// Add handler for server start and stop

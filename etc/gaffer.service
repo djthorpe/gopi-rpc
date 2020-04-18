@@ -5,10 +5,14 @@ Description=Gaffer microservice manager
 EnvironmentFile=-/opt/gaffer/etc/gaffer.env
 RuntimeDirectory=gaffer
 ExecStart=/opt/gaffer/libexec/gaffer-kernel \
-  -rpc.fifo=${RUNTIME_DIRECTORY}/${GAFFER_FIFO} -rpc.fifogid=${GAFFER_GID} \
+  -rpc.sock=${RUNTIME_DIRECTORY}/${GAFFER_SOCK} \
+  -rpc.sockgid=${GAFFER_GID} \
   -gaffer.root=${GAFFER_ROOT} \
-  -gaffer.service=${GAFFER_SERVICE} -gaffer.port=${GAFFER_PORT} \
-  -gaffer.user=${GAFFER_UID} -gaffer.group=${GAFFER_GID} 
+  -gaffer.service=${GAFFER_SERVICE} \
+  -gaffer.port=${GAFFER_PORT} \
+  -gaffer.user=${GAFFER_UID} \
+  -gaffer.group=${GAFFER_GID} 
 
 [Install]
 WantedBy=multi-user.target
+

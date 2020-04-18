@@ -142,17 +142,20 @@ func (this *kernelservice) Processes(_ context.Context, pb *pb.KernelProcessId) 
 
 func (this *kernelservice) Executables(context.Context, *empty.Empty) (*pb.KernelExecutableList, error) {
 	this.Log.Debug("<Executables>")
+
 	executables := this.kernel.Executables(true)
 	return ProtoFromExecutablesList(executables), nil
 }
 
 func (this *kernelservice) RunProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
 	this.Log.Debug("<RunProcess id=", pb.GetId(), ">")
+
 	return &empty.Empty{}, this.kernel.RunProcess(pb.GetId())
 }
 
 func (this *kernelservice) StopProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
 	this.Log.Debug("<StopProcess id=", pb.GetId, ">")
+
 	return &empty.Empty{}, this.kernel.StopProcess(pb.GetId())
 }
 
@@ -162,6 +165,7 @@ func (this *kernelservice) StreamEvents(filter *pb.KernelProcessId, stream pb.Ke
 	// Subscribe to cancels and send an empty message once a second
 	cancel := this.PubSub.Subscribe()
 	ticker := time.NewTicker(time.Second)
+
 	// Subscribe to messages from kernel
 	msgs := this.kernel.Subscribe()
 
@@ -171,11 +175,14 @@ FOR_LOOP:
 		select {
 		case msg := <-msgs:
 			if event, ok := msg.(GafferKernelEvent); ok {
-				if err := stream.Send(ProtoFromEvent(event)); err != nil {
-					if grpc.IsErrUnavailable(err) == false {
-						this.Log.Error(fmt.Errorf("StreamEvents: %w", err))
+				if this.applyFilter(filter, event) {
+					proto := ProtoFromEvent(event)
+					if err := stream.Send(proto); err != nil {
+						if grpc.IsErrUnavailable(err) == false {
+							this.Log.Error(fmt.Errorf("StreamEvents: %w", err))
+						}
+						break FOR_LOOP
 					}
-					break FOR_LOOP
 				}
 			}
 		case <-ticker.C:
@@ -187,16 +194,38 @@ FOR_LOOP:
 			}
 		case <-cancel:
 			this.Log.Debug("StreamEvents: Cancel called")
+			// Stop ticker, unsubscribe from events
+			this.Log.Debug("StreamEvents: Stop ticker")
+			ticker.Stop()
+			this.Log.Debug("StreamEvents: K unsub")
+			this.kernel.Unsubscribe(msgs)
+			this.Log.Debug("StreamEvents: C unsub")
+			this.PubSub.Unsubscribe(cancel)
+			this.Log.Debug("StreamEvents: break")
+			// Break loop
 			break FOR_LOOP
 		}
 	}
 
-	// Stop ticker, unsubscribe from events
-	ticker.Stop()
-	this.kernel.Unsubscribe(msgs)
-	this.PubSub.Unsubscribe(cancel)
 	this.Log.Debug("StreamEvents: Ended")
 
 	// Return success
 	return nil
+}
+
+func (this *kernelservice) applyFilter(filter *pb.KernelProcessId, event GafferKernelEvent) bool {
+	// Never allow filters on process 0
+	if event.Process().Id() == 0 {
+		this.Log.Debug(event)
+		return false
+	}
+	// Doesn't match unless the Id is zero or equal to the process id
+	if filter.Id != 0 && filter.Id != event.Process().Id() {
+		return false
+	}
+	if filter.Sid != 0 && filter.Sid != event.Process().Service().Sid {
+		return false
+	}
+	// Matches
+	return true
 }

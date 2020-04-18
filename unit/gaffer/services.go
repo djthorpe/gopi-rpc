@@ -12,6 +12,7 @@ import (
 
 	"math/rand"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -29,7 +30,7 @@ type Service struct {
 	flag    bool
 }
 
-type Services struct {
+type services struct {
 	sync.Mutex
 	Log      gopi.Logger
 	services map[uint32]*Service
@@ -39,7 +40,7 @@ type Services struct {
 ////////////////////////////////////////////////////////////////////////////////
 // INIT AND CLOSE
 
-func (this *Services) Init(config Gaffer, log gopi.Logger) error {
+func (this *services) Init(config Gaffer, log gopi.Logger) error {
 	// Seed random number
 	rand.Seed(time.Now().Unix())
 
@@ -58,7 +59,7 @@ func (this *Services) Init(config Gaffer, log gopi.Logger) error {
 	return nil
 }
 
-func (this *Services) Close() error {
+func (this *services) Close() error {
 	// Release resources
 	this.Log = nil
 
@@ -69,7 +70,15 @@ func (this *Services) Close() error {
 ////////////////////////////////////////////////////////////////////////////////
 // AND AND DISABLE SERVICES
 
-func (this *Services) Modify(executables []string) bool {
+func (this *services) List() []*Service {
+	services := make([]*Service, 0, len(this.services))
+	for _, service := range this.services {
+		services = append(services, service)
+	}
+	return services
+}
+
+func (this *services) Modify(executables []string) bool {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
@@ -110,7 +119,7 @@ func (this *Services) Modify(executables []string) bool {
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
-func (this *Services) servicesWithPath(path string) []*Service {
+func (this *services) servicesWithPath(path string) []*Service {
 	services := make([]*Service, 0)
 	for _, service := range this.services {
 		if service.Path == path {
@@ -120,7 +129,7 @@ func (this *Services) servicesWithPath(path string) []*Service {
 	return services
 }
 
-func (this *Services) add(executable string) *Service {
+func (this *services) add(executable string) *Service {
 	// Obtain a new Session ID
 	sid := this.newId()
 	if sid == 0 {
@@ -130,8 +139,9 @@ func (this *Services) add(executable string) *Service {
 	// Add a new service from an executable
 	service := &Service{
 		GafferService: rpc.GafferService{
+			Name:  filepath.Base(executable),
 			Path:  executable,
-			Wd:    this.user.HomeDir,
+			Cwd:   this.user.HomeDir,
 			User:  this.user.Uid,
 			Group: this.user.Gid,
 			Sid:   sid,
@@ -144,7 +154,7 @@ func (this *Services) add(executable string) *Service {
 	return service
 }
 
-func (this *Services) newId() uint32 {
+func (this *services) newId() uint32 {
 	// Try to get a unique id 25 times before failing
 	// the first id's would be between 1 and 63 and the second
 	// between 1 and 127 and so forth.

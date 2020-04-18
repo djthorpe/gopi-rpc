@@ -151,11 +151,11 @@ func (this *kernel) CreateProcess(service rpc.GafferService) (uint32, error) {
 	if id := this.newId(); id == 0 {
 		return 0, gopi.ErrInternalAppError.WithPrefix("NewId")
 	} else {
-		return this.CreateProcessEx(id, service)
+		return this.CreateProcessEx(id, service, 0)
 	}
 }
 
-func (this *kernel) CreateProcessEx(id uint32, service rpc.GafferService) (uint32, error) {
+func (this *kernel) CreateProcessEx(id uint32, service rpc.GafferService, timeout time.Duration) (uint32, error) {
 	this.Lock()
 	defer this.Unlock()
 
@@ -165,11 +165,12 @@ func (this *kernel) CreateProcessEx(id uint32, service rpc.GafferService) (uint3
 		return 0, err
 	} else if uid, gid, err := getUserGroup(service.User, service.Group); err != nil {
 		return 0, err
-	} else if process, err := NewProcess(id, service.Sid, path, service.Wd, service.Args, uid, gid, service.Timeout); err != nil {
+	} else if process, err := NewProcess(id, service.Sid, service.Name, path, service.Cwd, service.Args, uid, gid, timeout); err != nil {
 		return 0, err
 	} else if _, exists := this.process[id]; exists {
 		return 0, gopi.ErrInternalAppError.WithPrefix("CreateProcessEx")
 	} else {
+		this.Log.Debug("NewProcess<", process, ">")
 		// Success
 		this.process[id] = process
 		return id, nil
@@ -382,52 +383,75 @@ func getUserGroup(u, g string) (uint32, uint32, error) {
 
 	// Find user/group from u
 	if u != "" {
-		if user_, err := user.Lookup(u); err == nil {
-			if uid_, err := strconv.ParseUint(user_.Uid, 10, 32); err != nil {
-				return 0, 0, err
-			} else {
-				uid = uint32(uid_)
-			}
-			if gid_, err := strconv.ParseUint(user_.Gid, 10, 32); err != nil {
-				return 0, 0, err
-			} else {
-				gid = uint32(gid_)
-			}
-		} else if user_, err := user.LookupId(u); err == nil {
-			if uid_, err := strconv.ParseUint(user_.Uid, 10, 32); err != nil {
-				return 0, 0, err
-			} else {
-				uid = uint32(uid_)
-			}
-			if gid_, err := strconv.ParseUint(user_.Gid, 10, 32); err != nil {
-				return 0, 0, err
-			} else {
-				gid = uint32(gid_)
-			}
+		// Get user ID
+		user_, err := getUser(u)
+		if err != nil {
+			return 0, 0, err
+		} else if uid_, err := strconv.ParseUint(user_.Uid, 10, 32); err != nil {
+			return 0, 0, err
 		} else {
-			return 0, 0, fmt.Errorf("%w: Invalid user", gopi.ErrBadParameter)
+			uid = uint32(uid_)
+		}
+		// Get group ID
+		if gid_, err := strconv.ParseUint(user_.Gid, 10, 32); err != nil {
+			return 0, 0, err
+		} else {
+			gid = uint32(gid_)
 		}
 	}
 
 	// Find group from g
 	if g != "" {
-		if group_, err := user.LookupGroup(g); err == nil {
-			if gid_, err := strconv.ParseUint(group_.Gid, 10, 32); err != nil {
-				return 0, 0, err
-			} else {
-				gid = uint32(gid_)
-			}
-		} else if group_, err := user.LookupGroupId(g); err == nil {
-			if gid_, err := strconv.ParseUint(group_.Gid, 10, 32); err != nil {
-				return 0, 0, err
-			} else {
-				gid = uint32(gid_)
-			}
+		group_, err := getGroup(g)
+		if err != nil {
+			return 0, 0, err
+		} else if gid_, err := strconv.ParseUint(group_.Gid, 10, 32); err != nil {
+			return 0, 0, err
 		} else {
-			return 0, 0, fmt.Errorf("%w: Invalid group", gopi.ErrBadParameter)
+			gid = uint32(gid_)
 		}
+	}
+
+	// Ensure user and group match up
+	if user_, err := getUser(fmt.Sprint(uid)); err != nil {
+		return 0, 0, err
+	} else if gids_, err := user_.GroupIds(); err != nil {
+		return 0, 0, err
+	} else if containsString(gids_, fmt.Sprint(gid)) == false {
+		return 0, 0, fmt.Errorf("User %v is not a member of group with gid %v", user_.Username, gid)
 	}
 
 	// Return success
 	return uid, gid, nil
+}
+
+func getUser(u string) (*user.User, error) {
+	// Find user/group from u
+	if user_, err := user.Lookup(u); err == nil {
+		return user_, nil
+	} else if user_, err := user.LookupId(u); err == nil {
+		return user_, nil
+	} else {
+		return nil, gopi.ErrNotFound.WithPrefix("user")
+	}
+}
+
+func getGroup(g string) (*user.Group, error) {
+	// Find group from g
+	if group_, err := user.LookupGroup(g); err == nil {
+		return group_, nil
+	} else if group_, err := user.LookupGroupId(g); err == nil {
+		return group_, nil
+	} else {
+		return nil, gopi.ErrNotFound.WithPrefix("group")
+	}
+}
+
+func containsString(arr []string, value string) bool {
+	for _, member := range arr {
+		if member == value {
+			return true
+		}
+	}
+	return false
 }

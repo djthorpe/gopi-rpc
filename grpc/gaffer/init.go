@@ -8,6 +8,7 @@
 package gaffer
 
 import (
+
 	// Frameworks
 	rpc "github.com/djthorpe/gopi-rpc/v2"
 	gopi "github.com/djthorpe/gopi/v2"
@@ -15,7 +16,7 @@ import (
 
 func init() {
 
-	// Kernel
+	// Kernel Service
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     KernelService{}.Name(),
 		Type:     gopi.UNIT_RPC_SERVICE,
@@ -28,7 +29,7 @@ func init() {
 		},
 	})
 
-	// Service
+	// Gaffer Service
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     GafferService{}.Name(),
 		Type:     gopi.UNIT_RPC_SERVICE,
@@ -41,12 +42,25 @@ func init() {
 		},
 	})
 
-	// Client
+	// Kernel Client
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name: KernelClient{}.Name(),
 		Type: gopi.UNIT_RPC_CLIENT,
 		Stub: func(conn gopi.RPCClientConn) (gopi.RPCClientStub, error) {
 			if unit, err := gopi.New(KernelClient{Conn: conn}, nil); err != nil {
+				return nil, err
+			} else {
+				return unit.(gopi.RPCClientStub), nil
+			}
+		},
+	})
+
+	// Gaffer Client
+	gopi.UnitRegister(gopi.UnitConfig{
+		Name: GafferClient{}.Name(),
+		Type: gopi.UNIT_RPC_CLIENT,
+		Stub: func(conn gopi.RPCClientConn) (gopi.RPCClientStub, error) {
+			if unit, err := gopi.New(GafferClient{Conn: conn}, nil); err != nil {
 				return nil, err
 			} else {
 				return unit.(gopi.RPCClientStub), nil

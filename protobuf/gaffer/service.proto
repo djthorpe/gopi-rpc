@@ -21,12 +21,16 @@ service Gaffer {
   rpc Services(google.protobuf.Empty) returns (ServiceList);
 }
 
-// A service defintion is used to start a process
+// A service defintion is used to start one or more processes
 message Service {
-  string name = 1;                       // Name for the service
-  string path = 2;                       // Path to the executable
-  repeated string args = 3;              // Executable arguments
-  bool enabled = 4;
+  uint32 sid = 1;                        // Service ID
+  string name = 2;                       // Name for the service
+  string path = 3;                       // Path to the executable
+  string cwd = 4;                        // Working directory
+  repeated string args = 5;              // Executable arguments
+  string user = 6;                       // User identifier
+  string group = 7;                      // Group identifier
+  bool enabled = 8;                      // Service enablement
 }
 
 // Return a list of processes

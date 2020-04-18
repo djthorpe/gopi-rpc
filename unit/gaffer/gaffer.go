@@ -32,7 +32,7 @@ type gaffer struct {
 	base.Unit
 	sync.Mutex
 	sync.WaitGroup
-	Services
+	services
 
 	kernel1, kernel2 rpc.GafferKernelStub // Kernel clients
 	stop             chan struct{}        // stop service signal
@@ -62,14 +62,18 @@ func (config Gaffer) New(log gopi.Logger) (gopi.Unit, error) {
 	if err := this.Init(config); err != nil {
 		return nil, err
 	}
-	if err := this.Services.Init(config, log); err != nil {
+	if err := this.services.Init(config, log); err != nil {
 		return nil, err
 	}
 
 	// Stream all events from the kernel on the second channel
 	ctx, cancel := context.WithCancel(context.Background())
-	go this.kernel2.StreamEvents(ctx, 0, 0)
 	this.cancel = cancel
+	go func() {
+		if err := this.kernel2.StreamEvents(ctx, 0, 0); err != nil {
+			this.Unit.Log.Error(fmt.Errorf("StreamEvents: %w", err))
+		}
+	}()
 
 	// Background orchestrator
 	go this.BackgroundProcess()
@@ -83,7 +87,7 @@ func (config Gaffer) New(log gopi.Logger) (gopi.Unit, error) {
 
 func (this *gaffer) Init(config Gaffer) error {
 	if config.Fifo == "" {
-		return gopi.ErrBadParameter.WithPrefix("gaffer.fifo")
+		return gopi.ErrBadParameter.WithPrefix("-kernel.sock")
 	} else if config.Clientpool == nil {
 		return gopi.ErrBadParameter.WithPrefix("clientpool")
 	}
@@ -121,7 +125,7 @@ func (this *gaffer) Close() error {
 	this.stop = nil
 
 	// Close Services
-	if err := this.Services.Close(); err != nil {
+	if err := this.services.Close(); err != nil {
 		return err
 	}
 
@@ -134,6 +138,13 @@ func (this *gaffer) Close() error {
 
 func (this *gaffer) String() string {
 	return "<" + this.Unit.Log.Name() + " kernel=" + fmt.Sprint(this.kernel1) + ">"
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION
+
+func (this *gaffer) Services() []rpc.GafferService {
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -187,7 +198,7 @@ func (this *gaffer) discoverServices() (bool, error) {
 	if executables, err := this.kernel1.Executables(ctx); err != nil {
 		return false, err
 	} else {
-		return this.Services.Modify(executables), nil
+		return this.services.Modify(executables), nil
 	}
 }
 

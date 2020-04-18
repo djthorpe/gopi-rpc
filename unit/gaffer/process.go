@@ -32,12 +32,13 @@ type Process struct {
 	sync.WaitGroup
 
 	id, sid        uint32             // Process ID and Service ID
-	timeout        time.Duration      // Timeout
+	name           string             // Service name
 	cmd            *exec.Cmd          // Command object
 	cancel         context.CancelFunc // Cancel function
 	stdout, stderr io.ReadCloser      // Stdout and Stderr
 	user, group    string             // User and group process run under
 	stopping       bool               // Stopping flag
+	timeout        time.Duration      // Timeout
 	ts             time.Time          // Last updated
 }
 
@@ -45,35 +46,34 @@ type Process struct {
 // CONSTANTS
 
 const (
-	BUF_MAX_SIZE = 1024 * 64
+	BUF_MAX_SIZE = 1024
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 // NEW
 
 // NewProcess returns a new process object which is used to control processes
-func NewProcess(id, sid uint32, path string, wd string, args []string, uid, gid uint32, timeout time.Duration) (*Process, error) {
+func NewProcess(id, sid uint32, name, path string, cwd string, args []string, uid, gid uint32, timeout time.Duration) (*Process, error) {
 	this := new(Process)
 	ctx, cancel := ctxForTimeout(timeout)
+	this.name = name
 	this.cmd = exec.CommandContext(ctx, path, args...)
 	this.cancel = cancel
 	this.id = id
 	this.sid = sid
 
 	// Set user and group
-	if uid != 0 || gid != 0 {
-		if uid == 0 {
-			uid = uint32(syscall.Getuid())
-		}
-		if gid == 0 {
-			gid = uint32(syscall.Getgid())
-		}
-		this.cmd.SysProcAttr = &syscall.SysProcAttr{}
-		this.cmd.SysProcAttr.Credential = &syscall.Credential{
-			Uid:         uid,
-			Gid:         gid,
-			NoSetGroups: true,
-		}
+	if uid == 0 {
+		uid = uint32(syscall.Getuid())
+	}
+	if gid == 0 {
+		gid = uint32(syscall.Getgid())
+	}
+	this.cmd.SysProcAttr = &syscall.SysProcAttr{}
+	this.cmd.SysProcAttr.Credential = &syscall.Credential{
+		Uid:         uid,
+		Gid:         gid,
+		NoSetGroups: true,
 	}
 
 	// Set user & group
@@ -83,7 +83,7 @@ func NewProcess(id, sid uint32, path string, wd string, args []string, uid, gid 
 			this.user = u.Uid
 		}
 	}
-	if g, err := user.LookupGroupId(fmt.Sprint(uid)); err == nil {
+	if g, err := user.LookupGroupId(fmt.Sprint(gid)); err == nil {
 		this.group = g.Name
 		if this.group == "" {
 			this.group = g.Gid
@@ -91,22 +91,22 @@ func NewProcess(id, sid uint32, path string, wd string, args []string, uid, gid 
 	}
 
 	// Set home folder based on user if not explicitly set
-	if wd == "" && uid != 0 {
+	if cwd == "" && uid != 0 {
 		if user, err := user.LookupId(fmt.Sprint(uid)); err == nil {
 			if stat, err := os.Stat(user.HomeDir); err == nil && stat.IsDir() {
-				wd = user.HomeDir
+				cwd = user.HomeDir
 			}
 		}
 	}
 
 	// Set working directory
-	if wd != "" {
-		if stat, err := os.Stat(wd); err != nil {
+	if cwd != "" {
+		if stat, err := os.Stat(cwd); err != nil {
 			return nil, fmt.Errorf("wd: %w", err)
 		} else if stat.IsDir() == false {
 			return nil, fmt.Errorf("wd: %w", gopi.ErrBadParameter)
 		} else {
-			this.cmd.Dir = wd
+			this.cmd.Dir = cwd
 		}
 	}
 
@@ -217,13 +217,13 @@ func (this *Process) Service() rpc.GafferService {
 		return rpc.GafferService{}
 	} else {
 		return rpc.GafferService{
-			Path:    this.cmd.Path, // TODO: relative to root
-			Wd:      this.cmd.Dir,
-			Args:    this.cmd.Args,
-			Timeout: this.timeout,
-			Sid:     this.sid,
-			User:    this.user,
-			Group:   this.group,
+			Name:  this.name,
+			Path:  this.cmd.Path, // TODO: relative to root
+			Cwd:   this.cmd.Dir,
+			Args:  this.cmd.Args,
+			Sid:   this.sid,
+			User:  this.user,
+			Group: this.group,
 		}
 	}
 }
@@ -251,9 +251,16 @@ func (this *Process) State() rpc.GafferState {
 func (this *Process) String() string {
 	str := "<gaffer.Process"
 	str += " id=" + fmt.Sprint(this.id)
+	if this.name != "" {
+		str += " name=" + strconv.Quote(this.name)
+	}
 	str += " exec=" + strconv.Quote(this.cmd.Path)
 	str += " state=" + fmt.Sprint(this.State())
-
+	str += " user=" + fmt.Sprint(this.user)
+	str += " group=" + fmt.Sprint(this.group)
+	if this.sid != 0 {
+		str += " sid=" + fmt.Sprint(this.sid)
+	}
 	return str + ">"
 }
 

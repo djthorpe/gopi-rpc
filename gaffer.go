@@ -9,7 +9,6 @@ package rpc
 
 import (
 	"context"
-	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
@@ -26,6 +25,9 @@ type GafferState uint
 // Gaffer operations
 type Gaffer interface {
 	gopi.Unit
+
+	// Return services
+	Services() []GafferService
 }
 
 // GafferKernel operations
@@ -54,12 +56,12 @@ type GafferKernel interface {
 
 // GafferService represents a service to be run
 type GafferService struct {
-	Path        string        // Path represents the path to the service executable
-	Wd          string        // Working directory
-	User, Group string        // User and group for process
-	Timeout     time.Duration // Timeout for maximum run time for process or zero
-	Args        []string      // Process arguments
-	Sid         uint32        // Service ID
+	Name        string   // Name of the service
+	Path        string   // Path represents the path to the executable
+	Cwd         string   // Working directory on execution
+	User, Group string   // User and group for process
+	Args        []string // Process arguments
+	Sid         uint32   // Service ID
 }
 
 // GafferProcess represents a running process
@@ -94,6 +96,17 @@ type GafferKernelStub interface {
 
 	// Stream events until cancelled, using a filter
 	StreamEvents(context.Context, uint32, uint32) error
+}
+
+// GafferClientStub represents a connection to a remote gaffer service
+type GafferClientStub interface {
+	gopi.RPCClientStub
+
+	// Ping returns without error if the remote service is running
+	Ping(context.Context) error
+
+	// Services returns a list of services registered
+	Services(context.Context) ([]GafferService, error)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

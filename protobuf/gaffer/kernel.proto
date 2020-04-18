@@ -11,7 +11,6 @@ package gaffer;
 
 // Import dependencies
 import "google/protobuf/empty.proto";
-import "google/protobuf/duration.proto";
 
 // The Kernel service definition
 service Kernel {
@@ -39,13 +38,13 @@ service Kernel {
 
 // A service defintion is used to start a process
 message KernelService {
-  string path = 1;                       // Path to the executable
-  string wd = 2;                         // Working directory
+  string name = 1;                       // Service name
+  string path = 2;                       // Path to the executable
+  string cwd = 3;                        // Working directory
   string user = 4;                       // User identifier
   string group = 5;                      // Group identifier
   repeated string args = 6;              // Executable arguments
-  google.protobuf.Duration timeout = 7;  // Timeout for the process
-  uint32 sid = 8;                        // Service ID
+  uint32 sid = 7;                        // Service ID
 }
 
 // A returned process identifier

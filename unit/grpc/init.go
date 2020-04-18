@@ -8,27 +8,40 @@
 package grpc
 
 import (
+	"fmt"
+	"os"
+
 	gopi "github.com/djthorpe/gopi/v2"
 )
 
 func init() {
+	// Server
 	gopi.UnitRegister(gopi.UnitConfig{
 		Type:     gopi.UNIT_RPC_SERVER,
 		Name:     Server{}.Name(),
 		Requires: []string{"bus"},
 		Config: func(app gopi.App) error {
-			app.Flags().FlagString("rpc.fifo", "", "Server Fifo file")
-			app.Flags().FlagString("rpc.fifogid", "", "Server Fifo group")
+			app.Flags().FlagString("rpc.sock", "", "Server Unix socket file")
+			app.Flags().FlagString("rpc.sockgid", "", "Server socket group")
 			app.Flags().FlagUint("rpc.port", 0, "Server Port")
 			app.Flags().FlagString("rpc.sslcert", "", "SSL Certificate Path")
 			app.Flags().FlagString("rpc.sslkey", "", "SSL Key Path")
 			return nil
 		},
 		New: func(app gopi.App) (gopi.Unit, error) {
+			// Remove existing socket file
+			if file := app.Flags().GetString("rpc.sock", gopi.FLAG_NS_DEFAULT); file != "" {
+				if _, err := os.Stat(file); os.IsNotExist(err) {
+					// Do nothing if socket does not exist
+				} else if err := os.Remove(file); err != nil {
+					return nil, fmt.Errorf("Unable to remove stale socket: %w", err)
+				}
+			}
+
 			return gopi.New(Server{
 				Bus:            app.Bus(),
-				File:           app.Flags().GetString("rpc.fifo", gopi.FLAG_NS_DEFAULT),
-				FileGroup:      app.Flags().GetString("rpc.fifogid", gopi.FLAG_NS_DEFAULT),
+				File:           app.Flags().GetString("rpc.sock", gopi.FLAG_NS_DEFAULT),
+				FileGroup:      app.Flags().GetString("rpc.sockgid", gopi.FLAG_NS_DEFAULT),
 				Port:           app.Flags().GetUint("rpc.port", gopi.FLAG_NS_DEFAULT),
 				SSLCertificate: app.Flags().GetString("rpc.sslcert", gopi.FLAG_NS_DEFAULT),
 				SSLKey:         app.Flags().GetString("rpc.sslkey", gopi.FLAG_NS_DEFAULT),

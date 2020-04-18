@@ -12,7 +12,6 @@ import (
 
 	// Frameworks
 	rpc "github.com/djthorpe/gopi-rpc/v2"
-	ptypes "github.com/golang/protobuf/ptypes"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/gopi-rpc/v2/protobuf/gaffer"
@@ -51,30 +50,28 @@ func ProtoFromEvent(event GafferKernelEvent) *pb.KernelProcessEvent {
 func ProtoToService(proto *pb.KernelService) rpc.GafferService {
 	if proto == nil {
 		return rpc.GafferService{}
-	} else if timeout, err := ptypes.Duration(proto.GetTimeout()); err != nil {
-		return rpc.GafferService{}
 	} else {
 		return rpc.GafferService{
-			Path:    proto.GetPath(),
-			Args:    proto.GetArgs(),
-			Wd:      proto.GetWd(),
-			User:    proto.GetUser(),
-			Group:   proto.GetGroup(),
-			Timeout: timeout,
-			Sid:     proto.GetSid(),
+			Name:  proto.GetName(),
+			Path:  proto.GetPath(),
+			Args:  proto.GetArgs(),
+			Cwd:   proto.GetCwd(),
+			User:  proto.GetUser(),
+			Group: proto.GetGroup(),
+			Sid:   proto.GetSid(),
 		}
 	}
 }
 
 func ProtoFromService(service rpc.GafferService) *pb.KernelService {
 	return &pb.KernelService{
-		Path:    service.Path,
-		Args:    service.Args,
-		Wd:      service.Wd,
-		User:    service.User,
-		Group:   service.Group,
-		Timeout: ptypes.DurationProto(service.Timeout),
-		Sid:     service.Sid,
+		Name:  service.Name,
+		Path:  service.Path,
+		Args:  service.Args,
+		Cwd:   service.Cwd,
+		User:  service.User,
+		Group: service.Group,
+		Sid:   service.Sid,
 	}
 }
 

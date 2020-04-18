@@ -30,14 +30,24 @@ type KernelClient struct {
 	Conn gopi.RPCClientConn
 }
 
+type GafferClient struct {
+	Conn gopi.RPCClientConn
+}
+
 type kernelclient struct {
 	base.Unit
 	conn   gopi.RPCClientConn
 	client pb.KernelClient
 }
 
+type gafferclient struct {
+	base.Unit
+	conn   gopi.RPCClientConn
+	client pb.GafferClient
+}
+
 ////////////////////////////////////////////////////////////////////////////////
-// IMPLEMENTATION gopi.Unit
+// IMPLEMENTATION gopi.Unit for Kernel client
 
 func (KernelClient) Name() string { return "gaffer.Kernel" }
 
@@ -80,6 +90,52 @@ func (this *kernelclient) Conn() gopi.RPCClientConn {
 
 func (this *kernelclient) String() string {
 	return "<gaffer.Kernel conn=" + fmt.Sprint(this.conn) + ">"
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION gopi.Unit for Gaffer client
+
+func (GafferClient) Name() string { return "gaffer.Gaffer" }
+
+func (config GafferClient) New(log gopi.Logger) (gopi.Unit, error) {
+	this := new(gafferclient)
+	if err := this.Unit.Init(log); err != nil {
+		return nil, err
+	} else if err := this.Init(config); err != nil {
+		return nil, err
+	}
+
+	// Success
+	return this, nil
+}
+
+func (this *gafferclient) Init(config GafferClient) error {
+	// Create the client
+	if config.Conn == nil {
+		return gopi.ErrBadParameter
+	} else if grpcconn, ok := config.Conn.(grpc.GRPCClientConn); ok == false {
+		return gopi.ErrBadParameter
+	} else if client := pb.NewGafferClient(grpcconn.GRPCClient()); client == nil {
+		return gopi.ErrBadParameter
+	} else {
+		this.conn = config.Conn
+		this.client = client
+	}
+
+	// Success
+	return nil
+}
+
+func (this *gafferclient) Close() error {
+	return this.Unit.Close()
+}
+
+func (this *gafferclient) Conn() gopi.RPCClientConn {
+	return this.conn
+}
+
+func (this *gafferclient) String() string {
+	return "<gaffer.Gaffer conn=" + fmt.Sprint(this.conn) + ">"
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -200,5 +256,29 @@ func (this *kernelclient) StreamEvents(ctx context.Context, id, sid uint32) erro
 				return err
 			}
 		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION rpc.GafferClient
+
+func (this *gafferclient) Ping(ctx context.Context) error {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+	if _, err := this.client.Ping(ctx, &empty.Empty{}); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (this *gafferclient) Services(ctx context.Context) ([]rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+	if services, err := this.client.Services(ctx, &empty.Empty{}); err != nil {
+		return nil, err
+	} else {
+		fmt.Println("services=", services)
+		return nil, nil
 	}
 }

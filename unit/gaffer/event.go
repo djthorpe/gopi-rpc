@@ -63,7 +63,7 @@ func (this *Event) Error() error {
 // STRINGIFY
 
 func (this *Event) String() string {
-	str := "<Event " + fmt.Sprint(this.State)
+	str := "<Event " + fmt.Sprint(this.state)
 	if this.Process != nil {
 		str += " process_id=" + fmt.Sprint(this.process.Id())
 	}

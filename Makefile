@@ -25,6 +25,7 @@ gaffer: protogen
 	@install etc/gaffer.service /opt/gaffer/etc
 	@$(GO) build -o /opt/gaffer/libexec/gaffer-kernel $(GOFLAGS) ./cmd/gaffer-kernel
 	@$(GO) build -o /opt/gaffer/sbin/gaffer-service $(GOFLAGS) ./cmd/gaffer-service
+	@$(GO) build -o /opt/gaffer/bin/gaffer $(GOFLAGS) ./cmd/gaffer-client
 	@echo "Run the following commands:"
 	@echo "  sudo ln -s /opt/gaffer/etc/gaffer.service /etc/systemd/system/gaffer.service"
 	@echo "  sudo groupadd --system --force gaffer"

@@ -110,3 +110,9 @@ func (this *gafferservice) Ping(context.Context, *empty.Empty) (*empty.Empty, er
 	this.Log.Debug("<Ping>")
 	return &empty.Empty{}, nil
 }
+
+func (this *gafferservice) Services(context.Context, *empty.Empty) (*pb.ServiceList, error) {
+	this.Log.Debug("<Services>")
+	// TODO
+	return &pb.ServiceList{}, nil
+}
