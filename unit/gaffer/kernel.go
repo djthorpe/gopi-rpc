@@ -146,9 +146,11 @@ func (this *kernel) String() string {
 // IMPLEMENTATION GafferKernel
 
 func (this *kernel) CreateProcess(service rpc.GafferService) (uint32, error) {
+	// Get ID in critical section
 	this.Lock()
-	defer this.Unlock()
-	if id := this.newId(); id == 0 {
+	id := this.newId()
+	this.Unlock()
+	if id == 0 {
 		return 0, gopi.ErrInternalAppError.WithPrefix("NewId")
 	} else {
 		return this.CreateProcessEx(id, service, 0)

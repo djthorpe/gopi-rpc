@@ -123,7 +123,7 @@ func (this *kernelservice) Ping(context.Context, *empty.Empty) (*empty.Empty, er
 }
 
 func (this *kernelservice) CreateProcess(_ context.Context, pb *pb.Service) (*pb.ProcessId, error) {
-	this.Log.Debug("<CreateProcess service=[", pb, "]>")
+	this.Log.Debug("<CreateProcess service=", pb, ">")
 
 	if service := ProtoToService(pb); service.Path() == "" {
 		return nil, gopi.ErrBadParameter

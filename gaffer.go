@@ -34,7 +34,7 @@ type Gaffer interface {
 	Update(GafferService, []string) (GafferService, error)
 
 	// Start a service process
-	Start(uint32) (GafferProcess, error)
+	Start(context.Context, uint32) (GafferProcess, error)
 }
 
 // GafferService represents a service which may or may not be running
