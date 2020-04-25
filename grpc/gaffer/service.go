@@ -131,3 +131,13 @@ func (this *gafferservice) Update(_ context.Context, req *pb.ServiceUpdateReques
 		return ProtoFromServiceListOne(service), nil
 	}
 }
+
+func (this *gafferservice) Start(_ context.Context, req *pb.ServiceId) (*pb.ServiceList, error) {
+	this.Log.Debug("<Start req=", req, ">")
+
+	if process, err := this.gaffer.Start(req.Sid); err != nil {
+		return nil, err
+	} else {
+		return ProtoFromServiceListOne(process.Service()), nil
+	}
+}

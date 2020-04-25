@@ -8,6 +8,7 @@
 package gaffer
 
 import (
+	"fmt"
 	"sync"
 
 	// Frameworks
@@ -56,15 +57,9 @@ func (this *processes) modify(processes []rpc.GafferProcess) bool {
 
 	// Modified is set to true if process is added, removed or changed
 	modified := false
-	flag := make(map[uint32]bool, len(this.process))
 
-	for _, process := range processes {
-		if _, exists := this.process[process.Id()]; exists == false {
-			// New process to add
-			this.Log.Info("Add:", process)
-			modified = true
-		}
-	}
+	// TODO
+	fmt.Println("processes=", processes)
 
-	return false
+	return modified
 }

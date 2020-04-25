@@ -186,6 +186,12 @@ func ProtoFromServiceListOne(service rpc.GafferService) *pb.ServiceList {
 	}
 }
 
+func ProtoFromServiceId(sid uint32) *pb.ServiceId {
+	return &pb.ServiceId{
+		Sid: sid,
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // PROCESS
 

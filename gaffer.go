@@ -32,6 +32,9 @@ type Gaffer interface {
 
 	// Update a service
 	Update(GafferService, []string) (GafferService, error)
+
+	// Start a service process
+	Start(uint32) (GafferProcess, error)
 }
 
 // GafferService represents a service which may or may not be running
@@ -102,7 +105,10 @@ type GafferClientStub interface {
 	Services(context.Context) ([]GafferService, error)
 
 	// Update a service name, cwd, args, user, group or enabled field
-	Update(context.Context, MutableGafferService) ([]GafferService, error)
+	Update(context.Context, MutableGafferService) (GafferService, error)
+
+	// Start a service
+	Start(context.Context, uint32) (GafferService, error)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -121,6 +127,7 @@ const (
 const (
 	ERROR_NONE Error = iota
 	ERROR_NOT_MODIFIED
+	ERROR_NOT_ENABLED
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -153,6 +160,8 @@ func (e Error) Error() string {
 		return "No Error"
 	case ERROR_NOT_MODIFIED:
 		return "Not Modified"
+	case ERROR_NOT_ENABLED:
+		return "Not Enabled"
 	default:
 		return "[?? Invalid Error value]"
 	}

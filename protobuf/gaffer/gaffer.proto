@@ -23,6 +23,9 @@ service Gaffer {
 
   // Update a service
   rpc Update(ServiceUpdateRequest) returns (ServiceList);
+
+  // Start a service
+  rpc Start(ServiceId) returns (ServiceList);
 }
 
 // Update a service

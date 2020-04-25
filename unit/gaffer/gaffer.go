@@ -151,6 +151,31 @@ func (this *gaffer) String() string {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION
+
+func (this *gaffer) Start(sid uint32) (rpc.GafferProcess, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Get service for ID
+	if service := this.services.Get(sid); service == nil {
+		return nil, gopi.ErrNotFound.WithPrefix("sid")
+	} else if service.Enabled() == false {
+		return nil, rpc.ERROR_NOT_ENABLED
+	} else if pid, err := this.kernel1.CreateProcess(ctx, service); err != nil {
+		return nil, err
+	} else if err := this.kernel1.RunProcess(ctx, pid); err != nil {
+		return nil, err
+	} else if processes, err := this.kernel1.Processes(ctx, pid); err != nil {
+		return nil, err
+	} else if len(processes) != 1 {
+		return nil, gopi.ErrInternalAppError
+	} else {
+		return processes[0], nil
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BACKGROUND PROCESS
 
 func (this *gaffer) BackgroundProcess() {

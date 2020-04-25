@@ -291,7 +291,7 @@ func (this *gafferclient) Services(ctx context.Context) ([]rpc.GafferService, er
 	}
 }
 
-func (this *gafferclient) Update(ctx context.Context, service rpc.MutableGafferService) ([]rpc.GafferService, error) {
+func (this *gafferclient) Update(ctx context.Context, service rpc.MutableGafferService) (rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
@@ -304,11 +304,22 @@ func (this *gafferclient) Update(ctx context.Context, service rpc.MutableGafferS
 		},
 	}); err != nil {
 		return nil, err
+	} else if len(services_.Service) != 1 {
+		return nil, gopi.ErrInternalAppError
 	} else {
-		services := make([]rpc.GafferService, len(services_.Service))
-		for i, pb := range services_.Service {
-			services[i] = ProtoToService(pb)
-		}
-		return services, nil
+		return ProtoToService(services_.Service[0]), nil
+	}
+}
+
+func (this *gafferclient) Start(ctx context.Context, sid uint32) (rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if services, err := this.client.Start(ctx, ProtoFromServiceId(sid)); err != nil {
+		return nil, err
+	} else if len(services.Service) != 1 {
+		return nil, gopi.ErrInternalAppError
+	} else {
+		return ProtoToService(services.Service[0]), nil
 	}
 }

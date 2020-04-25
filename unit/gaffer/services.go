@@ -68,7 +68,21 @@ func (this *services) Close() error {
 ////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION
 
+func (this *services) Get(sid uint32) rpc.GafferService {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
+	if service, exists := this.service[sid]; exists {
+		return service
+	} else {
+		return nil
+	}
+}
+
 func (this *services) Services() []rpc.GafferService {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
 	services := make([]rpc.GafferService, 0, len(this.service))
 	for _, service := range this.service {
 		services = append(services, service)

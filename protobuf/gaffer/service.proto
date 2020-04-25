@@ -25,3 +25,7 @@ message ServiceList {
   repeated Service service = 1;
 }
 
+// A service identifier
+message ServiceId {
+  uint32 sid = 1;    // ID of a service
+}
