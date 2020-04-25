@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"syscall"
@@ -31,12 +32,13 @@ type Process struct {
 	sync.Mutex
 	sync.WaitGroup
 
-	id, sid        uint32             // Process ID and Service ID
-	name           string             // Service name
+	id   uint32 // Process ID
+	root string // Service root
+
+	service        *service           // Service description
 	cmd            *exec.Cmd          // Command object
 	cancel         context.CancelFunc // Cancel function
 	stdout, stderr io.ReadCloser      // Stdout and Stderr
-	user, group    string             // User and group process run under
 	stopping       bool               // Stopping flag
 	timeout        time.Duration      // Timeout
 	ts             time.Time          // Last updated
@@ -53,16 +55,32 @@ const (
 // NEW
 
 // NewProcess returns a new process object which is used to control processes
-func NewProcess(id, sid uint32, name, path string, cwd string, args []string, uid, gid uint32, timeout time.Duration) (*Process, error) {
+func NewProcess(id uint32, service *service, root string, timeout time.Duration) (*Process, error) {
 	this := new(Process)
 	ctx, cancel := ctxForTimeout(timeout)
-	this.name = name
-	this.cmd = exec.CommandContext(ctx, path, args...)
+	this.service = service
+	this.root = root
+	this.cmd = exec.CommandContext(ctx, service.path, service.args...)
 	this.cancel = cancel
 	this.id = id
-	this.sid = sid
 
-	// Set user and group
+	// Transform user & group into uid and gid
+	uid := uint32(0)
+	gid := uint32(0)
+	if service.user != "" {
+		if uid_, err := strconv.ParseUint(service.user, 10, 32); err != nil {
+			return nil, gopi.ErrBadParameter.WithPrefix("user")
+		} else {
+			uid = uint32(uid_)
+		}
+	}
+	if service.group != "" {
+		if gid_, err := strconv.ParseUint(service.group, 10, 32); err != nil {
+			return nil, gopi.ErrBadParameter.WithPrefix("group")
+		} else {
+			gid = uint32(gid_)
+		}
+	}
 	if uid == 0 {
 		uid = uint32(syscall.Getuid())
 	}
@@ -76,38 +94,45 @@ func NewProcess(id, sid uint32, name, path string, cwd string, args []string, ui
 		NoSetGroups: true,
 	}
 
-	// Set user & group
-	if u, err := user.LookupId(fmt.Sprint(uid)); err == nil {
-		this.user = u.Username
-		if this.user == "" {
-			this.user = u.Uid
+	// Set user & group into names
+	if u, err := user.LookupId(service.user); err == nil {
+		if u.Username == "" {
+			this.service.user = u.Uid
+		} else {
+			this.service.user = u.Username
 		}
 	}
-	if g, err := user.LookupGroupId(fmt.Sprint(gid)); err == nil {
-		this.group = g.Name
-		if this.group == "" {
-			this.group = g.Gid
+	if g, err := user.LookupGroupId(service.group); err == nil {
+		if g.Name == "" {
+			this.service.group = g.Gid
+		} else {
+			this.service.group = g.Name
 		}
 	}
 
 	// Set home folder based on user if not explicitly set
-	if cwd == "" && uid != 0 {
-		if user, err := user.LookupId(fmt.Sprint(uid)); err == nil {
+	if this.service.cwd == "" && uid != 0 {
+		if user, err := user.LookupId(service.user); err == nil {
 			if stat, err := os.Stat(user.HomeDir); err == nil && stat.IsDir() {
-				cwd = user.HomeDir
+				this.service.cwd = user.HomeDir
 			}
 		}
 	}
 
 	// Set working directory
-	if cwd != "" {
-		if stat, err := os.Stat(cwd); err != nil {
+	if this.service.cwd != "" {
+		if stat, err := os.Stat(this.service.cwd); err != nil {
 			return nil, fmt.Errorf("wd: %w", err)
 		} else if stat.IsDir() == false {
 			return nil, fmt.Errorf("wd: %w", gopi.ErrBadParameter)
 		} else {
-			this.cmd.Dir = cwd
+			this.cmd.Dir = this.service.cwd
 		}
+	}
+
+	// Set service path
+	if this.root != "" {
+		this.service.path = relativePath(this.root, this.service.path)
 	}
 
 	// Set deadline
@@ -210,22 +235,7 @@ func (this *Process) ExitCode() int64 {
 }
 
 func (this *Process) Service() rpc.GafferService {
-	this.Lock()
-	defer this.Unlock()
-
-	if this.cmd == nil {
-		return rpc.GafferService{}
-	} else {
-		return rpc.GafferService{
-			Name:  this.name,
-			Path:  this.cmd.Path, // TODO: relative to root
-			Cwd:   this.cmd.Dir,
-			Args:  this.cmd.Args,
-			Sid:   this.sid,
-			User:  this.user,
-			Group: this.group,
-		}
-	}
+	return this.service
 }
 
 func (this *Process) State() rpc.GafferState {
@@ -251,16 +261,12 @@ func (this *Process) State() rpc.GafferState {
 func (this *Process) String() string {
 	str := "<gaffer.Process"
 	str += " id=" + fmt.Sprint(this.id)
-	if this.name != "" {
-		str += " name=" + strconv.Quote(this.name)
+	str += " service=" + fmt.Sprint(this.service)
+	if this.root != "" {
+		str += " root=" + strconv.Quote(this.root)
 	}
-	str += " exec=" + strconv.Quote(this.cmd.Path)
+	str += " exec=" + strconv.Quote(relativePath(this.cmd.Path, this.root))
 	str += " state=" + fmt.Sprint(this.State())
-	str += " user=" + fmt.Sprint(this.user)
-	str += " group=" + fmt.Sprint(this.group)
-	if this.sid != 0 {
-		str += " sid=" + fmt.Sprint(this.sid)
-	}
 	return str + ">"
 }
 
@@ -305,5 +311,15 @@ func ctxForTimeout(timeout time.Duration) (context.Context, context.CancelFunc) 
 		return context.WithCancel(context.Background())
 	} else {
 		return context.WithTimeout(context.Background(), timeout)
+	}
+}
+
+func relativePath(abs, root string) string {
+	if root == "" {
+		return abs
+	} else if rel, err := filepath.Rel(root, abs); err == nil {
+		return rel
+	} else {
+		return abs
 	}
 }

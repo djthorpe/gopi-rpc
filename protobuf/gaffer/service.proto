@@ -6,22 +6,9 @@
 */
 
 syntax = "proto3";
-
 package gaffer;
 
-// Import dependencies
-import "google/protobuf/empty.proto";
-
-// The Gaffer service definition
-service Gaffer {
-  // Simple ping method to show server is "up"
-  rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
-
-  // Return services
-  rpc Services(google.protobuf.Empty) returns (ServiceList);
-}
-
-// A service defintion is used to start one or more processes
+// A service definition is used to start one or more processes
 message Service {
   uint32 sid = 1;                        // Service ID
   string name = 2;                       // Name for the service
@@ -33,7 +20,8 @@ message Service {
   bool enabled = 8;                      // Service enablement
 }
 
-// Return a list of processes
+// Return a list of services
 message ServiceList {
   repeated Service service = 1;
 }
+

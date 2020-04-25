@@ -6,11 +6,11 @@
 */
 
 syntax = "proto3";
-
 package gaffer;
 
 // Import dependencies
 import "google/protobuf/empty.proto";
+import "gaffer/service.proto";
 
 // The Kernel service definition
 service Kernel {
@@ -18,39 +18,27 @@ service Kernel {
   rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
 
   // Create a new process
-  rpc CreateProcess (KernelService) returns (KernelProcessId);
+  rpc CreateProcess (Service) returns (ProcessId);
 
   // Run a process
-  rpc RunProcess (KernelProcessId) returns (google.protobuf.Empty);
+  rpc RunProcess (ProcessId) returns (google.protobuf.Empty);
 
   // Stop a process
-  rpc StopProcess (KernelProcessId) returns (google.protobuf.Empty);
+  rpc StopProcess (ProcessId) returns (google.protobuf.Empty);
 
   // Return filtered list of processes
-  rpc Processes (KernelProcessId) returns (KernelProcessList);
+  rpc Processes (ProcessId) returns (KernelProcessList);
 
   // Return list of service executables
   rpc Executables (google.protobuf.Empty) returns (KernelExecutableList);
 
   // Stream filtered list of events
-  rpc StreamEvents (KernelProcessId) returns (stream KernelProcessEvent); 
-}
-
-// A service defintion is used to start a process
-message KernelService {
-  string name = 1;                       // Service name
-  string path = 2;                       // Path to the executable
-  string cwd = 3;                        // Working directory
-  string user = 4;                       // User identifier
-  string group = 5;                      // Group identifier
-  repeated string args = 6;              // Executable arguments
-  uint32 sid = 7;                        // Service ID
+  rpc StreamEvents (ProcessId) returns (stream KernelProcessEvent); 
 }
 
 // A returned process identifier
-message KernelProcessId {
+message ProcessId {
   uint32 id = 1;    // Process ID of a running process
-  uint32 sid = 2;   // Service ID of a running process
 }
 
 // Return a list of processes
@@ -65,9 +53,9 @@ message KernelExecutableList {
 
 // Return information about a process
 message KernelProcess { 
-  KernelProcessId id = 1;
+  ProcessId id = 1;
   State state = 2;
-  KernelService service = 3;
+  Service service = 3;
 
   enum State {
     	NONE = 0;

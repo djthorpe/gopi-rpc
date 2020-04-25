@@ -11,11 +11,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/user"
+	"strconv"
 	"strings"
 
 	// Frameworks
-	rpc "github.com/djthorpe/gopi-rpc/v2"
+
 	app "github.com/djthorpe/gopi-rpc/v2/app"
+	gaffer "github.com/djthorpe/gopi-rpc/v2/unit/gaffer"
 	gopi "github.com/djthorpe/gopi/v2"
 
 	// Units
@@ -27,22 +30,14 @@ import (
 )
 
 ////////////////////////////////////////////////////////////////////////////////
-// INTERFACE
-
-type GafferKernelEx interface {
-	rpc.GafferKernel
-
-	// Extended version of create process
-	CreateProcessEx(id uint32, service rpc.GafferService) (uint32, error)
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // BOOTSTRAP SERVICE
 
 func StartService(app gopi.App) error {
 	args := make([]string, 0)
+	user := app.Flags().GetString("gaffer.user", gopi.FLAG_NS_DEFAULT)
+	group := app.Flags().GetString("gaffer.group", gopi.FLAG_NS_DEFAULT)
 
-	if kernel := app.UnitInstance("gaffer/kernel").(GafferKernelEx); kernel == nil {
+	if kernel := app.UnitInstance("gaffer/kernel").(gaffer.GafferKernel); kernel == nil {
 		return gopi.ErrInternalAppError.WithPrefix("StartService")
 	} else if service := app.Flags().GetString("gaffer.service", gopi.FLAG_NS_DEFAULT); service == "" {
 		// No service to start
@@ -54,15 +49,18 @@ func StartService(app gopi.App) error {
 		if fifo := app.Flags().GetString("rpc.sock", gopi.FLAG_NS_DEFAULT); fifo != "" {
 			args = append(args, "-kernel.sock", fifo)
 		}
+		if state := app.Flags().GetString("gaffer.state", gopi.FLAG_NS_DEFAULT); state != "" {
+			// Change ownership of folder
+			if err := SetStateOwnership(state, user, group); err != nil {
+				return err
+			} else {
+				args = append(args, "-gaffer.state", state)
+			}
+		}
 		if app.Log().IsDebug() {
 			args = append(args, "-debug")
 		}
-		if id, err := kernel.CreateProcessEx(0, rpc.GafferService{
-			Path:  service,
-			User:  app.Flags().GetString("gaffer.user", gopi.FLAG_NS_DEFAULT),
-			Group: app.Flags().GetString("gaffer.group", gopi.FLAG_NS_DEFAULT),
-			Args:  args,
-		}); err != nil {
+		if id, err := kernel.CreateProcessEx(0, gaffer.NewServiceEx(service, user, group, args), 0); err != nil {
 			return err
 		} else if err := kernel.RunProcess(id); err != nil {
 			return err
@@ -73,6 +71,76 @@ func StartService(app gopi.App) error {
 
 	// Return success
 	return nil
+}
+
+func SetStateOwnership(folder, user, group string) error {
+
+	// Check to make sure folder exists
+	if stat, err := os.Stat(folder); err != nil {
+		return gopi.ErrNotFound.WithPrefix("-gaffer.state")
+	} else if stat.IsDir() == false {
+		return gopi.ErrBadParameter.WithPrefix("-gaffer.state")
+	}
+
+	// Set uid, gid and mode
+	uid := -1
+	gid := -1
+	mode := os.FileMode(0)
+	if user != "" {
+		if user_, err := LookupUser(user); err != nil {
+			return gopi.ErrBadParameter.WithPrefix("-gaffer.user")
+		} else if uid_, err := strconv.ParseUint(user_.Uid, 10, 32); err != nil {
+			return gopi.ErrBadParameter.WithPrefix("-gaffer.user")
+		} else if gid_, err := strconv.ParseUint(user_.Gid, 10, 32); err != nil {
+			return gopi.ErrBadParameter.WithPrefix("-gaffer.user")
+		} else {
+			uid = int(uid_)
+			gid = int(gid_)
+			mode = os.FileMode(0755)
+		}
+	}
+	if group != "" {
+		if group_, err := LookupGroup(group); err != nil {
+			return gopi.ErrBadParameter.WithPrefix("-gaffer.group")
+		} else if gid_, err := strconv.ParseUint(group_.Gid, 10, 32); err != nil {
+			return gopi.ErrBadParameter.WithPrefix("-gaffer.group")
+		} else {
+			gid = int(gid_)
+			mode = os.FileMode(0775)
+		}
+	}
+
+	// Set ownership and permissions
+	if err := os.Chown(folder, uid, gid); err != nil {
+		return err
+	} else if err := os.Chmod(folder, mode); err != nil {
+		return err
+	}
+
+	// Success
+	return nil
+}
+
+func LookupUser(u string) (*user.User, error) {
+	// Find user/group from u
+	if user_, err := user.Lookup(u); err == nil {
+		return user_, nil
+	} else if user_, err := user.LookupId(u); err == nil {
+		return user_, nil
+	} else {
+		return nil, gopi.ErrNotFound.WithPrefix("user")
+	}
+}
+
+func LookupGroup(g string) (*user.Group, error) {
+	// Find group from g
+	if group_, err := user.LookupGroup(g); err == nil {
+		return group_, nil
+	} else if group_, err := user.LookupGroupId(g); err == nil {
+		return group_, nil
+	} else {
+		return nil, gopi.ErrNotFound.WithPrefix("group")
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -126,6 +194,7 @@ func main() {
 	} else {
 		// Add bootstrap arguments
 		app.Flags().FlagString("gaffer.service", "", "Gaffer service binary")
+		app.Flags().FlagString("gaffer.state", "", "Gaffer state folder")
 		app.Flags().FlagUint("gaffer.port", 0, "Gaffer service port")
 		app.Flags().FlagString("gaffer.user", "", "Gaffer service user")
 		app.Flags().FlagString("gaffer.group", "", "Gaffer service group")

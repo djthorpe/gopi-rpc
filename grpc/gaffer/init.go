@@ -8,9 +8,9 @@
 package gaffer
 
 import (
-
 	// Frameworks
 	rpc "github.com/djthorpe/gopi-rpc/v2"
+	gaffer "github.com/djthorpe/gopi-rpc/v2/unit/gaffer"
 	gopi "github.com/djthorpe/gopi/v2"
 )
 
@@ -24,7 +24,7 @@ func init() {
 		New: func(app gopi.App) (gopi.Unit, error) {
 			return gopi.New(KernelService{
 				Server: app.UnitInstance("server").(gopi.RPCServer),
-				Kernel: app.UnitInstance("gaffer/kernel").(rpc.GafferKernel),
+				Kernel: app.UnitInstance("gaffer/kernel").(gaffer.GafferKernel),
 			}, app.Log().Clone(KernelService{}.Name()))
 		},
 	})

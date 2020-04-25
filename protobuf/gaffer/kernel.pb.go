@@ -56,7 +56,7 @@ func (x KernelProcess_State) String() string {
 }
 
 func (KernelProcess_State) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_b7683b100b2849c5, []int{4, 0}
+	return fileDescriptor_b7683b100b2849c5, []int{3, 0}
 }
 
 type KernelProcessEvent_State int32
@@ -96,141 +96,45 @@ func (x KernelProcessEvent_State) String() string {
 }
 
 func (KernelProcessEvent_State) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_b7683b100b2849c5, []int{5, 0}
-}
-
-// A service defintion is used to start a process
-type KernelService struct {
-	Name                 string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Path                 string   `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	Cwd                  string   `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	User                 string   `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
-	Group                string   `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`
-	Args                 []string `protobuf:"bytes,6,rep,name=args,proto3" json:"args,omitempty"`
-	Sid                  uint32   `protobuf:"varint,7,opt,name=sid,proto3" json:"sid,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *KernelService) Reset()         { *m = KernelService{} }
-func (m *KernelService) String() string { return proto.CompactTextString(m) }
-func (*KernelService) ProtoMessage()    {}
-func (*KernelService) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7683b100b2849c5, []int{0}
-}
-
-func (m *KernelService) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_KernelService.Unmarshal(m, b)
-}
-func (m *KernelService) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_KernelService.Marshal(b, m, deterministic)
-}
-func (m *KernelService) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_KernelService.Merge(m, src)
-}
-func (m *KernelService) XXX_Size() int {
-	return xxx_messageInfo_KernelService.Size(m)
-}
-func (m *KernelService) XXX_DiscardUnknown() {
-	xxx_messageInfo_KernelService.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_KernelService proto.InternalMessageInfo
-
-func (m *KernelService) GetName() string {
-	if m != nil {
-		return m.Name
-	}
-	return ""
-}
-
-func (m *KernelService) GetPath() string {
-	if m != nil {
-		return m.Path
-	}
-	return ""
-}
-
-func (m *KernelService) GetCwd() string {
-	if m != nil {
-		return m.Cwd
-	}
-	return ""
-}
-
-func (m *KernelService) GetUser() string {
-	if m != nil {
-		return m.User
-	}
-	return ""
-}
-
-func (m *KernelService) GetGroup() string {
-	if m != nil {
-		return m.Group
-	}
-	return ""
-}
-
-func (m *KernelService) GetArgs() []string {
-	if m != nil {
-		return m.Args
-	}
-	return nil
-}
-
-func (m *KernelService) GetSid() uint32 {
-	if m != nil {
-		return m.Sid
-	}
-	return 0
+	return fileDescriptor_b7683b100b2849c5, []int{4, 0}
 }
 
 // A returned process identifier
-type KernelProcessId struct {
+type ProcessId struct {
 	Id                   uint32   `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Sid                  uint32   `protobuf:"varint,2,opt,name=sid,proto3" json:"sid,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *KernelProcessId) Reset()         { *m = KernelProcessId{} }
-func (m *KernelProcessId) String() string { return proto.CompactTextString(m) }
-func (*KernelProcessId) ProtoMessage()    {}
-func (*KernelProcessId) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7683b100b2849c5, []int{1}
+func (m *ProcessId) Reset()         { *m = ProcessId{} }
+func (m *ProcessId) String() string { return proto.CompactTextString(m) }
+func (*ProcessId) ProtoMessage()    {}
+func (*ProcessId) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b7683b100b2849c5, []int{0}
 }
 
-func (m *KernelProcessId) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_KernelProcessId.Unmarshal(m, b)
+func (m *ProcessId) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ProcessId.Unmarshal(m, b)
 }
-func (m *KernelProcessId) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_KernelProcessId.Marshal(b, m, deterministic)
+func (m *ProcessId) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ProcessId.Marshal(b, m, deterministic)
 }
-func (m *KernelProcessId) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_KernelProcessId.Merge(m, src)
+func (m *ProcessId) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProcessId.Merge(m, src)
 }
-func (m *KernelProcessId) XXX_Size() int {
-	return xxx_messageInfo_KernelProcessId.Size(m)
+func (m *ProcessId) XXX_Size() int {
+	return xxx_messageInfo_ProcessId.Size(m)
 }
-func (m *KernelProcessId) XXX_DiscardUnknown() {
-	xxx_messageInfo_KernelProcessId.DiscardUnknown(m)
+func (m *ProcessId) XXX_DiscardUnknown() {
+	xxx_messageInfo_ProcessId.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_KernelProcessId proto.InternalMessageInfo
+var xxx_messageInfo_ProcessId proto.InternalMessageInfo
 
-func (m *KernelProcessId) GetId() uint32 {
+func (m *ProcessId) GetId() uint32 {
 	if m != nil {
 		return m.Id
-	}
-	return 0
-}
-
-func (m *KernelProcessId) GetSid() uint32 {
-	if m != nil {
-		return m.Sid
 	}
 	return 0
 }
@@ -247,7 +151,7 @@ func (m *KernelProcessList) Reset()         { *m = KernelProcessList{} }
 func (m *KernelProcessList) String() string { return proto.CompactTextString(m) }
 func (*KernelProcessList) ProtoMessage()    {}
 func (*KernelProcessList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7683b100b2849c5, []int{2}
+	return fileDescriptor_b7683b100b2849c5, []int{1}
 }
 
 func (m *KernelProcessList) XXX_Unmarshal(b []byte) error {
@@ -287,7 +191,7 @@ func (m *KernelExecutableList) Reset()         { *m = KernelExecutableList{} }
 func (m *KernelExecutableList) String() string { return proto.CompactTextString(m) }
 func (*KernelExecutableList) ProtoMessage()    {}
 func (*KernelExecutableList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7683b100b2849c5, []int{3}
+	return fileDescriptor_b7683b100b2849c5, []int{2}
 }
 
 func (m *KernelExecutableList) XXX_Unmarshal(b []byte) error {
@@ -317,9 +221,9 @@ func (m *KernelExecutableList) GetExecutable() []string {
 
 // Return information about a process
 type KernelProcess struct {
-	Id                   *KernelProcessId    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id                   *ProcessId          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	State                KernelProcess_State `protobuf:"varint,2,opt,name=state,proto3,enum=gaffer.KernelProcess_State" json:"state,omitempty"`
-	Service              *KernelService      `protobuf:"bytes,3,opt,name=service,proto3" json:"service,omitempty"`
+	Service              *Service            `protobuf:"bytes,3,opt,name=service,proto3" json:"service,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_unrecognized     []byte              `json:"-"`
 	XXX_sizecache        int32               `json:"-"`
@@ -329,7 +233,7 @@ func (m *KernelProcess) Reset()         { *m = KernelProcess{} }
 func (m *KernelProcess) String() string { return proto.CompactTextString(m) }
 func (*KernelProcess) ProtoMessage()    {}
 func (*KernelProcess) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7683b100b2849c5, []int{4}
+	return fileDescriptor_b7683b100b2849c5, []int{3}
 }
 
 func (m *KernelProcess) XXX_Unmarshal(b []byte) error {
@@ -350,7 +254,7 @@ func (m *KernelProcess) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_KernelProcess proto.InternalMessageInfo
 
-func (m *KernelProcess) GetId() *KernelProcessId {
+func (m *KernelProcess) GetId() *ProcessId {
 	if m != nil {
 		return m.Id
 	}
@@ -364,7 +268,7 @@ func (m *KernelProcess) GetState() KernelProcess_State {
 	return KernelProcess_NONE
 }
 
-func (m *KernelProcess) GetService() *KernelService {
+func (m *KernelProcess) GetService() *Service {
 	if m != nil {
 		return m.Service
 	}
@@ -386,7 +290,7 @@ func (m *KernelProcessEvent) Reset()         { *m = KernelProcessEvent{} }
 func (m *KernelProcessEvent) String() string { return proto.CompactTextString(m) }
 func (*KernelProcessEvent) ProtoMessage()    {}
 func (*KernelProcessEvent) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7683b100b2849c5, []int{5}
+	return fileDescriptor_b7683b100b2849c5, []int{4}
 }
 
 func (m *KernelProcessEvent) XXX_Unmarshal(b []byte) error {
@@ -438,8 +342,7 @@ func (m *KernelProcessEvent) GetError() string {
 func init() {
 	proto.RegisterEnum("gaffer.KernelProcess_State", KernelProcess_State_name, KernelProcess_State_value)
 	proto.RegisterEnum("gaffer.KernelProcessEvent_State", KernelProcessEvent_State_name, KernelProcessEvent_State_value)
-	proto.RegisterType((*KernelService)(nil), "gaffer.KernelService")
-	proto.RegisterType((*KernelProcessId)(nil), "gaffer.KernelProcessId")
+	proto.RegisterType((*ProcessId)(nil), "gaffer.ProcessId")
 	proto.RegisterType((*KernelProcessList)(nil), "gaffer.KernelProcessList")
 	proto.RegisterType((*KernelExecutableList)(nil), "gaffer.KernelExecutableList")
 	proto.RegisterType((*KernelProcess)(nil), "gaffer.KernelProcess")
@@ -451,42 +354,38 @@ func init() {
 }
 
 var fileDescriptor_b7683b100b2849c5 = []byte{
-	// 559 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x53, 0xc1, 0x6e, 0xd3, 0x40,
-	0x10, 0xc5, 0x76, 0xe2, 0x34, 0x93, 0xa4, 0x98, 0xa5, 0x80, 0x49, 0x11, 0xb2, 0x7c, 0x21, 0x27,
-	0x07, 0x52, 0x29, 0x37, 0xa8, 0x44, 0x63, 0xa1, 0x08, 0xe4, 0x44, 0xeb, 0x54, 0x48, 0xdc, 0x9c,
-	0x78, 0x63, 0x2c, 0x12, 0xdb, 0x5a, 0xaf, 0x0b, 0x1c, 0xf9, 0x0c, 0x3e, 0x8a, 0x7f, 0xe0, 0x53,
-	0xd0, 0xee, 0xc6, 0x29, 0x69, 0xed, 0x1e, 0xe0, 0x36, 0xfb, 0xf6, 0xcd, 0xec, 0x7b, 0x3b, 0x33,
-	0xf0, 0x30, 0x0a, 0xd6, 0x6b, 0x42, 0x87, 0x5f, 0x08, 0x4d, 0xc8, 0xc6, 0xc9, 0x68, 0xca, 0x52,
-	0xa4, 0x4b, 0xb0, 0x7f, 0x1a, 0xa5, 0x69, 0xb4, 0x21, 0x43, 0x81, 0x2e, 0x8b, 0xf5, 0x90, 0x6c,
-	0x33, 0xf6, 0x5d, 0x92, 0xec, 0x9f, 0x0a, 0xf4, 0xde, 0x8b, 0x2c, 0x9f, 0xd0, 0xab, 0x78, 0x45,
-	0x10, 0x82, 0x46, 0x12, 0x6c, 0x89, 0xa9, 0x58, 0xca, 0xa0, 0x8d, 0x45, 0xcc, 0xb1, 0x2c, 0x60,
-	0x9f, 0x4d, 0x55, 0x62, 0x3c, 0x46, 0x06, 0x68, 0xab, 0xaf, 0xa1, 0xa9, 0x09, 0x88, 0x87, 0x9c,
-	0x55, 0xe4, 0x84, 0x9a, 0x0d, 0xc9, 0xe2, 0x31, 0x3a, 0x81, 0x66, 0x44, 0xd3, 0x22, 0x33, 0x9b,
-	0x02, 0x94, 0x07, 0xce, 0x0c, 0x68, 0x94, 0x9b, 0xba, 0xa5, 0x71, 0x26, 0x8f, 0x79, 0xbd, 0x3c,
-	0x0e, 0xcd, 0x96, 0xa5, 0x0c, 0x7a, 0x98, 0x87, 0xf6, 0x19, 0xdc, 0x97, 0xd2, 0xe6, 0x34, 0x5d,
-	0x91, 0x3c, 0x9f, 0x86, 0xe8, 0x18, 0xd4, 0x38, 0x14, 0xd2, 0x7a, 0x58, 0x8d, 0xc3, 0x32, 0x49,
-	0xbd, 0x4e, 0x9a, 0xc0, 0x83, 0x83, 0xa4, 0x0f, 0x71, 0xce, 0xd0, 0x10, 0x5a, 0x99, 0x3c, 0x9a,
-	0x8a, 0xa5, 0x0d, 0x3a, 0xa3, 0x47, 0x8e, 0xfc, 0x1c, 0xe7, 0x80, 0x8b, 0x4b, 0x96, 0x3d, 0x86,
-	0x13, 0x79, 0xe3, 0x7e, 0x23, 0xab, 0x82, 0x05, 0xcb, 0x0d, 0x11, 0x85, 0x9e, 0x03, 0x90, 0x3d,
-	0x22, 0x6a, 0xb5, 0xf1, 0x5f, 0x88, 0xfd, 0x7b, 0xff, 0x9d, 0xbb, 0x92, 0xe8, 0xc5, 0x5e, 0x71,
-	0x67, 0xf4, 0xa4, 0xf2, 0xd5, 0x69, 0x28, 0xac, 0xbc, 0x82, 0x66, 0xce, 0x02, 0x46, 0x84, 0x99,
-	0xe3, 0xd1, 0x69, 0x25, 0xd7, 0xf1, 0x39, 0x05, 0x4b, 0x26, 0xb7, 0x95, 0xcb, 0xae, 0x89, 0x36,
-	0xdc, 0xb2, 0xb5, 0x6b, 0x29, 0x2e, 0x59, 0xf6, 0x5b, 0x68, 0x8a, 0x02, 0xe8, 0x08, 0x1a, 0xde,
-	0xcc, 0x73, 0x8d, 0x7b, 0xa8, 0x05, 0x9a, 0xe7, 0x7e, 0x34, 0x14, 0xd4, 0x81, 0x16, 0xbe, 0xf4,
-	0xbc, 0xa9, 0xf7, 0xce, 0x50, 0x51, 0x17, 0x8e, 0xfc, 0xc5, 0x6c, 0x3e, 0xe7, 0x27, 0x8d, 0x5f,
-	0x89, 0x93, 0x3b, 0x31, 0x1a, 0xf6, 0x0f, 0x15, 0xd0, 0x81, 0x26, 0xf7, 0x8a, 0x24, 0x0c, 0x8d,
-	0x4b, 0xf9, 0x8a, 0x90, 0x6f, 0x55, 0xca, 0x17, 0xd4, 0x5b, 0x1e, 0xca, 0xd6, 0xa8, 0x55, 0x1e,
-	0x6e, 0xb6, 0x86, 0xb7, 0x7c, 0x59, 0xac, 0x85, 0xe1, 0x2e, 0xe6, 0x21, 0x9f, 0x31, 0x42, 0x69,
-	0x5a, 0x0e, 0x9e, 0x3c, 0xd8, 0x9f, 0xfe, 0xdf, 0x2b, 0x02, 0xd0, 0xfd, 0xc5, 0x64, 0x76, 0xb9,
-	0x30, 0x9a, 0xbb, 0xd8, 0xc5, 0xd8, 0xd0, 0x47, 0xbf, 0x34, 0xd0, 0xa5, 0x3c, 0x34, 0x86, 0xc6,
-	0x3c, 0x4e, 0x22, 0xf4, 0xd8, 0x91, 0x6b, 0xe6, 0x94, 0x6b, 0xe6, 0xb8, 0x7c, 0xcd, 0xfa, 0x35,
-	0x38, 0x3a, 0x87, 0xde, 0x05, 0x25, 0x01, 0x23, 0xe5, 0xa0, 0x54, 0xf7, 0xae, 0x5f, 0x37, 0x33,
-	0xe8, 0x35, 0x00, 0x2e, 0x92, 0x32, 0xbb, 0x8e, 0x56, 0xfb, 0xfe, 0x1b, 0xe8, 0xf8, 0x2c, 0xcd,
-	0xfe, 0x39, 0xff, 0x1c, 0xda, 0x3b, 0x12, 0xb9, 0x23, 0xfb, 0x69, 0xe5, 0x85, 0x58, 0xa5, 0x0b,
-	0xe8, 0x5c, 0x2f, 0x57, 0x5e, 0xfb, 0x7f, 0xcf, 0x0e, 0x2b, 0xdc, 0xd8, 0x47, 0x17, 0xba, 0x3e,
-	0xa3, 0x24, 0xd8, 0x8a, 0xc9, 0xba, 0x43, 0x48, 0xbf, 0x7e, 0x1e, 0x5f, 0x2a, 0x4b, 0x5d, 0x3c,
-	0x7a, 0xf6, 0x27, 0x00, 0x00, 0xff, 0xff, 0xf7, 0x5a, 0x40, 0x66, 0x48, 0x05, 0x00, 0x00,
+	// 493 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x53, 0x51, 0x8f, 0xd2, 0x4c,
+	0x14, 0xfd, 0xa6, 0x85, 0xb2, 0xdc, 0xc2, 0x7e, 0xdd, 0x2b, 0x9a, 0x5a, 0x8c, 0xa9, 0x7d, 0xc2,
+	0x97, 0xa2, 0x6c, 0x82, 0xfa, 0x64, 0xe2, 0xd2, 0x98, 0x8d, 0xa6, 0x90, 0x29, 0x1b, 0x13, 0xdf,
+	0x0a, 0x0c, 0xa4, 0x91, 0xa5, 0x64, 0x3a, 0x6c, 0xf4, 0xd1, 0x9f, 0xe3, 0xff, 0xf1, 0x07, 0x99,
+	0xce, 0x50, 0xdc, 0xee, 0x96, 0x98, 0xe8, 0xdb, 0xdc, 0x33, 0xe7, 0xde, 0x7b, 0x66, 0xee, 0xb9,
+	0xf0, 0x60, 0x15, 0x2f, 0x97, 0x8c, 0xf7, 0xbf, 0x30, 0xbe, 0x61, 0x6b, 0x7f, 0xcb, 0x53, 0x91,
+	0xa2, 0xa1, 0x40, 0xa7, 0xbb, 0x4a, 0xd3, 0xd5, 0x9a, 0xf5, 0x25, 0x3a, 0xdb, 0x2d, 0xfb, 0xec,
+	0x7a, 0x2b, 0xbe, 0x29, 0x92, 0xd3, 0xd9, 0x67, 0x66, 0x8c, 0xdf, 0x24, 0x73, 0xa6, 0x50, 0xaf,
+	0x0b, 0xcd, 0x09, 0x4f, 0xe7, 0x2c, 0xcb, 0x2e, 0x17, 0x78, 0x0a, 0x5a, 0xb2, 0xb0, 0x89, 0x4b,
+	0x7a, 0x6d, 0xaa, 0x25, 0x0b, 0x6f, 0x04, 0x67, 0x1f, 0x64, 0x9f, 0x3d, 0xe5, 0x63, 0x92, 0x09,
+	0xec, 0x43, 0x63, 0xab, 0x42, 0x9b, 0xb8, 0x7a, 0xcf, 0x1c, 0x3c, 0xf4, 0x55, 0x65, 0xbf, 0xc4,
+	0xa5, 0x05, 0xcb, 0x1b, 0x42, 0x47, 0xdd, 0x04, 0x5f, 0xd9, 0x7c, 0x27, 0xe2, 0xd9, 0x9a, 0xc9,
+	0x42, 0x4f, 0x01, 0xd8, 0x01, 0x91, 0xb5, 0x9a, 0xf4, 0x16, 0xe2, 0xfd, 0x24, 0xd0, 0x2e, 0x95,
+	0xc4, 0x67, 0x07, 0x7d, 0xe6, 0xe0, 0xac, 0xe8, 0x7a, 0x90, 0x9f, 0x4b, 0xc6, 0x97, 0x50, 0xcf,
+	0x44, 0x2c, 0x98, 0xad, 0xb9, 0xa4, 0x77, 0x3a, 0xe8, 0x56, 0x6a, 0xf3, 0xa3, 0x9c, 0x42, 0x15,
+	0x13, 0x9f, 0x43, 0x63, 0xff, 0x27, 0xb6, 0x2e, 0x4b, 0xff, 0x5f, 0x24, 0x45, 0x0a, 0xa6, 0xc5,
+	0xbd, 0xf7, 0x0e, 0xea, 0x32, 0x15, 0x4f, 0xa0, 0x16, 0x8e, 0xc3, 0xc0, 0xfa, 0x0f, 0x1b, 0xa0,
+	0x87, 0xc1, 0x27, 0x8b, 0xa0, 0x09, 0x0d, 0x7a, 0x15, 0x86, 0x97, 0xe1, 0x7b, 0x4b, 0xc3, 0x16,
+	0x9c, 0x44, 0xd3, 0xf1, 0x64, 0x92, 0x47, 0x7a, 0x7e, 0x25, 0xa3, 0x60, 0x64, 0xd5, 0xbc, 0xef,
+	0x1a, 0x60, 0x49, 0x4d, 0x70, 0xc3, 0x36, 0x02, 0x87, 0x85, 0x70, 0x22, 0x85, 0xbb, 0x95, 0xc2,
+	0x25, 0xb5, 0xac, 0xfe, 0xd6, 0x38, 0x34, 0xa9, 0xfe, 0x0f, 0xe3, 0x40, 0x0b, 0xf4, 0xd9, 0x6e,
+	0x29, 0x9f, 0xda, 0xa2, 0xf9, 0x11, 0x3b, 0x50, 0x67, 0x9c, 0xa7, 0xdc, 0xae, 0xb9, 0xa4, 0xd7,
+	0xa4, 0x2a, 0xf0, 0x3e, 0xff, 0xfb, 0x5b, 0x11, 0xc0, 0x88, 0xa6, 0xa3, 0xf1, 0xd5, 0xd4, 0xaa,
+	0xef, 0xcf, 0x01, 0xa5, 0x96, 0x31, 0xf8, 0xa1, 0x83, 0xa1, 0xe4, 0xe1, 0x10, 0x6a, 0x93, 0x64,
+	0xb3, 0xc2, 0x47, 0xbe, 0x32, 0xaf, 0x5f, 0x98, 0xd7, 0x0f, 0x72, 0xf3, 0x3a, 0x47, 0x70, 0x3c,
+	0x87, 0xf6, 0x05, 0x67, 0xb1, 0x60, 0x85, 0x39, 0xee, 0x4e, 0xcd, 0xb9, 0xef, 0x10, 0x7c, 0x05,
+	0x40, 0x77, 0x9b, 0x22, 0xe3, 0x3e, 0xe1, 0x68, 0xb7, 0xd7, 0x60, 0x46, 0x22, 0xdd, 0xfe, 0x45,
+	0xe6, 0x9b, 0xc3, 0x82, 0xb1, 0xca, 0xbc, 0xc7, 0x95, 0xe3, 0x92, 0x0b, 0x72, 0x01, 0xe6, 0xef,
+	0x95, 0xc9, 0x8e, 0xfe, 0xd0, 0x93, 0x72, 0x85, 0x3b, 0x5b, 0xf6, 0x16, 0x5a, 0x91, 0xe0, 0x2c,
+	0xbe, 0x96, 0xde, 0xa9, 0x94, 0xe0, 0x1c, 0xf7, 0xda, 0x0b, 0x32, 0x33, 0x64, 0xbb, 0xf3, 0x5f,
+	0x01, 0x00, 0x00, 0xff, 0xff, 0x63, 0x7f, 0x37, 0xf0, 0x7a, 0x04, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -504,17 +403,17 @@ type KernelClient interface {
 	// Simple ping method to show server is "up"
 	Ping(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error)
 	// Create a new process
-	CreateProcess(ctx context.Context, in *KernelService, opts ...grpc.CallOption) (*KernelProcessId, error)
+	CreateProcess(ctx context.Context, in *Service, opts ...grpc.CallOption) (*ProcessId, error)
 	// Run a process
-	RunProcess(ctx context.Context, in *KernelProcessId, opts ...grpc.CallOption) (*empty.Empty, error)
+	RunProcess(ctx context.Context, in *ProcessId, opts ...grpc.CallOption) (*empty.Empty, error)
 	// Stop a process
-	StopProcess(ctx context.Context, in *KernelProcessId, opts ...grpc.CallOption) (*empty.Empty, error)
+	StopProcess(ctx context.Context, in *ProcessId, opts ...grpc.CallOption) (*empty.Empty, error)
 	// Return filtered list of processes
-	Processes(ctx context.Context, in *KernelProcessId, opts ...grpc.CallOption) (*KernelProcessList, error)
+	Processes(ctx context.Context, in *ProcessId, opts ...grpc.CallOption) (*KernelProcessList, error)
 	// Return list of service executables
 	Executables(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*KernelExecutableList, error)
 	// Stream filtered list of events
-	StreamEvents(ctx context.Context, in *KernelProcessId, opts ...grpc.CallOption) (Kernel_StreamEventsClient, error)
+	StreamEvents(ctx context.Context, in *ProcessId, opts ...grpc.CallOption) (Kernel_StreamEventsClient, error)
 }
 
 type kernelClient struct {
@@ -534,8 +433,8 @@ func (c *kernelClient) Ping(ctx context.Context, in *empty.Empty, opts ...grpc.C
 	return out, nil
 }
 
-func (c *kernelClient) CreateProcess(ctx context.Context, in *KernelService, opts ...grpc.CallOption) (*KernelProcessId, error) {
-	out := new(KernelProcessId)
+func (c *kernelClient) CreateProcess(ctx context.Context, in *Service, opts ...grpc.CallOption) (*ProcessId, error) {
+	out := new(ProcessId)
 	err := c.cc.Invoke(ctx, "/gaffer.Kernel/CreateProcess", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -543,7 +442,7 @@ func (c *kernelClient) CreateProcess(ctx context.Context, in *KernelService, opt
 	return out, nil
 }
 
-func (c *kernelClient) RunProcess(ctx context.Context, in *KernelProcessId, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *kernelClient) RunProcess(ctx context.Context, in *ProcessId, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/gaffer.Kernel/RunProcess", in, out, opts...)
 	if err != nil {
@@ -552,7 +451,7 @@ func (c *kernelClient) RunProcess(ctx context.Context, in *KernelProcessId, opts
 	return out, nil
 }
 
-func (c *kernelClient) StopProcess(ctx context.Context, in *KernelProcessId, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *kernelClient) StopProcess(ctx context.Context, in *ProcessId, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/gaffer.Kernel/StopProcess", in, out, opts...)
 	if err != nil {
@@ -561,7 +460,7 @@ func (c *kernelClient) StopProcess(ctx context.Context, in *KernelProcessId, opt
 	return out, nil
 }
 
-func (c *kernelClient) Processes(ctx context.Context, in *KernelProcessId, opts ...grpc.CallOption) (*KernelProcessList, error) {
+func (c *kernelClient) Processes(ctx context.Context, in *ProcessId, opts ...grpc.CallOption) (*KernelProcessList, error) {
 	out := new(KernelProcessList)
 	err := c.cc.Invoke(ctx, "/gaffer.Kernel/Processes", in, out, opts...)
 	if err != nil {
@@ -579,7 +478,7 @@ func (c *kernelClient) Executables(ctx context.Context, in *empty.Empty, opts ..
 	return out, nil
 }
 
-func (c *kernelClient) StreamEvents(ctx context.Context, in *KernelProcessId, opts ...grpc.CallOption) (Kernel_StreamEventsClient, error) {
+func (c *kernelClient) StreamEvents(ctx context.Context, in *ProcessId, opts ...grpc.CallOption) (Kernel_StreamEventsClient, error) {
 	stream, err := c.cc.NewStream(ctx, &_Kernel_serviceDesc.Streams[0], "/gaffer.Kernel/StreamEvents", opts...)
 	if err != nil {
 		return nil, err
@@ -616,17 +515,17 @@ type KernelServer interface {
 	// Simple ping method to show server is "up"
 	Ping(context.Context, *empty.Empty) (*empty.Empty, error)
 	// Create a new process
-	CreateProcess(context.Context, *KernelService) (*KernelProcessId, error)
+	CreateProcess(context.Context, *Service) (*ProcessId, error)
 	// Run a process
-	RunProcess(context.Context, *KernelProcessId) (*empty.Empty, error)
+	RunProcess(context.Context, *ProcessId) (*empty.Empty, error)
 	// Stop a process
-	StopProcess(context.Context, *KernelProcessId) (*empty.Empty, error)
+	StopProcess(context.Context, *ProcessId) (*empty.Empty, error)
 	// Return filtered list of processes
-	Processes(context.Context, *KernelProcessId) (*KernelProcessList, error)
+	Processes(context.Context, *ProcessId) (*KernelProcessList, error)
 	// Return list of service executables
 	Executables(context.Context, *empty.Empty) (*KernelExecutableList, error)
 	// Stream filtered list of events
-	StreamEvents(*KernelProcessId, Kernel_StreamEventsServer) error
+	StreamEvents(*ProcessId, Kernel_StreamEventsServer) error
 }
 
 // UnimplementedKernelServer can be embedded to have forward compatible implementations.
@@ -636,22 +535,22 @@ type UnimplementedKernelServer struct {
 func (*UnimplementedKernelServer) Ping(ctx context.Context, req *empty.Empty) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
-func (*UnimplementedKernelServer) CreateProcess(ctx context.Context, req *KernelService) (*KernelProcessId, error) {
+func (*UnimplementedKernelServer) CreateProcess(ctx context.Context, req *Service) (*ProcessId, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateProcess not implemented")
 }
-func (*UnimplementedKernelServer) RunProcess(ctx context.Context, req *KernelProcessId) (*empty.Empty, error) {
+func (*UnimplementedKernelServer) RunProcess(ctx context.Context, req *ProcessId) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RunProcess not implemented")
 }
-func (*UnimplementedKernelServer) StopProcess(ctx context.Context, req *KernelProcessId) (*empty.Empty, error) {
+func (*UnimplementedKernelServer) StopProcess(ctx context.Context, req *ProcessId) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopProcess not implemented")
 }
-func (*UnimplementedKernelServer) Processes(ctx context.Context, req *KernelProcessId) (*KernelProcessList, error) {
+func (*UnimplementedKernelServer) Processes(ctx context.Context, req *ProcessId) (*KernelProcessList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Processes not implemented")
 }
 func (*UnimplementedKernelServer) Executables(ctx context.Context, req *empty.Empty) (*KernelExecutableList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Executables not implemented")
 }
-func (*UnimplementedKernelServer) StreamEvents(req *KernelProcessId, srv Kernel_StreamEventsServer) error {
+func (*UnimplementedKernelServer) StreamEvents(req *ProcessId, srv Kernel_StreamEventsServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamEvents not implemented")
 }
 
@@ -678,7 +577,7 @@ func _Kernel_Ping_Handler(srv interface{}, ctx context.Context, dec func(interfa
 }
 
 func _Kernel_CreateProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(KernelService)
+	in := new(Service)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -690,13 +589,13 @@ func _Kernel_CreateProcess_Handler(srv interface{}, ctx context.Context, dec fun
 		FullMethod: "/gaffer.Kernel/CreateProcess",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KernelServer).CreateProcess(ctx, req.(*KernelService))
+		return srv.(KernelServer).CreateProcess(ctx, req.(*Service))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Kernel_RunProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(KernelProcessId)
+	in := new(ProcessId)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -708,13 +607,13 @@ func _Kernel_RunProcess_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/gaffer.Kernel/RunProcess",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KernelServer).RunProcess(ctx, req.(*KernelProcessId))
+		return srv.(KernelServer).RunProcess(ctx, req.(*ProcessId))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Kernel_StopProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(KernelProcessId)
+	in := new(ProcessId)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -726,13 +625,13 @@ func _Kernel_StopProcess_Handler(srv interface{}, ctx context.Context, dec func(
 		FullMethod: "/gaffer.Kernel/StopProcess",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KernelServer).StopProcess(ctx, req.(*KernelProcessId))
+		return srv.(KernelServer).StopProcess(ctx, req.(*ProcessId))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Kernel_Processes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(KernelProcessId)
+	in := new(ProcessId)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -744,7 +643,7 @@ func _Kernel_Processes_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: "/gaffer.Kernel/Processes",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KernelServer).Processes(ctx, req.(*KernelProcessId))
+		return srv.(KernelServer).Processes(ctx, req.(*ProcessId))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -768,7 +667,7 @@ func _Kernel_Executables_Handler(srv interface{}, ctx context.Context, dec func(
 }
 
 func _Kernel_StreamEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(KernelProcessId)
+	m := new(ProcessId)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

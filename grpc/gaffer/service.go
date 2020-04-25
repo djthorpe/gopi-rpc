@@ -108,11 +108,26 @@ func (this *gafferservice) String() string {
 
 func (this *gafferservice) Ping(context.Context, *empty.Empty) (*empty.Empty, error) {
 	this.Log.Debug("<Ping>")
+
 	return &empty.Empty{}, nil
 }
 
 func (this *gafferservice) Services(context.Context, *empty.Empty) (*pb.ServiceList, error) {
 	this.Log.Debug("<Services>")
-	// TODO
-	return &pb.ServiceList{}, nil
+
+	return ProtoFromServiceList(this.gaffer.Services()), nil
+}
+
+func (this *gafferservice) Update(_ context.Context, req *pb.ServiceUpdateRequest) (*pb.ServiceList, error) {
+	this.Log.Debug("<Update req=", req, ">")
+
+	if service := ProtoToService(req.Service); service == nil {
+		return nil, gopi.ErrBadParameter.WithPrefix("service")
+	} else if fields := req.Fields.Paths; len(fields) == 0 {
+		return nil, gopi.ErrBadParameter.WithPrefix("fields")
+	} else if service, err := this.gaffer.Update(service, fields); err != nil {
+		return nil, err
+	} else {
+		return ProtoFromServiceListOne(service), nil
+	}
 }

@@ -16,6 +16,7 @@ import (
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
 	"github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/genproto/protobuf/field_mask"
 
 	// Protocol buffers
 	rpc "github.com/djthorpe/gopi-rpc/v2"
@@ -163,11 +164,11 @@ func (this *kernelclient) CreateProcess(ctx context.Context, service rpc.GafferS
 	}
 }
 
-func (this *kernelclient) Processes(ctx context.Context, id, sid uint32) ([]rpc.GafferProcess, error) {
+func (this *kernelclient) Processes(ctx context.Context, id uint32) ([]rpc.GafferProcess, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	if processes, err := this.client.Processes(ctx, ProtoFromProcessId(id, sid)); err != nil {
+	if processes, err := this.client.Processes(ctx, ProtoFromProcessId(id)); err != nil {
 		return nil, err
 	} else {
 		list := make([]rpc.GafferProcess, len(processes.Process))
@@ -197,7 +198,7 @@ func (this *kernelclient) RunProcess(ctx context.Context, id uint32) error {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	if _, err := this.client.RunProcess(ctx, ProtoFromProcessId(id, 0)); err != nil {
+	if _, err := this.client.RunProcess(ctx, ProtoFromProcessId(id)); err != nil {
 		return err
 	} else {
 		return nil
@@ -208,18 +209,18 @@ func (this *kernelclient) StopProcess(ctx context.Context, id uint32) error {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	if _, err := this.client.StopProcess(ctx, ProtoFromProcessId(id, 0)); err != nil {
+	if _, err := this.client.StopProcess(ctx, ProtoFromProcessId(id)); err != nil {
 		return err
 	} else {
 		return nil
 	}
 }
 
-func (this *kernelclient) StreamEvents(ctx context.Context, id, sid uint32) error {
+func (this *kernelclient) StreamEvents(ctx context.Context, id uint32) error {
 	this.conn.Lock()
 	defer this.conn.Unlock()
 
-	stream, err := this.client.StreamEvents(ctx, ProtoFromProcessId(id, sid))
+	stream, err := this.client.StreamEvents(ctx, ProtoFromProcessId(id))
 	if err != nil {
 		return err
 	}
@@ -262,6 +263,10 @@ func (this *kernelclient) StreamEvents(ctx context.Context, id, sid uint32) erro
 ////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION rpc.GafferClient
 
+func (this *gafferclient) Mutable(service rpc.GafferService) rpc.MutableGafferService {
+	return NewMutable(service)
+}
+
 func (this *gafferclient) Ping(ctx context.Context) error {
 	this.conn.Lock()
 	defer this.conn.Unlock()
@@ -275,10 +280,35 @@ func (this *gafferclient) Ping(ctx context.Context) error {
 func (this *gafferclient) Services(ctx context.Context) ([]rpc.GafferService, error) {
 	this.conn.Lock()
 	defer this.conn.Unlock()
-	if services, err := this.client.Services(ctx, &empty.Empty{}); err != nil {
+	if services_, err := this.client.Services(ctx, &empty.Empty{}); err != nil {
 		return nil, err
 	} else {
-		fmt.Println("services=", services)
-		return nil, nil
+		services := make([]rpc.GafferService, len(services_.Service))
+		for i, pb := range services_.Service {
+			services[i] = ProtoToService(pb)
+		}
+		return services, nil
+	}
+}
+
+func (this *gafferclient) Update(ctx context.Context, service rpc.MutableGafferService) ([]rpc.GafferService, error) {
+	this.conn.Lock()
+	defer this.conn.Unlock()
+
+	if proto, ok := service.(*pbservice); ok == false {
+		return nil, gopi.ErrInternalAppError.WithPrefix("service")
+	} else if services_, err := this.client.Update(ctx, &pb.ServiceUpdateRequest{
+		Service: proto.proto,
+		Fields: &field_mask.FieldMask{
+			Paths: proto.Fields(),
+		},
+	}); err != nil {
+		return nil, err
+	} else {
+		services := make([]rpc.GafferService, len(services_.Service))
+		for i, pb := range services_.Service {
+			services[i] = ProtoToService(pb)
+		}
+		return services, nil
 	}
 }

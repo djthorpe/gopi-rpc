@@ -143,7 +143,7 @@ func (this *kernel) String() string {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// IMPLEMENTATION rpc.GafferKernel
+// IMPLEMENTATION GafferKernel
 
 func (this *kernel) CreateProcess(service rpc.GafferService) (uint32, error) {
 	this.Lock()
@@ -161,20 +161,28 @@ func (this *kernel) CreateProcessEx(id uint32, service rpc.GafferService, timeou
 
 	if _, exists := this.process[id]; exists {
 		return 0, gopi.ErrDuplicateItem.WithPrefix("id")
-	} else if path, err := this.pathForExecutable(strings.TrimSpace(service.Path)); err != nil {
+	} else if path, err := this.pathForExecutable(strings.TrimSpace(service.Path())); err != nil {
 		return 0, err
-	} else if uid, gid, err := getUserGroup(service.User, service.Group); err != nil {
+	} else if uid, gid, err := getUserGroup(service.User(), service.Group()); err != nil {
 		return 0, err
-	} else if process, err := NewProcess(id, service.Sid, service.Name, path, service.Cwd, service.Args, uid, gid, timeout); err != nil {
-		return 0, err
-	} else if _, exists := this.process[id]; exists {
-		return 0, gopi.ErrInternalAppError.WithPrefix("CreateProcessEx")
+	} else if service_ := NewService(service, 0); service_ == nil {
+		return 0, gopi.ErrBadParameter.WithPrefix("service")
 	} else {
-		this.Log.Debug("NewProcess<", process, ">")
-		// Success
-		this.process[id] = process
-		return id, nil
+		service_.path = path
+		service_.user = fmt.Sprint(uid)
+		service_.group = fmt.Sprint(gid)
+		if process, err := NewProcess(id, service_, this.root, timeout); err != nil {
+			return 0, err
+		} else if _, exists := this.process[id]; exists {
+			return 0, gopi.ErrInternalAppError.WithPrefix("CreateProcessEx")
+		} else {
+			this.Log.Debug("NewProcess<", process, ">")
+			this.process[id] = process
+		}
 	}
+
+	// Success
+	return id, nil
 }
 
 // RunProcess starts a process in NEW state
@@ -217,7 +225,7 @@ func (this *kernel) StopProcess(id uint32) error {
 func (this *kernel) Processes(id, sid uint32) []rpc.GafferProcess {
 	processes := make([]rpc.GafferProcess, 0, len(this.process))
 	for _, process := range this.process {
-		if sid != 0 && sid != process.sid {
+		if sid != 0 && sid != process.service.sid {
 			continue
 		}
 		if id != 0 && id != process.id {

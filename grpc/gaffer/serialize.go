@@ -45,33 +45,144 @@ func ProtoFromEvent(event GafferKernelEvent) *pb.KernelProcessEvent {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// SERVICE
+// SERVICE AND SERVICE LIST
 
-func ProtoToService(proto *pb.KernelService) rpc.GafferService {
-	if proto == nil {
-		return rpc.GafferService{}
-	} else {
-		return rpc.GafferService{
-			Name:  proto.GetName(),
-			Path:  proto.GetPath(),
-			Args:  proto.GetArgs(),
-			Cwd:   proto.GetCwd(),
-			User:  proto.GetUser(),
-			Group: proto.GetGroup(),
-			Sid:   proto.GetSid(),
-		}
+type pbservice struct {
+	proto  *pb.Service
+	fields map[string]bool
+}
+
+func NewMutable(service rpc.GafferService) rpc.MutableGafferService {
+	return &pbservice{
+		proto:  ProtoFromService(service),
+		fields: make(map[string]bool),
 	}
 }
 
-func ProtoFromService(service rpc.GafferService) *pb.KernelService {
-	return &pb.KernelService{
-		Name:  service.Name,
-		Path:  service.Path,
-		Args:  service.Args,
-		Cwd:   service.Cwd,
-		User:  service.User,
-		Group: service.Group,
-		Sid:   service.Sid,
+func (this *pbservice) Name() string {
+	if this.proto == nil {
+		return ""
+	} else {
+		return this.proto.Name
+	}
+}
+
+func (this *pbservice) SetName(value string) rpc.MutableGafferService {
+	this.proto.Name = value
+	this.fields["name"] = true
+	return this
+}
+
+func (this *pbservice) Sid() uint32 {
+	if this.proto == nil {
+		return 0
+	} else {
+		return this.proto.Sid
+	}
+}
+
+func (this *pbservice) Path() string {
+	if this.proto == nil {
+		return ""
+	} else {
+		return this.proto.Path
+	}
+}
+
+func (this *pbservice) Cwd() string {
+	if this.proto == nil {
+		return ""
+	} else {
+		return this.proto.Cwd
+	}
+}
+
+func (this *pbservice) Args() []string {
+	if this.proto == nil {
+		return nil
+	} else {
+		return this.proto.Args
+	}
+}
+
+func (this *pbservice) User() string {
+	if this.proto == nil {
+		return ""
+	} else {
+		return this.proto.User
+	}
+}
+
+func (this *pbservice) Group() string {
+	if this.proto == nil {
+		return ""
+	} else {
+		return this.proto.Group
+	}
+}
+
+func (this *pbservice) Enabled() bool {
+	if this.proto == nil {
+		return false
+	} else {
+		return this.proto.Enabled
+	}
+}
+
+func (this *pbservice) SetEnabled(value bool) rpc.MutableGafferService {
+	this.proto.Enabled = value
+	this.fields["enabled"] = true
+	return this
+}
+
+func (this *pbservice) String() string {
+	return "<GafferService " + fmt.Sprint(this.proto) + ">"
+}
+
+func (this *pbservice) Fields() []string {
+	fields := make([]string, 0, len(this.fields))
+	for field := range this.fields {
+		fields = append(fields, field)
+	}
+	return fields
+}
+
+func ProtoToService(proto *pb.Service) rpc.GafferService {
+	return &pbservice{proto, nil}
+}
+
+func ProtoFromService(service rpc.GafferService) *pb.Service {
+	return &pb.Service{
+		Name:    service.Name(),
+		Sid:     service.Sid(),
+		Path:    service.Path(),
+		Cwd:     service.Cwd(),
+		Args:    service.Args(),
+		User:    service.User(),
+		Group:   service.Group(),
+		Enabled: service.Enabled(),
+	}
+}
+
+func ProtoFromServiceList(services []rpc.GafferService) *pb.ServiceList {
+	if services == nil {
+		return nil
+	}
+	proto := &pb.ServiceList{
+		Service: make([]*pb.Service, len(services)),
+	}
+	for i, service := range services {
+		proto.Service[i] = ProtoFromService(service)
+	}
+	return proto
+}
+
+func ProtoFromServiceListOne(service rpc.GafferService) *pb.ServiceList {
+	if service == nil {
+		return nil
+	}
+	return &pb.ServiceList{
+		Service: []*pb.Service{ProtoFromService(service)},
 	}
 }
 
@@ -81,7 +192,7 @@ func ProtoFromService(service rpc.GafferService) *pb.KernelService {
 func ProtoFromProcess(process rpc.GafferProcess) *pb.KernelProcess {
 	service := process.Service()
 	return &pb.KernelProcess{
-		Id:      ProtoFromProcessId(process.Id(), service.Sid),
+		Id:      ProtoFromProcessId(process.Id()),
 		State:   pb.KernelProcess_State(process.State()),
 		Service: ProtoFromService(service),
 	}
@@ -131,9 +242,9 @@ func (this *protoProcess) Id() uint32 {
 
 func (this *protoProcess) Service() rpc.GafferService {
 	if this.pb == nil {
-		return rpc.GafferService{}
+		return nil
 	} else {
-		return ProtoToService(this.pb.GetService())
+		return ProtoToService(this.pb.Service)
 	}
 }
 
@@ -152,6 +263,6 @@ func (this *protoProcess) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // PROCESS ID
 
-func ProtoFromProcessId(id, sid uint32) *pb.KernelProcessId {
-	return &pb.KernelProcessId{Id: id, Sid: sid}
+func ProtoFromProcessId(id uint32) *pb.ProcessId {
+	return &pb.ProcessId{Id: id}
 }

@@ -24,17 +24,12 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-type Service struct {
-	rpc.GafferService
-	Enabled bool
-	flag    bool
-}
-
 type services struct {
 	sync.Mutex
-	Log      gopi.Logger
-	services map[uint32]*Service
-	user     *user.User
+	Log     gopi.Logger
+	service map[uint32]*service
+	flag    map[uint32]bool
+	user    *user.User
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +41,7 @@ func (this *services) Init(config Gaffer, log gopi.Logger) error {
 
 	// Set parameters
 	this.Log = log
-	this.services = make(map[uint32]*Service)
+	this.service = make(map[uint32]*service)
 
 	// Set user and group
 	if user, err := user.Current(); err != nil {
@@ -60,6 +55,9 @@ func (this *services) Init(config Gaffer, log gopi.Logger) error {
 }
 
 func (this *services) Close() error {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
 	// Release resources
 	this.Log = nil
 
@@ -68,48 +66,98 @@ func (this *services) Close() error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// AND AND DISABLE SERVICES
+// IMPLEMENTATION
 
-func (this *services) List() []*Service {
-	services := make([]*Service, 0, len(this.services))
-	for _, service := range this.services {
+func (this *services) Services() []rpc.GafferService {
+	services := make([]rpc.GafferService, 0, len(this.service))
+	for _, service := range this.service {
 		services = append(services, service)
 	}
 	return services
 }
 
-func (this *services) Modify(executables []string) bool {
+func (this *services) Update(src rpc.GafferService, fields []string) (rpc.GafferService, error) {
+	if src == nil {
+		return nil, gopi.ErrBadParameter.WithPrefix("service")
+	} else if len(fields) == 0 {
+		return nil, gopi.ErrBadParameter.WithPrefix("fields")
+	}
+
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
+	// Retrieve a service by ID
+	if service, exists := this.service[src.Sid()]; exists == false {
+		return nil, gopi.ErrNotFound.WithPrefix("sid")
+	} else {
+		// Create a copy
+		dst := NewService(service, service.instances)
+		modified := false
+		for _, field := range fields {
+			switch field {
+			case "enabled":
+				if src.Enabled() != dst.enabled {
+					dst.enabled = src.Enabled()
+					modified = true
+				}
+			case "name":
+				if dst.IsValidName(src.Name()) == false {
+					return nil, gopi.ErrBadParameter.WithPrefix("name")
+				}
+				if src.Name() != dst.name {
+					dst.name = src.Name()
+					modified = true
+				}
+			default:
+				return nil, gopi.ErrBadParameter.WithPrefix(field)
+			}
+		}
+
+		// Nothing modified
+		if modified == false {
+			return nil, rpc.ERROR_NOT_MODIFIED
+		}
+
+		// Commit the transaction, return success
+		this.service[src.Sid()] = dst
+		return dst, nil
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// AND AND DISABLE SERVICES
+
+func (this *services) modify(executables []string) bool {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
 	// Modified is set to true if new service executable is added
 	// or a service executable is removed
 	modified := false
+	flag := make(map[uint32]bool, len(this.service))
 
-	// Set flag to false on all services
-	for _, s := range this.services {
-		s.flag = false
-	}
 	// Iterate services
 	for _, exec := range executables {
 		if services := this.servicesWithPath(exec); len(services) > 0 {
 			for _, service := range services {
-				service.flag = true
+				flag[service.sid] = true
 			}
 		} else if service := this.add(exec); service == nil {
 			this.Log.Warn("Unable to add service", strconv.Quote(exec))
 		} else {
 			this.Log.Info("Added:", service)
-			service.flag = true
+			flag[service.sid] = true
 			modified = true
 		}
 	}
 	// If any flags are still false, then this service should be disabled
-	for _, service := range this.services {
-		if service.flag == false && service.Enabled == true {
-			this.Log.Info("TODO: Disable service:", service)
-			service.Enabled = false
-			modified = true
+	for _, service := range this.service {
+		if _, exists := flag[service.sid]; exists == false {
+			if service.enabled == true {
+				this.Log.Info("TODO: Disable service:", service)
+				service.enabled = false
+				modified = true
+			}
 		}
 	}
 
@@ -117,19 +165,22 @@ func (this *services) Modify(executables []string) bool {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// SERVICE IMPLEMENTATION
+
+////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
-func (this *services) servicesWithPath(path string) []*Service {
-	services := make([]*Service, 0)
-	for _, service := range this.services {
-		if service.Path == path {
+func (this *services) servicesWithPath(path string) []*service {
+	services := make([]*service, 0)
+	for _, service := range this.service {
+		if service.path == path {
 			services = append(services, service)
 		}
 	}
 	return services
 }
 
-func (this *services) add(executable string) *Service {
+func (this *services) add(executable string) *service {
 	// Obtain a new Session ID
 	sid := this.newId()
 	if sid == 0 {
@@ -137,18 +188,15 @@ func (this *services) add(executable string) *Service {
 	}
 
 	// Add a new service from an executable
-	service := &Service{
-		GafferService: rpc.GafferService{
-			Name:  filepath.Base(executable),
-			Path:  executable,
-			Cwd:   this.user.HomeDir,
-			User:  this.user.Uid,
-			Group: this.user.Gid,
-			Sid:   sid,
-		},
-		Enabled: false,
+	service := &service{
+		name:  filepath.Base(executable),
+		sid:   sid,
+		path:  executable,
+		cwd:   this.user.HomeDir,
+		user:  this.user.Uid,
+		group: this.user.Gid,
 	}
-	this.services[sid] = service
+	this.service[sid] = service
 
 	// Return the service
 	return service
@@ -161,7 +209,7 @@ func (this *services) newId() uint32 {
 	mod := uint32(64)
 	for i := 0; i < 25; i++ {
 		rand := uint32(rand.Int31()) % mod
-		if _, exists := this.services[rand]; exists == false && rand > 0 {
+		if _, exists := this.service[rand]; exists == false && rand > 0 {
 			return rand
 		} else {
 			mod <<= 1

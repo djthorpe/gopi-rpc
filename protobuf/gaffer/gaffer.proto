@@ -1,0 +1,32 @@
+/*
+  Go Language Raspberry Pi Interface
+  (c) Copyright David Thorpe 2016-2020
+  All Rights Reserved
+  For Licensing and Usage information, please see LICENSE.md
+*/
+
+syntax = "proto3";
+package gaffer;
+
+// Import dependencies
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "gaffer/service.proto";
+
+// The Gaffer service definition
+service Gaffer {
+  // Simple ping method to show server is "up"
+  rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // Return services
+  rpc Services(google.protobuf.Empty) returns (ServiceList);
+
+  // Update a service
+  rpc Update(ServiceUpdateRequest) returns (ServiceList);
+}
+
+// Update a service
+message ServiceUpdateRequest {
+  Service service = 1;    // The service and fields to update
+  google.protobuf.FieldMask fields = 2; // The fields to update. Valid fields to update are name, cwd, args, user, group and enabled
+}

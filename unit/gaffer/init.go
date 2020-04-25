@@ -36,11 +36,13 @@ func init() {
 		Requires: []string{"clientpool"},
 		Config: func(app gopi.App) error {
 			app.Flags().FlagString("kernel.sock", "", "Unix socket connection to kernel")
+			app.Flags().FlagString("gaffer.state", "", "Folder for storing state")
 			return nil
 		},
 		New: func(app gopi.App) (gopi.Unit, error) {
 			return gopi.New(Gaffer{
 				Fifo:       app.Flags().GetString("kernel.sock", gopi.FLAG_NS_DEFAULT),
+				State:      app.Flags().GetString("gaffer.state", gopi.FLAG_NS_DEFAULT),
 				Clientpool: app.UnitInstance("clientpool").(gopi.RPCClientPool),
 			}, app.Log().Clone(Gaffer{}.Name()))
 		},

@@ -26,6 +26,7 @@ type Gaffer struct {
 	gopi.Config
 	Fifo       string             // Location for the UNIX socket
 	Clientpool gopi.RPCClientPool // Clientpool to create connnections and stubs
+	State      string             // Folder for storing state information
 }
 
 type gaffer struct {
@@ -33,6 +34,7 @@ type gaffer struct {
 	sync.Mutex
 	sync.WaitGroup
 	services
+	processes
 
 	kernel1, kernel2 rpc.GafferKernelStub // Kernel clients
 	stop             chan struct{}        // stop service signal
@@ -65,12 +67,15 @@ func (config Gaffer) New(log gopi.Logger) (gopi.Unit, error) {
 	if err := this.services.Init(config, log); err != nil {
 		return nil, err
 	}
+	if err := this.processes.Init(config, log); err != nil {
+		return nil, err
+	}
 
 	// Stream all events from the kernel on the second channel
 	ctx, cancel := context.WithCancel(context.Background())
 	this.cancel = cancel
 	go func() {
-		if err := this.kernel2.StreamEvents(ctx, 0, 0); err != nil {
+		if err := this.kernel2.StreamEvents(ctx, 0); err != nil {
 			this.Unit.Log.Error(fmt.Errorf("StreamEvents: %w", err))
 		}
 	}()
@@ -124,6 +129,11 @@ func (this *gaffer) Close() error {
 	this.kernel2 = nil
 	this.stop = nil
 
+	// Close Processes
+	if err := this.processes.Close(); err != nil {
+		return err
+	}
+
 	// Close Services
 	if err := this.services.Close(); err != nil {
 		return err
@@ -141,20 +151,13 @@ func (this *gaffer) String() string {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// IMPLEMENTATION
-
-func (this *gaffer) Services() []rpc.GafferService {
-	return nil
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // BACKGROUND PROCESS
 
 func (this *gaffer) BackgroundProcess() {
 	this.WaitGroup.Add(1)
 	defer this.WaitGroup.Done()
 
-	// ticker to discover new services
+	// ticker to discover new services and processes
 	ticker1 := time.NewTimer(100 * time.Millisecond)
 	ticker2 := time.NewTimer(time.Second)
 
@@ -198,18 +201,17 @@ func (this *gaffer) discoverServices() (bool, error) {
 	if executables, err := this.kernel1.Executables(ctx); err != nil {
 		return false, err
 	} else {
-		return this.services.Modify(executables), nil
+		return this.services.modify(executables), nil
 	}
 }
 
 func (this *gaffer) discoverProcesses() (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if processes, err := this.kernel1.Processes(ctx, 0, 0); err != nil {
+	if processes, err := this.kernel1.Processes(ctx, 0); err != nil {
 		return false, err
 	} else {
-		fmt.Println("Processes=", processes)
-		return false, nil
+		return this.processes.modify(processes), nil
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 // TYPES
 
 type GafferState uint
+type Error uint
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERFACES
@@ -28,40 +29,29 @@ type Gaffer interface {
 
 	// Return services
 	Services() []GafferService
+
+	// Update a service
+	Update(GafferService, []string) (GafferService, error)
 }
 
-// GafferKernel operations
-type GafferKernel interface {
-	gopi.PubSub
-
-	// CreateProcess creates a new process, which is ready to run and returns
-	// a unique id for that process
-	CreateProcess(GafferService) (uint32, error)
-
-	// RunProcess starts a process in NEW state
-	RunProcess(uint32) error
-
-	// StopProcess kills a process in RUNNING state
-	StopProcess(uint32) error
-
-	// Processes returns a list of running processes, filtered optionally by
-	// process id and service id, both can be zero for 'any'
-	Processes(uint32, uint32) []GafferProcess
-
-	// Return a list of executables under the gaffer root, or returns
-	// an empty list if the gaffer root is not defined. When argument
-	// is set to true, then recurse into subfolders
-	Executables(bool) []string
+// GafferService represents a service which may or may not be running
+type GafferService interface {
+	Name() string
+	Sid() uint32
+	Path() string
+	Cwd() string
+	Args() []string
+	User() string
+	Group() string
+	Enabled() bool
 }
 
-// GafferService represents a service to be run
-type GafferService struct {
-	Name        string   // Name of the service
-	Path        string   // Path represents the path to the executable
-	Cwd         string   // Working directory on execution
-	User, Group string   // User and group for process
-	Args        []string // Process arguments
-	Sid         uint32   // Service ID
+// MutableGafferService represents a service which can have fields updated
+type MutableGafferService interface {
+	GafferService
+
+	SetEnabled(bool) MutableGafferService
+	SetName(string) MutableGafferService
 }
 
 // GafferProcess represents a running process
@@ -71,7 +61,7 @@ type GafferProcess interface {
 	State() GafferState
 }
 
-// GafferKernelClient represents a connection to a remote kernel service
+// GafferKernelStub represents a connection to a remote kernel service
 type GafferKernelStub interface {
 	gopi.RPCClientStub
 
@@ -89,24 +79,30 @@ type GafferKernelStub interface {
 	StopProcess(context.Context, uint32) error
 
 	// Processes returns a filtered set of processes
-	Processes(context.Context, uint32, uint32) ([]GafferProcess, error)
+	Processes(context.Context, uint32) ([]GafferProcess, error)
 
 	// Executables returns the set of executable service names
 	Executables(context.Context) ([]string, error)
 
 	// Stream events until cancelled, using a filter
-	StreamEvents(context.Context, uint32, uint32) error
+	StreamEvents(context.Context, uint32) error
 }
 
 // GafferClientStub represents a connection to a remote gaffer service
 type GafferClientStub interface {
 	gopi.RPCClientStub
 
+	// Make a mutable service
+	Mutable(GafferService) MutableGafferService
+
 	// Ping returns without error if the remote service is running
 	Ping(context.Context) error
 
 	// Services returns a list of services registered
 	Services(context.Context) ([]GafferService, error)
+
+	// Update a service name, cwd, args, user, group or enabled field
+	Update(context.Context, MutableGafferService) ([]GafferService, error)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -120,6 +116,11 @@ const (
 	GAFFER_STATE_STOPPED
 	GAFFER_STATE_STDOUT
 	GAFFER_STATE_STDERR
+)
+
+const (
+	ERROR_NONE Error = iota
+	ERROR_NOT_MODIFIED
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -143,5 +144,16 @@ func (s GafferState) String() string {
 		return "GAFFER_STATE_STDERR"
 	default:
 		return "[?? Invalid GafferStatus value]"
+	}
+}
+
+func (e Error) Error() string {
+	switch e {
+	case ERROR_NONE:
+		return "No Error"
+	case ERROR_NOT_MODIFIED:
+		return "Not Modified"
+	default:
+		return "[?? Invalid Error value]"
 	}
 }

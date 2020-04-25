@@ -13,7 +13,8 @@ import (
 	"time"
 
 	// Frameworks
-	rpc "github.com/djthorpe/gopi-rpc/v2"
+
+	gaffer "github.com/djthorpe/gopi-rpc/v2/unit/gaffer"
 	grpc "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
@@ -28,7 +29,7 @@ import (
 
 type KernelService struct {
 	Server gopi.RPCServer
-	Kernel rpc.GafferKernel
+	Kernel gaffer.GafferKernel
 }
 
 type kernelservice struct {
@@ -36,7 +37,7 @@ type kernelservice struct {
 	base.PubSub
 
 	server gopi.RPCServer
-	kernel rpc.GafferKernel
+	kernel gaffer.GafferKernel
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -121,22 +122,22 @@ func (this *kernelservice) Ping(context.Context, *empty.Empty) (*empty.Empty, er
 	return &empty.Empty{}, nil
 }
 
-func (this *kernelservice) CreateProcess(_ context.Context, pb *pb.KernelService) (*pb.KernelProcessId, error) {
+func (this *kernelservice) CreateProcess(_ context.Context, pb *pb.Service) (*pb.ProcessId, error) {
 	this.Log.Debug("<CreateProcess service=[", pb, "]>")
 
-	if service := ProtoToService(pb); service.Path == "" {
+	if service := ProtoToService(pb); service.Path() == "" {
 		return nil, gopi.ErrBadParameter
 	} else if pid, err := this.kernel.CreateProcess(service); err != nil {
 		return nil, err
 	} else {
-		return ProtoFromProcessId(pid, service.Sid), nil
+		return ProtoFromProcessId(pid), nil
 	}
 }
 
-func (this *kernelservice) Processes(_ context.Context, pb *pb.KernelProcessId) (*pb.KernelProcessList, error) {
+func (this *kernelservice) Processes(_ context.Context, pb *pb.ProcessId) (*pb.KernelProcessList, error) {
 	this.Log.Debug("<Processes filter=[", pb, "]>")
 
-	processes := this.kernel.Processes(pb.Id, pb.Sid)
+	processes := this.kernel.Processes(pb.Id, 0)
 	return ProtoFromProcessList(processes), nil
 }
 
@@ -147,19 +148,19 @@ func (this *kernelservice) Executables(context.Context, *empty.Empty) (*pb.Kerne
 	return ProtoFromExecutablesList(executables), nil
 }
 
-func (this *kernelservice) RunProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
+func (this *kernelservice) RunProcess(_ context.Context, pb *pb.ProcessId) (*empty.Empty, error) {
 	this.Log.Debug("<RunProcess id=", pb.GetId(), ">")
 
 	return &empty.Empty{}, this.kernel.RunProcess(pb.GetId())
 }
 
-func (this *kernelservice) StopProcess(_ context.Context, pb *pb.KernelProcessId) (*empty.Empty, error) {
+func (this *kernelservice) StopProcess(_ context.Context, pb *pb.ProcessId) (*empty.Empty, error) {
 	this.Log.Debug("<StopProcess id=", pb.GetId, ">")
 
 	return &empty.Empty{}, this.kernel.StopProcess(pb.GetId())
 }
 
-func (this *kernelservice) StreamEvents(filter *pb.KernelProcessId, stream pb.Kernel_StreamEventsServer) error {
+func (this *kernelservice) StreamEvents(filter *pb.ProcessId, stream pb.Kernel_StreamEventsServer) error {
 	this.Log.Debug("<StreamEvents filter=[", filter, "]>")
 
 	// Subscribe to cancels and send an empty message once a second
@@ -213,7 +214,7 @@ FOR_LOOP:
 	return nil
 }
 
-func (this *kernelservice) applyFilter(filter *pb.KernelProcessId, event GafferKernelEvent) bool {
+func (this *kernelservice) applyFilter(filter *pb.ProcessId, event GafferKernelEvent) bool {
 	// Never allow filters on process 0
 	if event.Process().Id() == 0 {
 		this.Log.Debug(event)
@@ -221,9 +222,6 @@ func (this *kernelservice) applyFilter(filter *pb.KernelProcessId, event GafferK
 	}
 	// Doesn't match unless the Id is zero or equal to the process id
 	if filter.Id != 0 && filter.Id != event.Process().Id() {
-		return false
-	}
-	if filter.Sid != 0 && filter.Sid != event.Process().Service().Sid {
 		return false
 	}
 	// Matches
