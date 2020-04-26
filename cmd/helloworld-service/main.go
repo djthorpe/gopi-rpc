@@ -21,6 +21,7 @@ import (
 	_ "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
 	_ "github.com/djthorpe/gopi/v2/unit/bus"
 	_ "github.com/djthorpe/gopi/v2/unit/logger"
+	_ "github.com/djthorpe/gopi/v2/unit/mdns"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +40,7 @@ func Main(app gopi.App, args []string) error {
 // BOOTSTRAP
 
 func main() {
-	if app, err := app.NewServer(Main, "rpc/helloworld/service"); err != nil {
+	if app, err := app.NewServer(Main, "rpc/helloworld/service", "register"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
 		// Run and exit

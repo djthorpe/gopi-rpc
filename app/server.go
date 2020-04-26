@@ -12,6 +12,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,7 +30,8 @@ type server struct {
 	base.App
 	sync.WaitGroup
 
-	main gopi.MainCommandFunc
+	main   gopi.MainCommandFunc
+	cancel context.CancelFunc
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -146,10 +148,60 @@ func (this *server) RPCEventHandler(_ context.Context, _ gopi.App, evt gopi.Even
 		server := rpcEvent.Source().(gopi.RPCServer)
 		this.WaitGroup.Add(1)
 		this.Log().Debug("Server started", server.Addr())
-		// TODO: Register service
+		if register := this.ServiceRegister(); register != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			if record, err := this.ServiceRecord(server); err != nil {
+				this.Log().Error(err)
+				cancel()
+			} else if record.Name != "" {
+				this.Log().Debug("Register", record)
+				go register.Register(ctx, record)
+				this.cancel = cancel
+			} else {
+				cancel()
+			}
+		}
 	case gopi.RPC_EVENT_SERVER_STOPPED:
-		// TODO: Unregister service
+		// Cancel registration
+		if this.cancel != nil {
+			this.cancel()
+		}
+		// Stop server
 		this.Log().Debug("Server stopped")
 		this.WaitGroup.Done()
+	}
+}
+
+func (this *server) ServiceRecord(server gopi.RPCServer) (gopi.RPCServiceRecord, error) {
+	record := gopi.RPCServiceRecord{
+		Name: "helloworld",
+	}
+	if hostname, err := os.Hostname(); err != nil {
+		return record, err
+	} else {
+		record.Host = hostname
+	}
+	switch addr := server.Addr().(type) {
+	case *net.UDPAddr:
+		record.Addrs = []net.IP{addr.IP}
+		record.Port = uint16(addr.Port)
+		record.Service = "_gopi._udp"
+	case *net.TCPAddr:
+		record.Addrs = []net.IP{addr.IP}
+		record.Port = uint16(addr.Port)
+		record.Service = "_gopi._tcp"
+	default:
+		return record, gopi.ErrBadParameter.WithPrefix("addr")
+	}
+	return record, nil
+}
+
+func (this *server) ServiceRegister() gopi.RPCServiceRegister {
+	if register_ := this.UnitInstance("register"); register_ == nil {
+		return nil
+	} else if register, ok := register_.(gopi.RPCServiceRegister); ok {
+		return register
+	} else {
+		return nil
 	}
 }
