@@ -122,6 +122,13 @@ func (this *services) Update(src rpc.GafferService, fields []string) (rpc.Gaffer
 					dst.name = src.Name()
 					modified = true
 				}
+			case "args":
+				if src.Enabled() {
+					return nil, rpc.ERROR_IMMUTABLE_PARAMETER.WithPrefix("args")
+				} else {
+					dst.args = src.Args()
+					modified = true
+				}
 			default:
 				return nil, gopi.ErrBadParameter.WithPrefix(field)
 			}

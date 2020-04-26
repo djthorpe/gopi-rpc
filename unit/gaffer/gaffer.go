@@ -71,14 +71,8 @@ func (config Gaffer) New(log gopi.Logger) (gopi.Unit, error) {
 		return nil, err
 	}
 
-	// Stream all events from the kernel on the second channel
-	ctx, cancel := context.WithCancel(context.Background())
-	this.cancel = cancel
-	go func() {
-		if err := this.kernel2.StreamEvents(ctx, 0); err != nil {
-			this.Unit.Log.Error(fmt.Errorf("StreamEvents: %w", err))
-		}
-	}()
+	// Streaming Events
+	go this.StreamEvents()
 
 	// Background orchestrator
 	go this.BackgroundProcess()
@@ -161,6 +155,8 @@ func (this *gaffer) Start(ctx context.Context, sid uint32) (rpc.GafferProcess, e
 		return nil, rpc.ERROR_NOT_ENABLED
 	} else if pid, err := this.kernel1.CreateProcess(ctx, service); err != nil {
 		return nil, err
+	} else if err := this.kernel1.RunProcess(ctx, pid); err != nil {
+		return nil, err
 	} else if process, err := this.kernel1.Processes(ctx, pid); err != nil {
 		return nil, err
 	} else if len(process) != 1 {
@@ -172,6 +168,21 @@ func (this *gaffer) Start(ctx context.Context, sid uint32) (rpc.GafferProcess, e
 
 ////////////////////////////////////////////////////////////////////////////////
 // BACKGROUND PROCESS
+
+func (this *gaffer) StreamEvents() {
+	this.WaitGroup.Add(1)
+	defer this.WaitGroup.Done()
+
+	this.Unit.Log.Debug("StreamEvents: Started")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	this.cancel = cancel
+	if err := this.kernel2.StreamEvents(ctx, 0); err != nil {
+		this.Unit.Log.Error(fmt.Errorf("StreamEvents: %w", err))
+	}
+
+	this.Unit.Log.Debug("StreamEvents: Ended")
+}
 
 func (this *gaffer) BackgroundProcess() {
 	this.WaitGroup.Add(1)

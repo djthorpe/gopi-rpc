@@ -30,6 +30,7 @@ service Gaffer {
 
 // Update a service
 message ServiceUpdateRequest {
-  Service service = 1;    // The service and fields to update
-  google.protobuf.FieldMask fields = 2; // The fields to update. Valid fields to update are name, cwd, args, user, group and enabled
+  Service service = 1;                  // The service and fields to update
+  google.protobuf.FieldMask fields = 2; // The fields to update. Valid fields to 
+                                        // update are name, cwd, args, user, group and enabled
 }

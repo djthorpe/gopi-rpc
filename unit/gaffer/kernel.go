@@ -254,6 +254,8 @@ func (this *kernel) Executables(recursive bool) []string {
 			// Trim prefix
 			sep := string(filepath.Separator)
 			path := strings.TrimPrefix(strings.TrimPrefix(path, this.root), sep)
+			// Ensure it starts with a "/"
+			path = filepath.Clean(filepath.Join("/", path))
 			// Append
 			executables = append(executables, path)
 		}

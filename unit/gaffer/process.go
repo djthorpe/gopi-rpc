@@ -132,7 +132,7 @@ func NewProcess(id uint32, service *service, root string, timeout time.Duration)
 
 	// Set service path
 	if this.root != "" {
-		this.service.path = relativePath(this.root, this.service.path)
+		this.service.path = relativePath(this.service.path, this.root)
 	}
 
 	// Set deadline
@@ -315,11 +315,15 @@ func ctxForTimeout(timeout time.Duration) (context.Context, context.CancelFunc) 
 }
 
 func relativePath(abs, root string) string {
-	if root == "" {
-		return abs
-	} else if rel, err := filepath.Rel(root, abs); err == nil {
-		return rel
-	} else {
-		return abs
+	innerRelpath := func(abs, root string) string {
+		if root == "" {
+			return abs
+		} else if rel, err := filepath.Rel(root, abs); err == nil {
+			return rel
+		} else {
+			return abs
+		}
 	}
+	// Ensure it starts with a "/"
+	return filepath.Clean(filepath.Join("/", innerRelpath(abs, root)))
 }

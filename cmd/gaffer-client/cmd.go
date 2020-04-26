@@ -49,6 +49,7 @@ var (
 		&Command{"enable", "Enable service by Name or Id", EnableService},
 		&Command{"disable", "Disable service by Name or Id", DisableService},
 		&Command{"rename", "Rename service by Name or Id", RenameService},
+		&Command{"args", "Set service arguments", SetServiceArguments},
 		&Command{"start", "Start a service instamce by Name or Id", StartService},
 	}
 )
@@ -225,6 +226,29 @@ func StartService(app gopi.App, cmd *Runnable) (bool, error) {
 	if service, err := cmd.LookupService(cmd.args[0]); err != nil {
 		return false, err
 	} else if services, err := cmd.stub.Start(ctx, service.Sid()); err != nil {
+		return false, err
+	} else {
+		PrintServiceTable(app, cmd, []rpc.GafferService{services})
+	}
+
+	// Return success
+	return false, nil
+}
+
+func SetServiceArguments(app gopi.App, cmd *Runnable) (bool, error) {
+	// Check arguments
+	if len(cmd.args) < 1 {
+		return false, gopi.ErrBadParameter
+	}
+
+	// Create running context
+	ctx, cancel := context.WithTimeout(context.Background(), RPC_TIMEOUT)
+	defer cancel()
+
+	// Return service
+	if service, err := cmd.LookupService(cmd.args[0]); err != nil {
+		return false, err
+	} else if services, err := cmd.stub.Update(ctx, cmd.stub.Mutable(service).SetArgs(cmd.args[1:])); err != nil {
 		return false, err
 	} else {
 		PrintServiceTable(app, cmd, []rpc.GafferService{services})

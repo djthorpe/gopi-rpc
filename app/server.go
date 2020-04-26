@@ -99,7 +99,7 @@ func (this *server) Run() int {
 			return -1
 		} else {
 			services = append(services, instance)
-			this.Log().Debug("Service", instance)
+			this.Log().Debug("Run: Service", instance)
 		}
 	}
 
@@ -113,9 +113,11 @@ func (this *server) Run() int {
 
 		// Send cancels
 		for _, service := range services {
+			this.Log().Debug("Run: Sending cancel request to", service)
 			if err := service.CancelRequests(); err != nil {
 				fmt.Fprintf(os.Stderr, "  %s\n", err)
 			}
+			this.Log().Debug("Run: Finished sending cancel request to", service)
 		}
 
 		// Stop server gracefully
@@ -129,7 +131,9 @@ func (this *server) Run() int {
 	}
 
 	// Wait for main to end and for server to be stopped
+	this.Log().Debug("Run: Waiting for server to stop")
 	this.WaitGroup.Wait()
+	this.Log().Debug("Run: Server stopped")
 
 	// Success
 	return 0

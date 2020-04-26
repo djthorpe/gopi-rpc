@@ -9,6 +9,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
@@ -53,8 +54,9 @@ type GafferService interface {
 type MutableGafferService interface {
 	GafferService
 
-	SetEnabled(bool) MutableGafferService
 	SetName(string) MutableGafferService
+	SetArgs(value []string) MutableGafferService
+	SetEnabled(bool) MutableGafferService
 }
 
 // GafferProcess represents a running process
@@ -128,6 +130,7 @@ const (
 	ERROR_NONE Error = iota
 	ERROR_NOT_MODIFIED
 	ERROR_NOT_ENABLED
+	ERROR_IMMUTABLE_PARAMETER
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -162,7 +165,13 @@ func (e Error) Error() string {
 		return "Not Modified"
 	case ERROR_NOT_ENABLED:
 		return "Not Enabled"
+	case ERROR_IMMUTABLE_PARAMETER:
+		return "Trying to edit immutable parameter"
 	default:
 		return "[?? Invalid Error value]"
 	}
+}
+
+func (e Error) WithPrefix(prefix string) error {
+	return fmt.Errorf("%s: %w", prefix, e)
 }

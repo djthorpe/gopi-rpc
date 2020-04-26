@@ -105,6 +105,12 @@ func (this *pbservice) Args() []string {
 	}
 }
 
+func (this *pbservice) SetArgs(value []string) rpc.MutableGafferService {
+	this.proto.Args = value
+	this.fields["args"] = true
+	return this
+}
+
 func (this *pbservice) User() string {
 	if this.proto == nil {
 		return ""

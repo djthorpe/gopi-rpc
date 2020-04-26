@@ -10,10 +10,12 @@ package gaffer
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	// Frameworks
 
+	rpc "github.com/djthorpe/gopi-rpc/v2"
 	gaffer "github.com/djthorpe/gopi-rpc/v2/unit/gaffer"
 	grpc "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
 	gopi "github.com/djthorpe/gopi/v2"
@@ -36,8 +38,9 @@ type kernelservice struct {
 	base.Unit
 	base.PubSub
 
-	server gopi.RPCServer
-	kernel gaffer.GafferKernel
+	server     gopi.RPCServer
+	kernel     gaffer.GafferKernel
+	cancelling atomic.Value
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -72,6 +75,9 @@ func (this *kernelservice) Init(config KernelService) error {
 		this.kernel = config.Kernel
 	}
 
+	// Set cancelling to false
+	this.cancelling.Store(false)
+
 	// Register with server
 	pb.RegisterKernelServer(this.server.(grpc.GRPCServer).GRPCServer(), this)
 
@@ -96,11 +102,83 @@ func (this *kernelservice) Close() error {
 // IMPLEMENTATION gopi.RPCService
 
 func (this *kernelservice) CancelRequests() error {
+	this.Log.Debug("<CancelRequests>")
+
+	// Flag that we are cancelling
+	this.cancelling.Store(true)
+
+	// Send stop signal all running processes except for process zero
+	this.Log.Debug("<CancelRequests CancelProcesses>")
+	this.CancelProcesses(context.Background())
+
 	// Send a NullEvent on the PubSub channel to indicate end
+	this.Log.Debug("<CancelRequests Emit>")
 	this.PubSub.Emit(gopi.NullEvent)
+
+	this.Log.Debug("<CancelRequests done>")
 
 	// Return success
 	return nil
+}
+
+func (this *kernelservice) CancelProcesses(ctx context.Context) error {
+
+	// Stop processes which are running
+	var root rpc.GafferProcess
+	for _, process := range this.kernel.Processes(0, 0) {
+		if process.Id() == 0 {
+			root = process
+			continue
+		} else if process.State() == rpc.GAFFER_STATE_RUNNING {
+			this.Log.Debug("<CancelProcesses stopping", process.Id())
+			if err := this.kernel.StopProcess(process.Id()); err != nil {
+				this.Log.Error(fmt.Errorf("CancelProcess: %v: %w", process.Id(), err))
+			}
+		}
+	}
+
+	// Wait for all processes the end, or deadline exceeded
+	ticker := time.NewTimer(100 * time.Millisecond)
+FOR_LOOP:
+	for {
+		select {
+		case <-ticker.C:
+			if processesRunning(this.kernel.Processes(0, 0)) {
+				ticker.Reset(500 * time.Millisecond)
+			} else {
+				ticker.Stop()
+				break FOR_LOOP
+			}
+		case <-ctx.Done():
+			ticker.Stop()
+			return ctx.Err()
+		}
+	}
+
+	// Cancel root process
+	if root != nil && root.State() == rpc.GAFFER_STATE_RUNNING {
+		if err := this.kernel.StopProcess(root.Id()); err != nil {
+			this.Log.Error(fmt.Errorf("CancelProcess: %v: %w", root.Id(), err))
+		}
+	}
+
+	// Return success
+	return nil
+}
+
+// processesRunning returns true if all processes are either new or stopped
+// (ie, not running)
+func processesRunning(processes []rpc.GafferProcess) bool {
+	for _, process := range processes {
+		if process.Id() == 0 {
+			continue
+		}
+		if process.State() != rpc.GAFFER_STATE_STOPPED && process.State() != rpc.GAFFER_STATE_NEW {
+			fmt.Println("<CancelProcesses still running", process.Id())
+			return true
+		}
+	}
+	return false
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -124,6 +202,10 @@ func (this *kernelservice) Ping(context.Context, *empty.Empty) (*empty.Empty, er
 
 func (this *kernelservice) CreateProcess(_ context.Context, pb *pb.Service) (*pb.ProcessId, error) {
 	this.Log.Debug("<CreateProcess service=", pb, ">")
+
+	if cancelling := this.cancelling.Load().(bool); cancelling {
+		return nil, gopi.ErrOutOfOrder
+	}
 
 	if service := ProtoToService(pb); service.Path() == "" {
 		return nil, gopi.ErrBadParameter
@@ -151,17 +233,29 @@ func (this *kernelservice) Executables(context.Context, *empty.Empty) (*pb.Kerne
 func (this *kernelservice) RunProcess(_ context.Context, pb *pb.ProcessId) (*empty.Empty, error) {
 	this.Log.Debug("<RunProcess id=", pb.GetId(), ">")
 
+	if cancelling := this.cancelling.Load().(bool); cancelling {
+		return nil, gopi.ErrOutOfOrder
+	}
+
 	return &empty.Empty{}, this.kernel.RunProcess(pb.GetId())
 }
 
 func (this *kernelservice) StopProcess(_ context.Context, pb *pb.ProcessId) (*empty.Empty, error) {
 	this.Log.Debug("<StopProcess id=", pb.GetId, ">")
 
+	if cancelling := this.cancelling.Load().(bool); cancelling {
+		return nil, gopi.ErrOutOfOrder
+	}
+
 	return &empty.Empty{}, this.kernel.StopProcess(pb.GetId())
 }
 
 func (this *kernelservice) StreamEvents(filter *pb.ProcessId, stream pb.Kernel_StreamEventsServer) error {
 	this.Log.Debug("<StreamEvents filter=[", filter, "]>")
+
+	if cancelling := this.cancelling.Load().(bool); cancelling {
+		return gopi.ErrOutOfOrder
+	}
 
 	// Subscribe to cancels and send an empty message once a second
 	cancel := this.PubSub.Subscribe()
@@ -173,7 +267,16 @@ func (this *kernelservice) StreamEvents(filter *pb.ProcessId, stream pb.Kernel_S
 	// Repeat until stream is canceled by server or client
 FOR_LOOP:
 	for {
+		this.Log.Debug("StreamEvents: FOR_LOOP")
 		select {
+		case <-cancel:
+			this.Log.Debug("StreamEvents: Cancel called")
+			// Stop ticker, unsubscribe from events
+			ticker.Stop()
+			this.kernel.Unsubscribe(msgs)
+			this.PubSub.Unsubscribe(cancel)
+			// Break loop
+			break FOR_LOOP
 		case msg := <-msgs:
 			if event, ok := msg.(GafferKernelEvent); ok {
 				if this.applyFilter(filter, event) {
@@ -193,18 +296,6 @@ FOR_LOOP:
 				}
 				break FOR_LOOP
 			}
-		case <-cancel:
-			this.Log.Debug("StreamEvents: Cancel called")
-			// Stop ticker, unsubscribe from events
-			this.Log.Debug("StreamEvents: Stop ticker")
-			ticker.Stop()
-			this.Log.Debug("StreamEvents: K unsub")
-			this.kernel.Unsubscribe(msgs)
-			this.Log.Debug("StreamEvents: C unsub")
-			this.PubSub.Unsubscribe(cancel)
-			this.Log.Debug("StreamEvents: break")
-			// Break loop
-			break FOR_LOOP
 		}
 	}
 
