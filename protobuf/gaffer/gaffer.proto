@@ -6,7 +6,9 @@
 */
 
 syntax = "proto3";
+
 package gaffer;
+option go_package = "github.com/djthorpe/gopi-rpc/v2/protobuf/gaffer";
 
 // Import dependencies
 import "google/protobuf/empty.proto";

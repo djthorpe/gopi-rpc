@@ -6,7 +6,9 @@
 */
 
 syntax = "proto3";
+
 package gaffer;
+option go_package = "github.com/djthorpe/gopi-rpc/v2/protobuf/gaffer";
 
 // A service definition is used to start one or more processes
 message Service {
