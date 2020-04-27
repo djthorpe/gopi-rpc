@@ -71,8 +71,10 @@ func (this *event) TTL() time.Duration {
 // STRINGIFY
 
 func (this *event) String() string {
-	return "<" + this.Name() +
-		" type=" + fmt.Sprint(this.type_) +
-		" service=" + fmt.Sprint(this.Service()) +
-		">"
+	str := "<" + this.Name()
+	str += " type=" + fmt.Sprint(this.type_)
+	if this.Service().Name != "" {
+		str += " service=" + fmt.Sprint(this.Service())
+	}
+	return str + ">"
 }

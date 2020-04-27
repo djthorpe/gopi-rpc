@@ -141,7 +141,7 @@ func (this *server) Run() int {
 	return 0
 }
 
-func (this *server) RPCEventHandler(_ context.Context, _ gopi.App, evt gopi.Event) {
+func (this *server) RPCEventHandler(_ context.Context, app gopi.App, evt gopi.Event) {
 	rpcEvent := evt.(gopi.RPCEvent)
 	switch rpcEvent.Type() {
 	case gopi.RPC_EVENT_SERVER_STARTED:
@@ -150,7 +150,7 @@ func (this *server) RPCEventHandler(_ context.Context, _ gopi.App, evt gopi.Even
 		this.Log().Debug("Server started", server.Addr())
 		if register := this.ServiceRegister(); register != nil {
 			ctx, cancel := context.WithCancel(context.Background())
-			if record, err := this.ServiceRecord(server); err != nil {
+			if record, err := this.ServiceRecord(app, server); err != nil {
 				this.Log().Error(err)
 				cancel()
 			} else if record.Name != "" {
@@ -172,24 +172,31 @@ func (this *server) RPCEventHandler(_ context.Context, _ gopi.App, evt gopi.Even
 	}
 }
 
-func (this *server) ServiceRecord(server gopi.RPCServer) (gopi.RPCServiceRecord, error) {
+func (this *server) ServiceRecord(app gopi.App, server gopi.RPCServer) (gopi.RPCServiceRecord, error) {
 	record := gopi.RPCServiceRecord{
-		Name: "helloworld",
+		Txt: make([]string, 0),
 	}
-	if hostname, err := os.Hostname(); err != nil {
-		return record, err
-	} else {
-		record.Host = hostname
-	}
+	app.Flags().Visit(gopi.FLAG_NS_SERVICE, func(name string, value interface{}) {
+		switch name {
+		case "name":
+			record.Name = fmt.Sprint(value)
+		case "host":
+			record.Host = fmt.Sprint(value)
+		case "service":
+			record.Service = fmt.Sprint(value)
+		default:
+			record.Txt = append(record.Txt, "%v=%v", name, fmt.Sprint(value))
+		}
+	})
 	switch addr := server.Addr().(type) {
-	case *net.UDPAddr:
-		record.Addrs = []net.IP{addr.IP}
-		record.Port = uint16(addr.Port)
-		record.Service = "_gopi._udp"
 	case *net.TCPAddr:
 		record.Addrs = []net.IP{addr.IP}
 		record.Port = uint16(addr.Port)
-		record.Service = "_gopi._tcp"
+		record.Service = fmt.Sprintf("_%v._tcp", record.Service)
+	case *net.UDPAddr:
+		record.Addrs = []net.IP{addr.IP}
+		record.Port = uint16(addr.Port)
+		record.Service = fmt.Sprintf("_%v._udp", record.Service)
 	default:
 		return record, gopi.ErrBadParameter.WithPrefix("addr")
 	}
